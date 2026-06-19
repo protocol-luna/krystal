@@ -30,10 +30,25 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
 });
 
+const pendingRequests = new Set<string>();
+
+function pendingKey(channelId: string, userId: string): string {
+	return `${channelId}:${userId}`;
+}
+
 async function triggerLunaReply(
 	message: Eris.Message,
 	isDM = false
 ): Promise<void> {
+	const key = pendingKey(message.channel.id, message.author.id);
+	if (pendingRequests.has(key)) {
+		console.log(
+			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: ignoré (déjà une requête en cours)`
+		);
+		return;
+	}
+	pendingRequests.add(key);
+
 	let typingInterval: ReturnType<typeof setInterval> | null = null;
 	const startTyping = () => {
 		client.sendChannelTyping(message.channel.id);
@@ -107,6 +122,7 @@ async function triggerLunaReply(
 			})
 			.then(() => markBotActivity(message.channel.id));
 	} finally {
+		pendingRequests.delete(key);
 		if (typingInterval) {
 			clearInterval(typingInterval);
 		}

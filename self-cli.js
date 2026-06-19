@@ -775,7 +775,19 @@ function shouldSendVoice() {
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
 });
+var pendingRequests = /* @__PURE__ */ new Set();
+function pendingKey(channelId, userId) {
+  return `${channelId}:${userId}`;
+}
 async function triggerLunaReply(message, isDM = false) {
+  const key = pendingKey(message.channel.id, message.author.id);
+  if (pendingRequests.has(key)) {
+    console.log(
+      `[bot] #${message.channel.name ?? message.channel.id} ${message.author.username}: ignor\xE9 (d\xE9j\xE0 une requ\xEAte en cours)`
+    );
+    return;
+  }
+  pendingRequests.add(key);
   let typingInterval = null;
   const startTyping = () => {
     client.sendChannelTyping(message.channel.id);
@@ -831,6 +843,7 @@ async function triggerLunaReply(message, isDM = false) {
       } : {}
     }).then(() => markBotActivity(message.channel.id));
   } finally {
+    pendingRequests.delete(key);
     if (typingInterval) {
       clearInterval(typingInterval);
     }
