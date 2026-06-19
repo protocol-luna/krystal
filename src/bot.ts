@@ -1,5 +1,5 @@
 import * as Eris from "eris";
-import { DISCORD_TOKEN } from "./config.js";
+import { DISCORD_TOKEN, pickReplyStyle } from "./config.js";
 import { askLLM, resetLLM } from "./llm.js";
 import { evaluateMessage, isFollowUpMessage, clearCooldown, type TriggerResult } from "./trigger.js";
 
@@ -23,6 +23,8 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     }, 8000);
   };
 
+  const style = pickReplyStyle();
+
   try {
     const content = message.content
       .replace(new RegExp(`<@!?${client.user.id}>`, "g"), "")
@@ -40,8 +42,9 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
           sendChain = sendChain.then(() =>
             client.createMessage(message.channel.id, {
               content: chunk,
-              messageReference: { messageID: message.id },
-              allowedMentions: { repliedUser: false },
+              ...(style.messageReference
+                ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
+                : {}),
             }),
           );
         },
@@ -54,7 +57,9 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
-      messageReference: { messageID: message.id },
+      ...(style.messageReference
+        ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
+        : {}),
     });
   }
 }

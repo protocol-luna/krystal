@@ -40,6 +40,23 @@ var keywords = [
 var randomChance = 0.015;
 var cooldownSeconds = 8;
 var replyInDM = true;
+var replyStyles = [
+  { style: { messageReference: true, mentionRepliedUser: false }, weight: 50 },
+  { style: { messageReference: true, mentionRepliedUser: true }, weight: 15 },
+  { style: { messageReference: false, mentionRepliedUser: false }, weight: 30 },
+  { style: { messageReference: false, mentionRepliedUser: true }, weight: 5 }
+];
+function pickReplyStyle() {
+  const total = replyStyles.reduce((s, e) => s + e.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of replyStyles) {
+    roll -= entry.weight;
+    if (roll <= 0) {
+      return entry.style;
+    }
+  }
+  return replyStyles[0].style;
+}
 var llamaArgs = [
   "-m",
   LLAMA_MODEL_PATH,
@@ -291,6 +308,7 @@ async function triggerLunaReply(message) {
       client.sendChannelTyping(message.channel.id);
     }, 8e3);
   };
+  const style = pickReplyStyle();
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
@@ -303,8 +321,7 @@ async function triggerLunaReply(message) {
           sendChain = sendChain.then(
             () => client.createMessage(message.channel.id, {
               content: chunk,
-              messageReference: { messageID: message.id },
-              allowedMentions: { repliedUser: false }
+              ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
             })
           );
         }
@@ -318,7 +335,7 @@ async function triggerLunaReply(message) {
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${err.message}`,
-      messageReference: { messageID: message.id }
+      ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
     });
   }
 }

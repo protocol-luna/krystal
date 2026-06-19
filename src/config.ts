@@ -44,6 +44,29 @@ export const cooldownSeconds = 8;
 
 export const replyInDM = true;
 
+// --- REPLY STYLE ---
+export interface ReplyStyle {
+  messageReference: boolean;
+  mentionRepliedUser: boolean;
+}
+
+const replyStyles: { style: ReplyStyle; weight: number }[] = [
+  { style: { messageReference: true,  mentionRepliedUser: false }, weight: 50 },
+  { style: { messageReference: true,  mentionRepliedUser: true  }, weight: 15 },
+  { style: { messageReference: false, mentionRepliedUser: false }, weight: 30 },
+  { style: { messageReference: false, mentionRepliedUser: true  }, weight: 5  },
+];
+
+export function pickReplyStyle(): ReplyStyle {
+  const total = replyStyles.reduce((s, e) => s + e.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of replyStyles) {
+    roll -= entry.weight;
+    if (roll <= 0) { return entry.style; }
+  }
+  return replyStyles[0].style;
+}
+
 export const llamaArgs = [
   "-m", LLAMA_MODEL_PATH,
   "-t", "4", "-tb", "4",
