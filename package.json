@@ -1,0 +1,14 @@
+{
+  "name": "discord-llm-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "discord.js-selfbot-v13": "^3.7.1",
+    "dotenv": "^16.4.5",
+    "eris": "^0.18.0"
+  }
+}
