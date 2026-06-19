@@ -82,7 +82,7 @@ var spontaneousContextMessages = v(
 );
 var voiceMessageChance = v("voice_message_chance", 0.08);
 var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
-var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper/piper");
+var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
 var rawStyles = v("reply_styles", [
   { message_reference: true, mention_replied_user: false, weight: 50 },
   { message_reference: true, mention_replied_user: true, weight: 15 },

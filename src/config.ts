@@ -111,7 +111,7 @@ export const ttsModelPath: string =
 	join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 
 export const ttsBinaryPath: string =
-	process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper/piper");
+	process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
 
 // --- Reply style ---
 export interface ReplyStyle {
