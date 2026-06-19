@@ -254,7 +254,7 @@ function askLLM(userMessage, callbacks) {
     void processQueue();
   });
 }
-createServer((req, res) => {
+createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   if (req.method === "POST" && url.pathname === "/ask") {
     let body = "";
@@ -302,6 +302,18 @@ createServer((req, res) => {
     currentOnDone = null;
     stdoutBuffer = "";
     llama.stdin.write("/clear\n");
+    await new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 5e3);
+      const listener = (data) => {
+        const str = data.toString();
+        if (str.includes("\n> ") || str.endsWith("> ")) {
+          clearTimeout(timeout);
+          llama.stdout.off("data", listener);
+          resolve();
+        }
+      };
+      llama.stdout.on("data", listener);
+    });
     res.writeHead(200, { "Access-Control-Allow-Origin": "*" });
     res.end("ok");
     return;

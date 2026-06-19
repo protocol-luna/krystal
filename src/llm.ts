@@ -166,11 +166,23 @@ export function isLLMBusy(): boolean {
 	return isProcessing || requestQueue.length > 0;
 }
 
-export function resetLLM(): void {
+export async function resetLLM(): Promise<void> {
 	requestQueue.length = 0;
 	isProcessing = false;
 	currentOnChunk = null;
 	currentOnDone = null;
 	stdoutBuffer = "";
 	llama.stdin!.write("/clear\n");
+	await new Promise<void>((resolve) => {
+		const timeout = setTimeout(resolve, 5_000);
+		const listener = (data: Buffer) => {
+			const str = data.toString();
+			if (str.includes("\n> ") || str.endsWith("> ")) {
+				clearTimeout(timeout);
+				llama.stdout!.off("data", listener);
+				resolve();
+			}
+		};
+		llama.stdout!.on("data", listener);
+	});
 }
