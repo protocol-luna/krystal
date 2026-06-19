@@ -1,7 +1,7 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN, pickReplyStyle, spontaneousIntervalMs, spontaneousChance } from "./config.js";
 import { askLLM, resetLLM } from "./llm-client.js";
-import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, type TriggerResult } from "./trigger.js";
+import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, trackSpeaker, canFollowUp, setPaused, type TriggerResult } from "./trigger.js";
 import { trySpawn } from "./spontaneous.js";
 import { computeDelay, shouldIgnore, shouldReact, pickReaction } from "./mannerisms.js";
 
@@ -55,7 +55,6 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
 
     await sendChain;
   } catch (err) {
-    if (typingInterval) { clearInterval(typingInterval); }
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
@@ -63,6 +62,8 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
         ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
         : {}),
     }).then(() => markBotActivity(message.channel.id));
+  } finally {
+    if (typingInterval) { clearInterval(typingInterval); }
   }
 }
 
@@ -71,6 +72,10 @@ client.on("ready", () => {
 });
 
 client.on("messageCreate", async (message: Eris.Message) => {
+  if (message.author.id === client.user.id) { return; }
+
+  trackSpeaker(message.channel.id, message.author.id);
+
   // Cancel any pending follow-up timer for this channel
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id)!);
@@ -83,11 +88,27 @@ client.on("messageCreate", async (message: Eris.Message) => {
     client.user.username,
   );
 
+  if (result.reason === "stop") {
+    console.log("Commande -stop reçue.");
+    await resetLLM();
+    clearCooldown(message.channel.id);
+    setPaused(true);
+    await client.createMessage(message.channel.id, "⏸️  Bot mis en pause. Envoie `-start` pour réactiver.");
+    return;
+  }
+
+  if (result.reason === "start") {
+    console.log("Commande -start reçue.");
+    setPaused(false);
+    await client.createMessage(message.channel.id, "▶️  Bot réactivé !");
+    return;
+  }
+
   if (result.reason === "clear") {
     console.log("Commande -clear reçue.");
     await resetLLM();
     clearCooldown(message.channel.id);
-    await client.createMessage(message.channel.id, "Historique et mémoire effacés !");
+    await client.createMessage(message.channel.id, "🧹  Historique et mémoire effacés !");
     return;
   }
 
@@ -110,9 +131,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
     return;
   }
 
-  // Follow-up: if the bot sent a message recently in this channel,
-  // the user might be continuing the conversation
-  if (isRecentBotActivity(message.channel.id)) {
+  // Follow-up: only if bot was the last speaker and is within the response budget
+  if (canFollowUp(message.channel.id, client.user.id)) {
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
       const followUp = evaluateMessage(message, client.user.id, client.user.username, true);

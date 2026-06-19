@@ -3,10 +3,25 @@ import { randomChance, names, keywords, cooldownSeconds, replyInDM } from "./con
 
 const channelCooldowns = new Map<string, number>();
 const botActivity = new Map<string, number>();
+const lastSpeaker = new Map<string, string>();
+const responseCount = new Map<string, number>();
+
+const MAX_FOLLOWUPS = 3;
+const FOLLOWUP_WINDOW = 60_000;
+
+let paused = false;
+
+export function isPaused(): boolean {
+  return paused;
+}
+
+export function setPaused(v: boolean): void {
+  paused = v;
+}
 
 export interface TriggerResult {
   shouldRespond: boolean;
-  reason: "mention" | "dm" | "name" | "keyword" | "random" | "follow-up" | "clear" | null;
+  reason: "mention" | "dm" | "name" | "keyword" | "random" | "follow-up" | "clear" | "stop" | "start" | null;
   botName: string;
 }
 
@@ -20,6 +35,12 @@ function markReplied(channelId: string): void {
   const now = Date.now();
   channelCooldowns.set(channelId, now);
   botActivity.set(channelId, now);
+  const count = responseCount.get(channelId) ?? 0;
+  responseCount.set(channelId, count + 1);
+  setTimeout(() => {
+    const c = responseCount.get(channelId) ?? 1;
+    responseCount.set(channelId, Math.max(0, c - 1));
+  }, FOLLOWUP_WINDOW);
 }
 
 export function markBotActivity(channelId: string): void {
@@ -32,6 +53,23 @@ export function isRecentBotActivity(channelId: string, windowMs = 15000): boolea
   return Date.now() - last < windowMs;
 }
 
+export function trackSpeaker(channelId: string, authorId: string): string | undefined {
+  const previous = lastSpeaker.get(channelId);
+  lastSpeaker.set(channelId, authorId);
+  return previous;
+}
+
+export function canFollowUp(channelId: string, botId: string): boolean {
+  if (!isRecentBotActivity(channelId)) { return false; }
+  if (lastSpeaker.get(channelId) !== botId) { return false; }
+  const count = responseCount.get(channelId) ?? 0;
+  return count < MAX_FOLLOWUPS;
+}
+
+export function isInConversation(channelId: string, botId: string): boolean {
+  return isRecentBotActivity(channelId) && lastSpeaker.get(channelId) === botId;
+}
+
 export function evaluateMessage(
   message: Eris.Message,
   botId: string,
@@ -42,12 +80,24 @@ export function evaluateMessage(
     return { shouldRespond: false, reason: null, botName: "" };
   }
 
+  if (message.content === "-stop") {
+    return { shouldRespond: true, reason: "stop", botName: "" };
+  }
+
+  if (message.content === "-start") {
+    return { shouldRespond: true, reason: "start", botName: "" };
+  }
+
   if (message.content === "-clear") {
     return { shouldRespond: true, reason: "clear", botName: "" };
   }
 
   const isMe = botId === message.author.id;
   if (isMe) {
+    return { shouldRespond: false, reason: null, botName: "" };
+  }
+
+  if (paused) {
     return { shouldRespond: false, reason: null, botName: "" };
   }
 
@@ -113,4 +163,6 @@ export function evaluateMessage(
 export function clearCooldown(channelId: string): void {
   channelCooldowns.delete(channelId);
   botActivity.delete(channelId);
+  responseCount.delete(channelId);
+  lastSpeaker.delete(channelId);
 }
