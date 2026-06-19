@@ -11,7 +11,9 @@ function loadSystemPrompt() {
   try {
     return readFileSync(promptPath, "utf-8").trim();
   } catch {
-    console.warn(`prompt.txt introuvable (${promptPath}), fallback sur prompt par d\xE9faut.`);
+    console.warn(
+      `prompt.txt introuvable (${promptPath}), fallback sur prompt par d\xE9faut.`
+    );
     return "Your name is Luna. You are playful 21 year old girl";
   }
 }
@@ -213,11 +215,16 @@ function canFollowUp(channelId, botId) {
   const speaker = lastSpeaker.get(channelId);
   const count = responseCount.get(channelId) ?? 0;
   const ok = recent && speaker === botId && count < MAX_FOLLOWUPS;
-  log(channelId, `canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : speaker?.slice(0, 6) ?? "?"} followCount=${count})`);
+  log(
+    channelId,
+    `canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : speaker?.slice(0, 6) ?? "?"} followCount=${count})`
+  );
   return ok;
 }
 function hasWord(text, word) {
-  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text);
+  return new RegExp(
+    `\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`
+  ).test(text);
 }
 function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   const channelId = message.channel.id;
@@ -270,20 +277,29 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
     return { shouldRespond: false, reason: null, botName };
   }
   if (hasWord(contentLower, botName.toLowerCase())) {
-    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (bot:${botName})`);
+    log(
+      channelId,
+      `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (bot:${botName})`
+    );
     markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
   }
   for (const name of names) {
     if (hasWord(contentLower, name.toLowerCase())) {
-      log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (custom:${name})`);
+      log(
+        channelId,
+        `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (custom:${name})`
+      );
       markReplied(channelId);
       return { shouldRespond: true, reason: "name", botName };
     }
   }
   for (const keyword of keywords) {
     if (hasWord(contentLower, keyword.toLowerCase())) {
-      log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 keyword (${keyword})`);
+      log(
+        channelId,
+        `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 keyword (${keyword})`
+      );
       markReplied(channelId);
       return { shouldRespond: true, reason: "keyword", botName };
     }
@@ -329,11 +345,16 @@ function findMostActiveChannel(guild) {
 
 // src/spontaneous.ts
 function pickWeightedGuild(client2) {
-  const guilds = [...client2.guilds.values()].filter((g) => [...g.channels.values()].some((c) => isTextChannel(c)));
+  const guilds = [...client2.guilds.values()].filter(
+    (g) => [...g.channels.values()].some((c) => isTextChannel(c))
+  );
   if (guilds.length === 0) {
     return null;
   }
-  const ranked = guilds.map((g) => ({ guild: g, lastID: findMostActiveChannel(g)?.lastMessageID ?? "0" })).sort((a, b) => b.lastID.localeCompare(a.lastID));
+  const ranked = guilds.map((g) => ({
+    guild: g,
+    lastID: findMostActiveChannel(g)?.lastMessageID ?? "0"
+  })).sort((a, b) => b.lastID.localeCompare(a.lastID));
   const total = ranked.length * (ranked.length + 1) / 2;
   let roll = Math.random() * total;
   for (let i = 0; i < ranked.length; i++) {
@@ -391,7 +412,9 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
   if (reply.trim()) {
     await client2.createMessage(channel.id, { content: reply.trim() });
     markBotActivity(channel.id);
-    console.log(`[spontaneous] #${channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`);
+    console.log(
+      `[spontaneous] #${channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`
+    );
   } else {
     console.log(`[spontaneous] #${channel.name} : r\xE9ponse vide`);
   }
@@ -411,7 +434,9 @@ function shouldIgnore(reason) {
   }
   const roll = Math.random();
   const ignored = roll < chance;
-  console.log(`[mannerisms] ignore=${ignored} (roll=${roll.toFixed(3)} < chance=${chance})`);
+  console.log(
+    `[mannerisms] ignore=${ignored} (roll=${roll.toFixed(3)} < chance=${chance})`
+  );
   return ignored;
 }
 function shouldReact() {
@@ -421,7 +446,9 @@ function shouldReact() {
   }
   const roll = Math.random();
   const react = roll < reactionChance;
-  console.log(`[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${reactionChance})`);
+  console.log(
+    `[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${reactionChance})`
+  );
   return react;
 }
 function pickReaction(customEmojis) {
@@ -437,12 +464,7 @@ function pickReaction(customEmojis) {
 
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
-  intents: [
-    "guilds",
-    "guildMessages",
-    "messageContent",
-    "directMessages"
-  ]
+  intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
 });
 async function triggerLunaReply(message, isDM = false) {
   let typingInterval = null;
@@ -454,7 +476,9 @@ async function triggerLunaReply(message, isDM = false) {
   };
   const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
   const refStyle = isDM ? { messageReference: false, mentionRepliedUser: false } : style;
-  console.log(`[bot] replyStyle: messageReference=${refStyle.messageReference} mentionRepliedUser=${refStyle.mentionRepliedUser}`);
+  console.log(
+    `[bot] replyStyle: messageReference=${refStyle.messageReference} mentionRepliedUser=${refStyle.mentionRepliedUser}`
+  );
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
@@ -468,7 +492,12 @@ async function triggerLunaReply(message, isDM = false) {
           sendChain = sendChain.then(
             () => client.createMessage(message.channel.id, {
               content: chunk,
-              ...isFirstChunk && refStyle.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: refStyle.mentionRepliedUser } } : {}
+              ...isFirstChunk && refStyle.messageReference ? {
+                messageReference: { messageID: message.id },
+                allowedMentions: {
+                  repliedUser: refStyle.mentionRepliedUser
+                }
+              } : {}
             }).then(() => {
               isFirstChunk = false;
               markBotActivity(message.channel.id);
@@ -483,7 +512,10 @@ async function triggerLunaReply(message, isDM = false) {
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${err.message}`,
-      ...refStyle.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
+      ...refStyle.messageReference ? {
+        messageReference: { messageID: message.id },
+        allowedMentions: { repliedUser: style.mentionRepliedUser }
+      } : {}
     }).then(() => markBotActivity(message.channel.id));
   } finally {
     if (typingInterval) {
@@ -492,7 +524,9 @@ async function triggerLunaReply(message, isDM = false) {
   }
 }
 client.on("ready", () => {
-  console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
+  console.log(
+    `Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`
+  );
 });
 client.on("error", (err) => {
   console.error("[eris] error:", err.message);
@@ -510,36 +544,52 @@ client.on("messageCreate", async (message) => {
     client.user.username
   );
   if (result.reason === "stop") {
-    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -stop \u2192 pause`);
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: -stop \u2192 pause`
+    );
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
     setPaused(true);
-    await client.createMessage(message.channel.id, "\u23F8\uFE0F  Bot mis en pause. Envoie `-start` pour r\xE9activer.");
+    await client.createMessage(
+      message.channel.id,
+      "\u23F8\uFE0F  Bot mis en pause. Envoie `-start` pour r\xE9activer."
+    );
     return;
   }
   if (result.reason === "start") {
-    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -start \u2192 reprise`);
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: -start \u2192 reprise`
+    );
     setPaused(false);
     await client.createMessage(message.channel.id, "\u25B6\uFE0F  Bot r\xE9activ\xE9 !");
     return;
   }
   if (result.reason === "clear") {
-    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -clear \u2192 reset`);
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: -clear \u2192 reset`
+    );
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
-    await client.createMessage(message.channel.id, "\u{1F9F9}  Historique et m\xE9moire effac\xE9s !");
+    await client.createMessage(
+      message.channel.id,
+      "\u{1F9F9}  Historique et m\xE9moire effac\xE9s !"
+    );
     return;
   }
   if (result.shouldRespond) {
     trackSpeaker(message.channel.id, message.author.id);
     if (shouldIgnore(result.reason)) {
-      console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: ignor\xE9 (${result.reason})`);
+      console.log(
+        `[bot] #${channel.name ?? message.channel.id} ${author}: ignor\xE9 (${result.reason})`
+      );
       return;
     }
     const delay = computeDelay();
-    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`);
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`
+    );
     await new Promise((r) => setTimeout(r, delay));
     if (shouldReact()) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
@@ -553,7 +603,9 @@ client.on("messageCreate", async (message) => {
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
     markReplied(message.channel.id);
-    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: follow-up imm\xE9diat`);
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: follow-up imm\xE9diat`
+    );
     await new Promise((r) => setTimeout(r, computeDelay()));
     if (shouldReact()) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
