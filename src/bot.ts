@@ -1,6 +1,7 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN } from "./config.js";
 import { askLLM, resetLLM } from "./llm.js";
+import { detectTrigger } from "./detect.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -70,14 +71,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
     messageWait.delete(message.channel.id);
   }
 
-  const isMentioned = message.mentions.some((u) => u.id === client.user.id);
-  const isDM = message.channel.type === 1;
-  const guild = (message.channel as Eris.GuildTextableChannel).guild;
-  const botMember = guild?.members?.get(client.user.id);
-  const botName = botMember?.nick || client.user.username;
-  const hasBotName = message.content.toLowerCase().includes(botName.toLowerCase());
-  const hasPixie = message.content.toLowerCase().includes("pixie");
-  const isMe = client.user.id === message.author.id;
+  const { isMentioned, isDM, hasBotName, hasPixie, isMe } = detectTrigger(
+    message,
+    client.user.id,
+    client.user.username,
+  );
 
   if (message.content === "-clear") {
     console.log("Commande -clear reçue.");

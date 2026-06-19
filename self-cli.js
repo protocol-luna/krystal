@@ -182,6 +182,19 @@ function resetLLM() {
   llama.stdin.write("/clear\n");
 }
 
+// src/detect.ts
+function detectTrigger(message, botId, botUsername) {
+  const isMentioned = message.mentions.some((u) => u.id === botId);
+  const isDM = message.channel.type === 1;
+  const guild = message.channel.guild;
+  const botMember = guild?.members?.get(botId);
+  const botName = botMember?.nick || botUsername;
+  const hasBotName = message.content.toLowerCase().includes(botName.toLowerCase());
+  const hasPixie = message.content.toLowerCase().includes("pixie");
+  const isMe = botId === message.author.id;
+  return { isMentioned, isDM, botName, hasBotName, hasPixie, isMe };
+}
+
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -242,14 +255,11 @@ client.on("messageCreate", async (message) => {
     clearTimeout(messageWait.get(message.channel.id));
     messageWait.delete(message.channel.id);
   }
-  const isMentioned = message.mentions.some((u) => u.id === client.user.id);
-  const isDM = message.channel.type === 1;
-  const guild = message.channel.guild;
-  const botMember = guild?.members?.get(client.user.id);
-  const botName = botMember?.nick || client.user.username;
-  const hasBotName = message.content.toLowerCase().includes(botName.toLowerCase());
-  const hasPixie = message.content.toLowerCase().includes("pixie");
-  const isMe = client.user.id === message.author.id;
+  const { isMentioned, isDM, hasBotName, hasPixie, isMe } = detectTrigger(
+    message,
+    client.user.id,
+    client.user.username
+  );
   if (message.content === "-clear") {
     console.log("Commande -clear re\xE7ue.");
     resetLLM();
