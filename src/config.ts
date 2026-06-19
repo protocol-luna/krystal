@@ -54,9 +54,15 @@ export const jinjaTemplate =
 // --- Triggers ---
 export const names: string[] = v<string[]>("names", ["Luna", "Pixie"]);
 export const keywords: string[] = v<string[]>("keywords", [
-	"hello", "hi", "hey", "yo",
-	"help", "question",
-	"ai", "llm", "bot",
+	"hello",
+	"hi",
+	"hey",
+	"yo",
+	"help",
+	"question",
+	"ai",
+	"llm",
+	"bot",
 ]);
 export const randomChance = v<number>("random_chance", 0.015);
 export const cooldownSeconds = v<number>("cooldown_seconds", 8);
@@ -70,14 +76,42 @@ export const ignoreChance = v<number>("ignore_chance", 0.08);
 export const ignoreChanceMention = v<number>("ignore_chance_mention", 0);
 export const serverEmojiChance = v<number>("server_emoji_chance", 0.3);
 export const reactions: string[] = v<string[]>("reactions", [
-	"👀", "😄", "🤔", "👋", "🔥", "💀", "✨",
-	"😭", "🤨", "👌", "🙏", "💅", "🗿", "🌚",
+	"👀",
+	"😄",
+	"🤔",
+	"👋",
+	"🔥",
+	"💀",
+	"✨",
+	"😭",
+	"🤨",
+	"👌",
+	"🙏",
+	"💅",
+	"🗿",
+	"🌚",
 ]);
 
 // --- Spontaneous ---
-export const spontaneousIntervalMs = v<number>("spontaneous_interval_ms", 300_000);
+export const spontaneousIntervalMs = v<number>(
+	"spontaneous_interval_ms",
+	300_000
+);
 export const spontaneousChance = v<number>("spontaneous_chance", 0.12);
-export const spontaneousContextMessages = v<number>("spontaneous_context_messages", 5);
+export const spontaneousContextMessages = v<number>(
+	"spontaneous_context_messages",
+	5
+);
+
+// --- TTS / Voice messages ---
+export const voiceMessageChance = v<number>("voice_message_chance", 0.08);
+
+export const ttsModelPath: string =
+	process.env.TTS_MODEL_PATH ??
+	join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
+
+export const ttsBinaryPath: string =
+	process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper/piper");
 
 // --- Reply style ---
 export interface ReplyStyle {
@@ -92,10 +126,10 @@ interface ReplyStyleEntry {
 }
 
 const rawStyles = v<ReplyStyleEntry[]>("reply_styles", [
-	{ message_reference: true,  mention_replied_user: false, weight: 50 },
-	{ message_reference: true,  mention_replied_user: true,  weight: 15 },
+	{ message_reference: true, mention_replied_user: false, weight: 50 },
+	{ message_reference: true, mention_replied_user: true, weight: 15 },
 	{ message_reference: false, mention_replied_user: false, weight: 30 },
-	{ message_reference: false, mention_replied_user: true,  weight: 5  },
+	{ message_reference: false, mention_replied_user: true, weight: 5 },
 ]);
 
 const replyStyles: { style: ReplyStyle; weight: number }[] = rawStyles.map(
@@ -105,7 +139,7 @@ const replyStyles: { style: ReplyStyle; weight: number }[] = rawStyles.map(
 			mentionRepliedUser: s.mention_replied_user,
 		},
 		weight: s.weight,
-	}),
+	})
 );
 
 export function pickReplyStyle(isActiveConversation: boolean): ReplyStyle {
@@ -137,25 +171,42 @@ import { cpus } from "node:os";
 const cpuCount = cpus().length;
 
 export const llamaArgs = [
-	"-m", LLAMA_MODEL_PATH,
-	"-t", String(cpuCount),
-	"-tb", String(cpuCount),
-	"-b", "4096",
-	"-ub", "256",
-	"--mlock","-c",
-	"4096", "-cnv",
+	"-m",
+	LLAMA_MODEL_PATH,
+	"-t",
+	String(cpuCount),
+	"-tb",
+	String(cpuCount),
+	"-b",
+	"4096",
+	"-ub",
+	"256",
+	"--mlock",
+	"-c",
+	"4096",
+	"-cnv",
 	"--simple-io",
 
-	"--temp", "0.75",
-	"--dynatemp-range", "0.15",
-	"--top-k", "40",
-	"--top-p", "0.95",
-	"--min-p", "0.05",
+	"--temp",
+	"0.75",
+	"--dynatemp-range",
+	"0.15",
+	"--top-k",
+	"40",
+	"--top-p",
+	"0.95",
+	"--min-p",
+	"0.05",
 
-	"--repeat-penalty", "1.12", 
-  "--repeat-last-n", "256",
-  "--presence-penalty", "0.1",
+	"--repeat-penalty",
+	"1.12",
+	"--repeat-last-n",
+	"256",
+	"--presence-penalty",
+	"0.1",
 
-	"-sys", SYSTEM_PROMPT,
-	"--chat-template", jinjaTemplate,
+	"-sys",
+	SYSTEM_PROMPT,
+	"--chat-template",
+	jinjaTemplate,
 ];

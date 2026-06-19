@@ -52,6 +52,9 @@ spontaneous_interval_ms: 300000     # 5 min
 spontaneous_chance: 0.12
 spontaneous_context_messages: 5
 
+# --- TTS / Voice messages ---
+voice_message_chance: 0.08
+
 # --- Reply styles (poids en pourcentage) ---
 reply_styles:
   - message_reference: true

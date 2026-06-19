@@ -24,6 +24,7 @@ import {
 	shouldReact,
 	pickReaction,
 } from "./mannerisms.js";
+import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
@@ -57,37 +58,40 @@ async function triggerLunaReply(
 		const displayName =
 			(message.member as Eris.Member | null)?.nick || message.author.username;
 
-		let sendChain: Promise<unknown> = Promise.resolve();
-		let isFirstChunk = true;
+		const isVoice = shouldSendVoice();
+		const chunks: string[] = [];
 
-		await askLLM(
+		const fullText = await askLLM(
 			{ username: displayName, text: content },
 			{
-				onFirstToken: startTyping,
+				onFirstToken: isVoice ? undefined : startTyping,
 				onChunk: (chunk: string) => {
-					sendChain = sendChain.then(() =>
-						client
-							.createMessage(message.channel.id, {
-								content: chunk,
-								...(isFirstChunk && refStyle.messageReference
-									? {
-											messageReference: { messageID: message.id },
-											allowedMentions: {
-												repliedUser: refStyle.mentionRepliedUser,
-											},
-										}
-									: {}),
-							})
-							.then(() => {
-								isFirstChunk = false;
-								markBotActivity(message.channel.id);
-							})
-					);
+					chunks.push(chunk);
 				},
 			}
 		);
 
-		await sendChain;
+		if (isVoice) {
+			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
+		} else {
+			let isFirstChunk = true;
+			for (const chunk of chunks) {
+				await client.createMessage(message.channel.id, {
+					content: chunk,
+					...(isFirstChunk && refStyle.messageReference
+						? {
+								messageReference: { messageID: message.id },
+								allowedMentions: {
+									repliedUser: refStyle.mentionRepliedUser,
+								},
+							}
+						: {}),
+				});
+				isFirstChunk = false;
+				markBotActivity(message.channel.id);
+			}
+		}
+
 		trackSpeaker(message.channel.id, client.user.id);
 	} catch (err) {
 		console.error(err);
@@ -226,6 +230,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 });
 
 export function startBot(): void {
+	void initTTS();
 	client.connect();
 
 	setInterval(() => {

@@ -71,9 +71,18 @@ var reactions = v("reactions", [
   "\u{1F5FF}",
   "\u{1F31A}"
 ]);
-var spontaneousIntervalMs = v("spontaneous_interval_ms", 3e5);
+var spontaneousIntervalMs = v(
+  "spontaneous_interval_ms",
+  3e5
+);
 var spontaneousChance = v("spontaneous_chance", 0.12);
-var spontaneousContextMessages = v("spontaneous_context_messages", 5);
+var spontaneousContextMessages = v(
+  "spontaneous_context_messages",
+  5
+);
+var voiceMessageChance = v("voice_message_chance", 0.08);
+var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
+var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper/piper");
 var rawStyles = v("reply_styles", [
   { message_reference: true, mention_replied_user: false, weight: 50 },
   { message_reference: true, mention_replied_user: true, weight: 15 },
@@ -181,7 +190,7 @@ async function askLLM(userMessage, callbacks) {
         const event = JSON.parse(line);
         switch (event.type) {
           case "firstToken":
-            callbacks.onFirstToken();
+            callbacks.onFirstToken?.();
             break;
           case "chunk":
             callbacks.onChunk(event.data);
@@ -518,6 +527,250 @@ function pickReaction(customEmojis) {
   return emoji;
 }
 
+// src/tts.ts
+import { PiperTTS } from "pipertts";
+import { execFile } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+var piper = null;
+var piperReady = false;
+async function initTTS() {
+  if (piperReady) {
+    return;
+  }
+  try {
+    piper = await PiperTTS.create({
+      modelPath: ttsModelPath,
+      piperBinaryPath: ttsBinaryPath
+    });
+    piperReady = true;
+    console.log(
+      `[tts] Piper TTS initialized (model=${path.basename(ttsModelPath)})`
+    );
+  } catch (err) {
+    console.warn("[tts] Piper TTS init failed, voice messages disabled:", err);
+  }
+}
+function sanitizeForTTS(text) {
+  let t = text || "".replace(/<@&?\d+>/g, "@utilisateur").replace(/<#\d+>/g, "").replace(/<a?:[\w-]+:\d+>/g, "").replace(/https?:\/\/\S+/g, "");
+  if (t.length > 500) {
+    t = t.slice(0, 500);
+  }
+  return t.trim() || "...";
+}
+function buildWaveformBase64(points = 256) {
+  const arr = new Uint8Array(points);
+  for (let i = 0; i < points; i++) {
+    arr[i] = Math.floor(127 + 127 * Math.sin(i / points * Math.PI * 2));
+  }
+  return Buffer.from(arr).toString("base64");
+}
+async function wavToOgg(wavBuf) {
+  const tmpWav = path.join(os.tmpdir(), `piper_${Date.now()}.wav`);
+  const tmpOgg = path.join(os.tmpdir(), `piper_${Date.now()}.ogg`);
+  try {
+    fs.writeFileSync(tmpWav, wavBuf);
+    await new Promise((resolve, reject) => {
+      execFile(
+        path.join(process.cwd(), "bin/ffmpeg"),
+        [
+          "-y",
+          "-i",
+          tmpWav,
+          "-c:a",
+          "libopus",
+          "-b:a",
+          "32k",
+          "-ar",
+          "24000",
+          "-ac",
+          "1",
+          tmpOgg
+        ],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+    return fs.readFileSync(tmpOgg);
+  } finally {
+    try {
+      fs.unlinkSync(tmpWav);
+    } catch {
+    }
+    try {
+      if (fs.existsSync(tmpOgg)) {
+        fs.unlinkSync(tmpOgg);
+      }
+    } catch {
+    }
+  }
+}
+async function getAudioDuration(oggBuf) {
+  const tmpOgg = path.join(os.tmpdir(), `dur_${Date.now()}.ogg`);
+  try {
+    fs.writeFileSync(tmpOgg, oggBuf);
+    const duration = await new Promise((resolve, reject) => {
+      execFile(
+        path.join(process.cwd(), "bin/ffprobe"),
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "format=duration",
+          "-of",
+          "csv=p=0",
+          tmpOgg
+        ],
+        (err, stdout) => err ? reject(err) : resolve(Number.parseFloat(stdout.trim()))
+      );
+    });
+    return Math.ceil(duration);
+  } catch {
+    return Math.max(1, Math.ceil(oggBuf.byteLength / 8e3));
+  } finally {
+    try {
+      if (fs.existsSync(tmpOgg)) {
+        fs.unlinkSync(tmpOgg);
+      }
+    } catch {
+    }
+  }
+}
+async function requestUploadUrl(channelId, size, duration, token) {
+  const res = await fetch(
+    `https://discord.com/api/v10/channels/${channelId}/attachments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `${token}`
+      },
+      body: JSON.stringify({
+        files: [
+          {
+            filename: "voice-message.ogg",
+            file_size: size,
+            id: "0",
+            duration_secs: duration
+          }
+        ]
+      })
+    }
+  );
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`attachments POST ${res.status}: ${txt}`);
+  }
+  const json = await res.json();
+  const a = json.attachments?.[0];
+  if (!(a?.upload_url && a?.upload_filename)) {
+    throw new Error("R\xE9ponse inattendue pour l'URL d'upload.");
+  }
+  return {
+    uploadUrl: a.upload_url,
+    uploadFilename: a.upload_filename
+  };
+}
+async function putFileToUploadUrl(uploadUrl, buffer) {
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "audio/ogg",
+      "Content-Length": String(buffer.byteLength)
+    },
+    body: new Uint8Array(buffer)
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`PUT upload ${res.status}: ${txt}`);
+  }
+}
+async function postVoiceMessage(channelId, uploadFilename, durationSecs, waveformB64, token, replyToMessageId) {
+  const body = {
+    flags: 8192,
+    attachments: [
+      {
+        id: "0",
+        filename: "voice-message.ogg",
+        uploaded_filename: uploadFilename,
+        duration_secs: durationSecs,
+        waveform: waveformB64
+      }
+    ],
+    allowed_mentions: { parse: [], replied_user: false },
+    fail_if_not_exists: false
+  };
+  if (replyToMessageId) {
+    body.message_reference = {
+      message_id: replyToMessageId,
+      channel_id: channelId
+    };
+  }
+  const res = await fetch(
+    `https://discord.com/api/v10/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `${token}`
+      },
+      body: JSON.stringify(body)
+    }
+  );
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`messages POST ${res.status}: ${txt}`);
+  }
+}
+async function sendTextAsVoiceMessage(channelId, replyToMessageId, text) {
+  if (!piperReady) {
+    console.warn("[tts] Piper not ready, skipping voice message");
+    return;
+  }
+  const safe = sanitizeForTTS(text);
+  if (!safe) {
+    console.warn("[tts] Empty text after sanitization, skipping");
+    return;
+  }
+  try {
+    console.log(`[tts] Synthesizing: "${safe.slice(0, 60)}..."`);
+    const { audio: wavBuf } = await piper.synthesize(safe);
+    const oggBuf = await wavToOgg(wavBuf);
+    const durationSecs = await getAudioDuration(oggBuf);
+    const waveform = buildWaveformBase64();
+    const token = DISCORD_TOKEN;
+    const { uploadUrl, uploadFilename } = await requestUploadUrl(
+      channelId,
+      oggBuf.byteLength,
+      durationSecs,
+      token
+    );
+    await putFileToUploadUrl(uploadUrl, oggBuf);
+    await postVoiceMessage(
+      channelId,
+      uploadFilename,
+      durationSecs,
+      waveform,
+      token,
+      replyToMessageId
+    );
+    console.log("[tts] Voice message sent");
+  } catch (err) {
+    console.error("[tts] Error sending voice message:", err);
+  }
+}
+function shouldSendVoice() {
+  if (voiceMessageChance <= 0) {
+    return false;
+  }
+  const roll = Math.random();
+  const send = roll < voiceMessageChance;
+  console.log(
+    `[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${voiceMessageChance})`
+  );
+  return send;
+}
+
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
@@ -538,31 +791,35 @@ async function triggerLunaReply(message, isDM = false) {
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
-    let sendChain = Promise.resolve();
-    let isFirstChunk = true;
-    await askLLM(
+    const isVoice = shouldSendVoice();
+    const chunks = [];
+    const fullText = await askLLM(
       { username: displayName, text: content },
       {
-        onFirstToken: startTyping,
+        onFirstToken: isVoice ? void 0 : startTyping,
         onChunk: (chunk) => {
-          sendChain = sendChain.then(
-            () => client.createMessage(message.channel.id, {
-              content: chunk,
-              ...isFirstChunk && refStyle.messageReference ? {
-                messageReference: { messageID: message.id },
-                allowedMentions: {
-                  repliedUser: refStyle.mentionRepliedUser
-                }
-              } : {}
-            }).then(() => {
-              isFirstChunk = false;
-              markBotActivity(message.channel.id);
-            })
-          );
+          chunks.push(chunk);
         }
       }
     );
-    await sendChain;
+    if (isVoice) {
+      await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
+    } else {
+      let isFirstChunk = true;
+      for (const chunk of chunks) {
+        await client.createMessage(message.channel.id, {
+          content: chunk,
+          ...isFirstChunk && refStyle.messageReference ? {
+            messageReference: { messageID: message.id },
+            allowedMentions: {
+              repliedUser: refStyle.mentionRepliedUser
+            }
+          } : {}
+        });
+        isFirstChunk = false;
+        markBotActivity(message.channel.id);
+      }
+    }
     trackSpeaker(message.channel.id, client.user.id);
   } catch (err) {
     console.error(err);
@@ -674,6 +931,7 @@ client.on("messageCreate", async (message) => {
   trackSpeaker(message.channel.id, message.author.id);
 });
 function startBot() {
+  void initTTS();
   client.connect();
   setInterval(() => {
     if (Math.random() < spontaneousChance) {

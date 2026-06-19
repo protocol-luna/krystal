@@ -4,7 +4,7 @@ interface UserMessage {
 }
 
 interface LLMCallbacks {
-	onFirstToken: () => void;
+	onFirstToken?: () => void;
 	onChunk: (chunk: string) => void;
 }
 
@@ -48,7 +48,7 @@ export async function askLLM(
 				const event = JSON.parse(line);
 				switch (event.type) {
 					case "firstToken":
-						callbacks.onFirstToken();
+						callbacks.onFirstToken?.();
 						break;
 					case "chunk":
 						callbacks.onChunk(event.data);
