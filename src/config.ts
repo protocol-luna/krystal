@@ -44,6 +44,11 @@ export const cooldownSeconds = 8;
 
 export const replyInDM = true;
 
+// --- SPONTANEOUS SPAWN ---
+export const spontaneousIntervalMs = 5 * 60 * 1000;
+export const spontaneousChance = 0.12;
+export const spontaneousContextMessages = 5;
+
 // --- REPLY STYLE ---
 export interface ReplyStyle {
   messageReference: boolean;

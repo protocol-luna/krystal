@@ -1,7 +1,8 @@
 import * as Eris from "eris";
-import { DISCORD_TOKEN, pickReplyStyle } from "./config.js";
+import { DISCORD_TOKEN, pickReplyStyle, spontaneousIntervalMs, spontaneousChance } from "./config.js";
 import { askLLM, resetLLM } from "./llm.js";
 import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, type TriggerResult } from "./trigger.js";
+import { trySpawn } from "./spontaneous.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -111,4 +112,10 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
 export function startBot(): void {
   client.connect();
+
+  setInterval(() => {
+    if (Math.random() < spontaneousChance) {
+      void trySpawn(client);
+    }
+  }, spontaneousIntervalMs);
 }

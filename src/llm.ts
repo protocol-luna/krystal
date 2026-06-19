@@ -139,6 +139,10 @@ export function askLLM(
   });
 }
 
+export function isLLMBusy(): boolean {
+  return isProcessing || requestQueue.length > 0;
+}
+
 export function resetLLM(): void {
   requestQueue.length = 0;
   isProcessing = false;
