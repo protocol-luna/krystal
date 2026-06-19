@@ -18,7 +18,8 @@
     "discord.js-selfbot-v13": "^3.7.1",
     "dotenv": "^16.4.5",
     "eris": "^0.18.0",
-    "js-yaml": "^4.2.0"
+    "js-yaml": "^4.2.0",
+    "pipertts": "^1.0.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
