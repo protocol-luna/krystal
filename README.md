@@ -41,6 +41,8 @@ xychart-beta
 
 Le bot est prévu pour tourner sur un GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`).
 
+<img width="823" height="784" alt="image" src="https://github.com/user-attachments/assets/89493037-37a2-477c-8c7d-4a6a6016f003" />
+
 ---
 
 ## Système de déclenchement
