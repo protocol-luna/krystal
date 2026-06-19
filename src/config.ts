@@ -40,7 +40,7 @@ export const DISCORD_TOKEN: string =
 	})();
 
 export const LLAMA_CLI_PATH: string =
-	process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
+	process.env.LLAMA_CLI_PATH ?? "llama/llama-cli";
 
 export const LLAMA_MODEL_PATH: string =
 	process.env.LLAMA_MODEL_PATH ??
