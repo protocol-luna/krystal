@@ -148,7 +148,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
       console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer déclenché`);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
       if (followUp.shouldRespond) {
         console.log(`[bot] #${channel.name ?? message.channel.id} followUp → réponse`);
         await triggerLunaReply(message);

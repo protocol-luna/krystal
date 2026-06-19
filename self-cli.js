@@ -547,7 +547,7 @@ client.on("messageCreate", async (message) => {
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
       console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer d\xE9clench\xE9`);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
       if (followUp.shouldRespond) {
         console.log(`[bot] #${channel.name ?? message.channel.id} followUp \u2192 r\xE9ponse`);
         await triggerLunaReply(message);
