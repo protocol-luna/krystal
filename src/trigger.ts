@@ -1,6 +1,10 @@
 import type * as Eris from "eris";
 import { randomChance, names, keywords, cooldownSeconds, replyInDM } from "./config.js";
 
+function log(channel: string, msg: string): void {
+  console.log(`[trigger] #${channel} ${msg}`);
+}
+
 const channelCooldowns = new Map<string, number>();
 const botActivity = new Map<string, number>();
 const lastSpeaker = new Map<string, string>();
@@ -60,10 +64,12 @@ export function trackSpeaker(channelId: string, authorId: string): string | unde
 }
 
 export function canFollowUp(channelId: string, botId: string): boolean {
-  if (!isRecentBotActivity(channelId)) { return false; }
-  if (lastSpeaker.get(channelId) !== botId) { return false; }
+  const recent = isRecentBotActivity(channelId);
+  const speaker = lastSpeaker.get(channelId);
   const count = responseCount.get(channelId) ?? 0;
-  return count < MAX_FOLLOWUPS;
+  const ok = recent && speaker === botId && count < MAX_FOLLOWUPS;
+  log(channelId, `canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : speaker?.slice(0, 6) ?? "?"} followCount=${count})`);
+  return ok;
 }
 
 export function isInConversation(channelId: string, botId: string): boolean {
@@ -76,19 +82,25 @@ export function evaluateMessage(
   botUsername: string,
   isFollowUp = false,
 ): TriggerResult {
+  const channelId = message.channel.id;
+
   if (message.author.bot) {
+    log(channelId, `“${message.content.slice(0, 60)}” auteur=bot → ignore`);
     return { shouldRespond: false, reason: null, botName: "" };
   }
 
   if (message.content === "-stop") {
+    log(channelId, "commande -stop → stop");
     return { shouldRespond: true, reason: "stop", botName: "" };
   }
 
   if (message.content === "-start") {
+    log(channelId, "commande -start → start");
     return { shouldRespond: true, reason: "start", botName: "" };
   }
 
   if (message.content === "-clear") {
+    log(channelId, "commande -clear → clear");
     return { shouldRespond: true, reason: "clear", botName: "" };
   }
 
@@ -103,38 +115,46 @@ export function evaluateMessage(
   const contentLower = message.content.toLowerCase();
   const isMentioned = message.mentions.some((u) => u.id === botId);
   const isDM = message.channel.type === 1;
+  const author = message.member?.nick || message.author.username;
 
   // Direct mention — always responds, bypasses pause
   if (isMentioned) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → mention`);
     setPaused(false);
     return { shouldRespond: true, reason: "mention", botName };
   }
   if (isDM && replyInDM) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → dm`);
     return { shouldRespond: true, reason: "dm", botName };
   }
   if (isDM) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → DM ignoré`);
     return { shouldRespond: false, reason: null, botName };
   }
 
   if (paused) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → paused`);
     return { shouldRespond: false, reason: null, botName: "" };
   }
 
   // Cooldown
-  if (isOnCooldown(message.channel.id) && !isMentioned && !isFollowUp) {
+  if (isOnCooldown(channelId) && !isMentioned && !isFollowUp) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → cooldown`);
     return { shouldRespond: false, reason: null, botName };
   }
 
   // Name detection (server nick + global username)
   if (contentLower.includes(botName.toLowerCase())) {
-    markReplied(message.channel.id);
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → name (bot:${botName})`);
+    markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
   }
 
   // Configurable extra names
   for (const name of names) {
     if (contentLower.includes(name.toLowerCase())) {
-      markReplied(message.channel.id);
+      log(channelId, `${author}: “${message.content.slice(0, 60)}” → name (custom:${name})`);
+      markReplied(channelId);
       return { shouldRespond: true, reason: "name", botName };
     }
   }
@@ -142,22 +162,26 @@ export function evaluateMessage(
   // Configurable keywords
   for (const keyword of keywords) {
     if (contentLower.includes(keyword.toLowerCase())) {
-      markReplied(message.channel.id);
+      log(channelId, `${author}: “${message.content.slice(0, 60)}” → keyword (${keyword})`);
+      markReplied(channelId);
       return { shouldRespond: true, reason: "keyword", botName };
     }
   }
 
   // Follow-up: bot replied recently in this channel
   if (isFollowUp) {
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → follow-up`);
     return { shouldRespond: true, reason: "follow-up", botName };
   }
 
   // Random spontaneous chime-in
   if (randomChance > 0 && Math.random() < randomChance) {
-    markReplied(message.channel.id);
+    log(channelId, `${author}: “${message.content.slice(0, 60)}” → random`);
+    markReplied(channelId);
     return { shouldRespond: true, reason: "random", botName };
   }
 
+  log(channelId, `${author}: “${message.content.slice(0, 60)}” → rien`);
   return { shouldRespond: false, reason: null, botName };
 }
 

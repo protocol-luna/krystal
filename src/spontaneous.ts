@@ -60,7 +60,9 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
   if (reply.trim()) {
     await client.createMessage(channel.id, { content: reply.trim() });
     markBotActivity(channel.id);
-    console.log(`[spontaneous] → #${channel.name} : ${reply.slice(0, 80)}`);
+    console.log(`[spontaneous] #${channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`);
+  } else {
+    console.log(`[spontaneous] #${channel.name} : réponse vide`);
   }
 
   await resetLLM();

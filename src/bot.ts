@@ -26,6 +26,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
   };
 
   const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
+  console.log(`[bot] replyStyle: messageReference=${style.messageReference} mentionRepliedUser=${style.mentionRepliedUser}`);
 
   try {
     const content = message.content
@@ -76,9 +77,13 @@ client.on("ready", () => {
 client.on("messageCreate", async (message: Eris.Message) => {
   if (message.author.id === client.user.id) { return; }
 
+  const author = message.member?.nick || message.author.username;
+  const channel = message.channel as Eris.GuildTextableChannel;
+
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id)!);
     followUpTimers.delete(message.channel.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer annulé (nouveau message)`);
   }
 
   const result: TriggerResult = evaluateMessage(
@@ -88,7 +93,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
   );
 
   if (result.reason === "stop") {
-    console.log("Commande -stop reçue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -stop → pause`);
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
@@ -98,14 +103,14 @@ client.on("messageCreate", async (message: Eris.Message) => {
   }
 
   if (result.reason === "start") {
-    console.log("Commande -start reçue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -start → reprise`);
     setPaused(false);
     await client.createMessage(message.channel.id, "▶️  Bot réactivé !");
     return;
   }
 
   if (result.reason === "clear") {
-    console.log("Commande -clear reçue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -clear → reset`);
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
@@ -115,16 +120,22 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   if (result.shouldRespond) {
     trackSpeaker(message.channel.id, message.author.id);
-    if (shouldIgnore(result.reason)) { return; }
+    if (shouldIgnore(result.reason)) {
+      console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: ignoré (${result.reason})`);
+      return;
+    }
 
-    await new Promise((r) => setTimeout(r, computeDelay()));
+    const delay = computeDelay();
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: répond (${result.reason}) delay=${delay.toFixed(0)}ms`);
+    await new Promise((r) => setTimeout(r, delay));
 
     if (shouldReact()) {
-      const guild = (message.channel as Eris.GuildTextableChannel).guild;
+      const guild = (channel as Eris.GuildTextableChannel).guild;
       const serverEmojis = guild?.emojis
         ?.filter((e) => e.id)
         .map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
-      await message.addReaction(pickReaction(serverEmojis)).catch(() => {});
+      const reaction = pickReaction(serverEmojis);
+      await message.addReaction(reaction).catch(() => {});
     }
 
     await triggerLunaReply(message);
@@ -133,10 +144,13 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer armé (4.5s)`);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
+      console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer déclenché`);
       const followUp = evaluateMessage(message, client.user.id, client.user.username);
       if (followUp.shouldRespond) {
+        console.log(`[bot] #${channel.name ?? message.channel.id} followUp → réponse`);
         await triggerLunaReply(message);
       }
     }, 4500);

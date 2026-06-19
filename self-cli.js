@@ -162,6 +162,9 @@ async function isLLMBusy() {
 }
 
 // src/trigger.ts
+function log(channel, msg) {
+  console.log(`[trigger] #${channel} ${msg}`);
+}
 var channelCooldowns = /* @__PURE__ */ new Map();
 var botActivity = /* @__PURE__ */ new Map();
 var lastSpeaker = /* @__PURE__ */ new Map();
@@ -206,26 +209,29 @@ function trackSpeaker(channelId, authorId) {
   return previous;
 }
 function canFollowUp(channelId, botId) {
-  if (!isRecentBotActivity(channelId)) {
-    return false;
-  }
-  if (lastSpeaker.get(channelId) !== botId) {
-    return false;
-  }
+  const recent = isRecentBotActivity(channelId);
+  const speaker = lastSpeaker.get(channelId);
   const count = responseCount.get(channelId) ?? 0;
-  return count < MAX_FOLLOWUPS;
+  const ok = recent && speaker === botId && count < MAX_FOLLOWUPS;
+  log(channelId, `canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : speaker?.slice(0, 6) ?? "?"} followCount=${count})`);
+  return ok;
 }
 function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
+  const channelId = message.channel.id;
   if (message.author.bot) {
+    log(channelId, `\u201C${message.content.slice(0, 60)}\u201D auteur=bot \u2192 ignore`);
     return { shouldRespond: false, reason: null, botName: "" };
   }
   if (message.content === "-stop") {
+    log(channelId, "commande -stop \u2192 stop");
     return { shouldRespond: true, reason: "stop", botName: "" };
   }
   if (message.content === "-start") {
+    log(channelId, "commande -start \u2192 start");
     return { shouldRespond: true, reason: "start", botName: "" };
   }
   if (message.content === "-clear") {
+    log(channelId, "commande -clear \u2192 clear");
     return { shouldRespond: true, reason: "clear", botName: "" };
   }
   const isMe = botId === message.author.id;
@@ -238,45 +244,57 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   const contentLower = message.content.toLowerCase();
   const isMentioned = message.mentions.some((u) => u.id === botId);
   const isDM = message.channel.type === 1;
+  const author = message.member?.nick || message.author.username;
   if (isMentioned) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 mention`);
     setPaused(false);
     return { shouldRespond: true, reason: "mention", botName };
   }
   if (isDM && replyInDM) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 dm`);
     return { shouldRespond: true, reason: "dm", botName };
   }
   if (isDM) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 DM ignor\xE9`);
     return { shouldRespond: false, reason: null, botName };
   }
   if (paused) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 paused`);
     return { shouldRespond: false, reason: null, botName: "" };
   }
-  if (isOnCooldown(message.channel.id) && !isMentioned && !isFollowUp) {
+  if (isOnCooldown(channelId) && !isMentioned && !isFollowUp) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 cooldown`);
     return { shouldRespond: false, reason: null, botName };
   }
   if (contentLower.includes(botName.toLowerCase())) {
-    markReplied(message.channel.id);
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (bot:${botName})`);
+    markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
   }
   for (const name of names) {
     if (contentLower.includes(name.toLowerCase())) {
-      markReplied(message.channel.id);
+      log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (custom:${name})`);
+      markReplied(channelId);
       return { shouldRespond: true, reason: "name", botName };
     }
   }
   for (const keyword of keywords) {
     if (contentLower.includes(keyword.toLowerCase())) {
-      markReplied(message.channel.id);
+      log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 keyword (${keyword})`);
+      markReplied(channelId);
       return { shouldRespond: true, reason: "keyword", botName };
     }
   }
   if (isFollowUp) {
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 follow-up`);
     return { shouldRespond: true, reason: "follow-up", botName };
   }
   if (randomChance > 0 && Math.random() < randomChance) {
-    markReplied(message.channel.id);
+    log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 random`);
+    markReplied(channelId);
     return { shouldRespond: true, reason: "random", botName };
   }
+  log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 rien`);
   return { shouldRespond: false, reason: null, botName };
 }
 function clearCooldown(channelId) {
@@ -361,29 +379,49 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
   if (reply.trim()) {
     await client2.createMessage(channel.id, { content: reply.trim() });
     markBotActivity(channel.id);
-    console.log(`[spontaneous] \u2192 #${channel.name} : ${reply.slice(0, 80)}`);
+    console.log(`[spontaneous] #${channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`);
+  } else {
+    console.log(`[spontaneous] #${channel.name} : r\xE9ponse vide`);
   }
   await resetLLM();
 }
 
 // src/mannerisms.ts
 function computeDelay() {
-  return responseDelayMin + Math.random() * (responseDelayMax - responseDelayMin);
+  const delay = responseDelayMin + Math.random() * (responseDelayMax - responseDelayMin);
+  console.log(`[mannerisms] delay=${delay.toFixed(0)}ms`);
+  return delay;
 }
 function shouldIgnore(reason) {
-  if (reason === "mention") {
-    return Math.random() < ignoreChanceMention;
+  const chance = reason === "mention" ? ignoreChanceMention : ignoreChance;
+  if (chance <= 0) {
+    console.log("[mannerisms] ignore=false (chance=0)");
+    return false;
   }
-  return Math.random() < ignoreChance;
+  const roll = Math.random();
+  const ignored = roll < chance;
+  console.log(`[mannerisms] ignore=${ignored} (roll=${roll.toFixed(3)} < chance=${chance})`);
+  return ignored;
 }
 function shouldReact() {
-  return Math.random() < reactionChance;
+  if (reactionChance <= 0) {
+    console.log("[mannerisms] react=false (chance=0)");
+    return false;
+  }
+  const roll = Math.random();
+  const react = roll < reactionChance;
+  console.log(`[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${reactionChance})`);
+  return react;
 }
 function pickReaction(customEmojis) {
   if (customEmojis && customEmojis.length > 0 && Math.random() < serverEmojiChance) {
-    return customEmojis[Math.floor(Math.random() * customEmojis.length)];
+    const emoji2 = customEmojis[Math.floor(Math.random() * customEmojis.length)];
+    console.log(`[mannerisms] reaction=${emoji2} (custom)`);
+    return emoji2;
   }
-  return reactions[Math.floor(Math.random() * reactions.length)];
+  const emoji = reactions[Math.floor(Math.random() * reactions.length)];
+  console.log(`[mannerisms] reaction=${emoji} (unicode)`);
+  return emoji;
 }
 
 // src/bot.ts
@@ -405,6 +443,7 @@ async function triggerLunaReply(message) {
     }, 8e3);
   };
   const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
+  console.log(`[bot] replyStyle: messageReference=${style.messageReference} mentionRepliedUser=${style.mentionRepliedUser}`);
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
@@ -448,9 +487,12 @@ client.on("messageCreate", async (message) => {
   if (message.author.id === client.user.id) {
     return;
   }
+  const author = message.member?.nick || message.author.username;
+  const channel = message.channel;
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id));
     followUpTimers.delete(message.channel.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer annul\xE9 (nouveau message)`);
   }
   const result = evaluateMessage(
     message,
@@ -458,7 +500,7 @@ client.on("messageCreate", async (message) => {
     client.user.username
   );
   if (result.reason === "stop") {
-    console.log("Commande -stop re\xE7ue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -stop \u2192 pause`);
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
@@ -467,13 +509,13 @@ client.on("messageCreate", async (message) => {
     return;
   }
   if (result.reason === "start") {
-    console.log("Commande -start re\xE7ue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -start \u2192 reprise`);
     setPaused(false);
     await client.createMessage(message.channel.id, "\u25B6\uFE0F  Bot r\xE9activ\xE9 !");
     return;
   }
   if (result.reason === "clear") {
-    console.log("Commande -clear re\xE7ue.");
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: -clear \u2192 reset`);
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
@@ -483,13 +525,17 @@ client.on("messageCreate", async (message) => {
   if (result.shouldRespond) {
     trackSpeaker(message.channel.id, message.author.id);
     if (shouldIgnore(result.reason)) {
+      console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: ignor\xE9 (${result.reason})`);
       return;
     }
-    await new Promise((r) => setTimeout(r, computeDelay()));
+    const delay = computeDelay();
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`);
+    await new Promise((r) => setTimeout(r, delay));
     if (shouldReact()) {
-      const guild = message.channel.guild;
+      const guild = channel.guild;
       const serverEmojis = guild?.emojis?.filter((e) => e.id).map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
-      await message.addReaction(pickReaction(serverEmojis)).catch(() => {
+      const reaction = pickReaction(serverEmojis);
+      await message.addReaction(reaction).catch(() => {
       });
     }
     await triggerLunaReply(message);
@@ -497,10 +543,13 @@ client.on("messageCreate", async (message) => {
   }
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer arm\xE9 (4.5s)`);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
+      console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer d\xE9clench\xE9`);
       const followUp = evaluateMessage(message, client.user.id, client.user.username);
       if (followUp.shouldRespond) {
+        console.log(`[bot] #${channel.name ?? message.channel.id} followUp \u2192 r\xE9ponse`);
         await triggerLunaReply(message);
       }
     }, 4500);
