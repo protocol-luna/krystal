@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=self-cli.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
     "start": "node self-cli.js"
   },
   "dependencies": {
