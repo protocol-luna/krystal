@@ -1,37 +1,104 @@
-# discord-llm-bot
+# pixieglow — Discord LLM Bot
 
-Bot Discord minimal qui parle a une API compatible OpenAI (llama.cpp `server` ou autre) en local.
+Bot Discord autonome qui fait tourner un LLM local (llama.cpp) et converse de façon naturelle dans les salons et DMs.
+
+## Architecture
+
+Deux processus séparés :
+
+- **llm-server** (`src/llm-server.ts`) — spawn `llama-cli`, queue les requêtes, stream NDJSON sur `:3124`
+- **bot client** (`src/bot.ts`) — connexion Discord via Eris, décisions de trigger, streaming vers le serveur LLM
+
+Séparés pour permettre le hot-reload du bot sans recharger le modèle.
 
 ## Setup
 
 ```bash
 npm install
 cp .env.example .env
-# édite .env : DISCORD_TOKEN, LLAMA_API_URL si besoin
-# édite prompt.txt : ton system prompt
+# édite .env : DISCORD_TOKEN
+# crée prompt.txt : le system prompt
+```
+
+### `.env`
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `DISCORD_TOKEN` | — | Token du bot Discord |
+| `LLAMA_CLI_PATH` | `../llama-b9682/llama-cli` | Chemin vers `llama-cli` |
+| `LLAMA_MODEL_PATH` | `./models/*.gguf` | Chemin du modèle GGUF |
+| `PORT` | `3124` | Port du serveur LLM |
+
+### `prompt.txt`
+
+Lu au démarrage dans `./prompt.txt`. Exemple :
+
+```
+Your name is pixieglow. You are a 21-year-old girl studying art.
+Talk naturally and never prefix your replies with your name.
+```
+
+## Lancer
+
+```bash
+# Dev — hot-reload LLM + bot + bundler watch
+npm run dev
+
+# Production
+npm run build
 npm start
 ```
 
-Le system prompt est lu depuis `prompt.txt` à chaque démarrage du bot (pas de hot-reload, redémarre le process après modif).
+## Déclencheurs
 
-## Lancer llama.cpp en local (compatible OpenAI)
+Par ordre de priorité :
 
-```bash
-./server -m ton-modele.gguf --port 8080 --parallel 4
-# expose /v1/chat/completions par défaut
+| Raison | Conditions |
+|---|---|
+| `mention` | Le bot est `@mentionné` — bypass pause, bypass ignore |
+| `dm` | Message privé |
+| `name` | Le message contient "Luna", "Pixie" ou le pseudo Discord |
+| `keyword` | Le message contient un mot-clé : `hello`, `hi`, `hey`, `yo`, `ai`, `bot`, etc. |
+| `follow-up` | Le bot est le dernier interlocuteur + activité récente (< 15s) — répond à tout |
+| `random` | 1.5% de chance sur chaque message ignoré |
+
+Les mots-clés et noms sont matchés en mot entier (`\b`), pas en substring.
+
+## Comportement
+
+- **Délai variable** 800–4000ms avant chaque réponse (simule la réflexion)
+- **Ignore chance** 8% pour les triggers normaux, 0% pour les mentions/DMs
+- **Réactions** 6% de chance, 30% d'utiliser un émoji personnalisé du serveur
+- **Typing indicator** seulement quand le LLM commence à générer
+- **Spontané** 12% toutes les 5min : le bot poste un message dans le salon le plus actif
+- **Réponse multi-chunk** les `\n` dans le stream génèrent des messages séparés
+- **Stop** `-stop` met en pause, `-start` réactive, `-clear` reset le contexte
+
+## Commandes
+
+| Commande | Effet |
+|---|---|
+| `-stop` | Pause tous les déclencheurs, reset le contexte LLM |
+| `-start` | Réactive le bot |
+| `-clear` | Reset l'historique de conversation du canal |
+
+## Structure
+
+```
+src/
+├── index.ts          # Point d'entrée
+├── bot.ts            # Client Discord, message handler, réponse
+├── config.ts         # Configuration (env, triggers, paramètres LLM)
+├── trigger.ts        # Décisions de déclenchement
+├── mannerisms.ts     # Délai, ignore, réactions
+├── spontaneous.ts    # Messages spontanés périodiques
+├── guild.ts          # Utilitaire salon le plus actif
+├── llm-server.ts     # Serveur HTTP NDJSON + process llama-cli
+├── llm-client.ts     # Client HTTP vers le serveur LLM
+└── llm.ts            # Ancien module monolithique (archivé)
 ```
 
-`--parallel N` doit matcher `LLAMA_PARALLEL_SLOTS` dans `.env` (défaut 4). Chaque salon Discord est assigné à un slot fixe (`id_slot`), donc le cache KV reste chaud entre les messages d'un même salon -- comme avec `llama-cli` en mode interactif, mais sur HTTP. Si tu as plus de salons actifs en même temps que de slots, les plus anciens se font voler leur slot et perdent leur cache (re-traitement complet au prochain message).
+## Portail Développeur Discord
 
-Le bot fetch directement sur `http://localhost:8080/v1/chat/completions` (modifiable via `LLAMA_API_URL` dans `.env`). Comme llama.cpp et OpenAI partagent le même format de payload (`messages`, `model`, `max_tokens`, `temperature`), tu peux switcher vers l'API OpenAI réelle juste en changeant `LLAMA_API_URL` et en ajoutant un header Authorization si besoin (les champs `id_slot`/`cache_prompt` seront alors simplement ignorés par l'API OpenAI).
-
-## Usage Discord
-
-- Mentionne le bot dans un salon: `@bot ta question`
-- Ou envoie-lui un DM directement
-- Historique de conversation gardé en RAM par salon (10 derniers messages)
-
-## Notes
-
-- Active "Message Content Intent" dans le portail développeur Discord (onglet Bot)
-- Invite le bot avec scope `bot` + permission `Send Messages` + `Read Message History`
+- Active **Message Content Intent** (onglet Bot)
+- Invite avec scope `bot` + permissions `Send Messages`, `Read Message History`
