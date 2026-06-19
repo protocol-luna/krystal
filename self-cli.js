@@ -232,9 +232,6 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   if (isMe) {
     return { shouldRespond: false, reason: null, botName: "" };
   }
-  if (paused) {
-    return { shouldRespond: false, reason: null, botName: "" };
-  }
   const guild = message.channel.guild;
   const botMember = guild?.members?.get(botId);
   const botName = botMember?.nick || botUsername;
@@ -242,6 +239,7 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   const isMentioned = message.mentions.some((u) => u.id === botId);
   const isDM = message.channel.type === 1;
   if (isMentioned) {
+    setPaused(false);
     return { shouldRespond: true, reason: "mention", botName };
   }
   if (isDM && replyInDM) {
@@ -249,6 +247,9 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   }
   if (isDM) {
     return { shouldRespond: false, reason: null, botName };
+  }
+  if (paused) {
+    return { shouldRespond: false, reason: null, botName: "" };
   }
   if (isOnCooldown(message.channel.id) && !isMentioned && !isFollowUp) {
     return { shouldRespond: false, reason: null, botName };
@@ -442,7 +443,6 @@ client.on("messageCreate", async (message) => {
   if (message.author.id === client.user.id) {
     return;
   }
-  trackSpeaker(message.channel.id, message.author.id);
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id));
     followUpTimers.delete(message.channel.id);
@@ -456,6 +456,7 @@ client.on("messageCreate", async (message) => {
     console.log("Commande -stop re\xE7ue.");
     await resetLLM();
     clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, message.author.id);
     setPaused(true);
     await client.createMessage(message.channel.id, "\u23F8\uFE0F  Bot mis en pause. Envoie `-start` pour r\xE9activer.");
     return;
@@ -470,16 +471,16 @@ client.on("messageCreate", async (message) => {
     console.log("Commande -clear re\xE7ue.");
     await resetLLM();
     clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, message.author.id);
     await client.createMessage(message.channel.id, "\u{1F9F9}  Historique et m\xE9moire effac\xE9s !");
     return;
   }
   if (result.shouldRespond) {
+    trackSpeaker(message.channel.id, message.author.id);
     if (shouldIgnore(result.reason)) {
       return;
     }
-    const delay = computeDelay();
-    await client.sendChannelTyping(message.channel.id);
-    await new Promise((r) => setTimeout(r, delay));
+    await new Promise((r) => setTimeout(r, computeDelay()));
     if (shouldReact()) {
       const guild = message.channel.guild;
       const serverEmojis = guild?.emojis?.filter((e) => e.id).map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
@@ -490,6 +491,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
   if (canFollowUp(message.channel.id, client.user.id)) {
+    trackSpeaker(message.channel.id, message.author.id);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
       const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
@@ -498,6 +500,8 @@ client.on("messageCreate", async (message) => {
       }
     }, 4500);
     followUpTimers.set(message.channel.id, timer);
+  } else {
+    trackSpeaker(message.channel.id, message.author.id);
   }
 });
 function startBot() {

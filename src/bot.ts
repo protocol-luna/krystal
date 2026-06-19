@@ -74,8 +74,6 @@ client.on("ready", () => {
 client.on("messageCreate", async (message: Eris.Message) => {
   if (message.author.id === client.user.id) { return; }
 
-  trackSpeaker(message.channel.id, message.author.id);
-
   // Cancel any pending follow-up timer for this channel
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id)!);
@@ -92,6 +90,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
     console.log("Commande -stop reçue.");
     await resetLLM();
     clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, message.author.id);
     setPaused(true);
     await client.createMessage(message.channel.id, "⏸️  Bot mis en pause. Envoie `-start` pour réactiver.");
     return;
@@ -108,16 +107,16 @@ client.on("messageCreate", async (message: Eris.Message) => {
     console.log("Commande -clear reçue.");
     await resetLLM();
     clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, message.author.id);
     await client.createMessage(message.channel.id, "🧹  Historique et mémoire effacés !");
     return;
   }
 
   if (result.shouldRespond) {
+    trackSpeaker(message.channel.id, message.author.id);
     if (shouldIgnore(result.reason)) { return; }
 
-    const delay = computeDelay();
-    await client.sendChannelTyping(message.channel.id);
-    await new Promise((r) => setTimeout(r, delay));
+    await new Promise((r) => setTimeout(r, computeDelay()));
 
     if (shouldReact()) {
       const guild = (message.channel as Eris.GuildTextableChannel).guild;
@@ -133,6 +132,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   // Follow-up: only if bot was the last speaker and is within the response budget
   if (canFollowUp(message.channel.id, client.user.id)) {
+    trackSpeaker(message.channel.id, message.author.id);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
       const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
@@ -142,6 +142,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
     }, 4500);
 
     followUpTimers.set(message.channel.id, timer);
+  } else {
+    trackSpeaker(message.channel.id, message.author.id);
   }
 });
 

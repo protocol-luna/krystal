@@ -97,10 +97,6 @@ export function evaluateMessage(
     return { shouldRespond: false, reason: null, botName: "" };
   }
 
-  if (paused) {
-    return { shouldRespond: false, reason: null, botName: "" };
-  }
-
   const guild = (message.channel as Eris.GuildTextableChannel).guild;
   const botMember = guild?.members?.get(botId);
   const botName = botMember?.nick || botUsername;
@@ -108,8 +104,9 @@ export function evaluateMessage(
   const isMentioned = message.mentions.some((u) => u.id === botId);
   const isDM = message.channel.type === 1;
 
-  // Direct mention / DM
+  // Direct mention — always responds, bypasses pause
   if (isMentioned) {
+    setPaused(false);
     return { shouldRespond: true, reason: "mention", botName };
   }
   if (isDM && replyInDM) {
@@ -117,6 +114,10 @@ export function evaluateMessage(
   }
   if (isDM) {
     return { shouldRespond: false, reason: null, botName };
+  }
+
+  if (paused) {
+    return { shouldRespond: false, reason: null, botName: "" };
   }
 
   // Cooldown
