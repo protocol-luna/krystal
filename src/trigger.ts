@@ -76,6 +76,10 @@ export function isInConversation(channelId: string, botId: string): boolean {
   return isRecentBotActivity(channelId) && lastSpeaker.get(channelId) === botId;
 }
 
+function hasWord(text: string, word: string): boolean {
+  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text);
+}
+
 export function evaluateMessage(
   message: Eris.Message,
   botId: string,
@@ -144,7 +148,7 @@ export function evaluateMessage(
   }
 
   // Name detection (server nick + global username)
-  if (contentLower.includes(botName.toLowerCase())) {
+  if (hasWord(contentLower, botName.toLowerCase())) {
     log(channelId, `${author}: “${message.content.slice(0, 60)}” → name (bot:${botName})`);
     markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
@@ -152,7 +156,7 @@ export function evaluateMessage(
 
   // Configurable extra names
   for (const name of names) {
-    if (contentLower.includes(name.toLowerCase())) {
+    if (hasWord(contentLower, name.toLowerCase())) {
       log(channelId, `${author}: “${message.content.slice(0, 60)}” → name (custom:${name})`);
       markReplied(channelId);
       return { shouldRespond: true, reason: "name", botName };
@@ -161,7 +165,7 @@ export function evaluateMessage(
 
   // Configurable keywords
   for (const keyword of keywords) {
-    if (contentLower.includes(keyword.toLowerCase())) {
+    if (hasWord(contentLower, keyword.toLowerCase())) {
       log(channelId, `${author}: “${message.content.slice(0, 60)}” → keyword (${keyword})`);
       markReplied(channelId);
       return { shouldRespond: true, reason: "keyword", botName };

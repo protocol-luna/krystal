@@ -216,6 +216,9 @@ function canFollowUp(channelId, botId) {
   log(channelId, `canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : speaker?.slice(0, 6) ?? "?"} followCount=${count})`);
   return ok;
 }
+function hasWord(text, word) {
+  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text);
+}
 function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   const channelId = message.channel.id;
   if (message.author.bot) {
@@ -266,20 +269,20 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
     log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 cooldown`);
     return { shouldRespond: false, reason: null, botName };
   }
-  if (contentLower.includes(botName.toLowerCase())) {
+  if (hasWord(contentLower, botName.toLowerCase())) {
     log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (bot:${botName})`);
     markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
   }
   for (const name of names) {
-    if (contentLower.includes(name.toLowerCase())) {
+    if (hasWord(contentLower, name.toLowerCase())) {
       log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 name (custom:${name})`);
       markReplied(channelId);
       return { shouldRespond: true, reason: "name", botName };
     }
   }
   for (const keyword of keywords) {
-    if (contentLower.includes(keyword.toLowerCase())) {
+    if (hasWord(contentLower, keyword.toLowerCase())) {
       log(channelId, `${author}: \u201C${message.content.slice(0, 60)}\u201D \u2192 keyword (${keyword})`);
       markReplied(channelId);
       return { shouldRespond: true, reason: "keyword", botName };
@@ -393,9 +396,8 @@ function computeDelay() {
   return delay;
 }
 function shouldIgnore(reason) {
-  const chance = reason === "mention" ? ignoreChanceMention : ignoreChance;
+  const chance = reason === "mention" || reason === "dm" ? ignoreChanceMention : ignoreChance;
   if (chance <= 0) {
-    console.log("[mannerisms] ignore=false (chance=0)");
     return false;
   }
   const roll = Math.random();
@@ -425,7 +427,6 @@ function pickReaction(customEmojis) {
 }
 
 // src/bot.ts
-var followUpTimers = /* @__PURE__ */ new Map();
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
     "guilds",
@@ -434,7 +435,7 @@ var client = new Eris.Client(DISCORD_TOKEN, {
     "directMessages"
   ]
 });
-async function triggerLunaReply(message) {
+async function triggerLunaReply(message, isDM = false) {
   let typingInterval = null;
   const startTyping = () => {
     client.sendChannelTyping(message.channel.id);
@@ -443,7 +444,8 @@ async function triggerLunaReply(message) {
     }, 8e3);
   };
   const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
-  console.log(`[bot] replyStyle: messageReference=${style.messageReference} mentionRepliedUser=${style.mentionRepliedUser}`);
+  const refStyle = isDM ? { messageReference: false, mentionRepliedUser: false } : style;
+  console.log(`[bot] replyStyle: messageReference=${refStyle.messageReference} mentionRepliedUser=${refStyle.mentionRepliedUser}`);
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
@@ -457,7 +459,7 @@ async function triggerLunaReply(message) {
           sendChain = sendChain.then(
             () => client.createMessage(message.channel.id, {
               content: chunk,
-              ...isFirstChunk && style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
+              ...isFirstChunk && refStyle.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: refStyle.mentionRepliedUser } } : {}
             }).then(() => {
               isFirstChunk = false;
               markBotActivity(message.channel.id);
@@ -472,7 +474,7 @@ async function triggerLunaReply(message) {
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${err.message}`,
-      ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
+      ...refStyle.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
     }).then(() => markBotActivity(message.channel.id));
   } finally {
     if (typingInterval) {
@@ -489,11 +491,7 @@ client.on("messageCreate", async (message) => {
   }
   const author = message.member?.nick || message.author.username;
   const channel = message.channel;
-  if (followUpTimers.has(message.channel.id)) {
-    clearTimeout(followUpTimers.get(message.channel.id));
-    followUpTimers.delete(message.channel.id);
-    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer annul\xE9 (nouveau message)`);
-  }
+  const isDM = message.channel.type === 1;
   const result = evaluateMessage(
     message,
     client.user.id,
@@ -532,31 +530,28 @@ client.on("messageCreate", async (message) => {
     console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`);
     await new Promise((r) => setTimeout(r, delay));
     if (shouldReact()) {
-      const guild = channel.guild;
-      const serverEmojis = guild?.emojis?.filter((e) => e.id).map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {
       });
     }
-    await triggerLunaReply(message);
+    await triggerLunaReply(message, isDM);
     return;
   }
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
-    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer arm\xE9 (4.5s)`);
-    const timer = setTimeout(async () => {
-      followUpTimers.delete(message.channel.id);
-      console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer d\xE9clench\xE9`);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
-      if (followUp.shouldRespond) {
-        console.log(`[bot] #${channel.name ?? message.channel.id} followUp \u2192 r\xE9ponse`);
-        await triggerLunaReply(message);
-      }
-    }, 4500);
-    followUpTimers.set(message.channel.id, timer);
-  } else {
-    trackSpeaker(message.channel.id, message.author.id);
+    markReplied(message.channel.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: follow-up imm\xE9diat`);
+    await new Promise((r) => setTimeout(r, computeDelay()));
+    if (shouldReact()) {
+      const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      const reaction = pickReaction(serverEmojis);
+      await message.addReaction(reaction).catch(() => {
+      });
+    }
+    await triggerLunaReply(message, isDM);
   }
+  trackSpeaker(message.channel.id, message.author.id);
 });
 function startBot() {
   client.connect();

@@ -14,7 +14,7 @@ const client = new Eris.Client(DISCORD_TOKEN, {
   ],
 });
 
-async function triggerLunaReply(message: Eris.Message): Promise<void> {
+async function triggerLunaReply(message: Eris.Message, isDM = false): Promise<void> {
   let typingInterval: ReturnType<typeof setInterval> | null = null;
   const startTyping = () => {
     client.sendChannelTyping(message.channel.id);
@@ -24,7 +24,8 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
   };
 
   const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
-  console.log(`[bot] replyStyle: messageReference=${style.messageReference} mentionRepliedUser=${style.mentionRepliedUser}`);
+  const refStyle = isDM ? { messageReference: false, mentionRepliedUser: false } : style;
+  console.log(`[bot] replyStyle: messageReference=${refStyle.messageReference} mentionRepliedUser=${refStyle.mentionRepliedUser}`);
 
   try {
     const content = message.content
@@ -44,8 +45,8 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
           sendChain = sendChain.then(() =>
             client.createMessage(message.channel.id, {
               content: chunk,
-              ...(isFirstChunk && style.messageReference
-                ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
+              ...(isFirstChunk && refStyle.messageReference
+        ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: refStyle.mentionRepliedUser } }
                 : {}),
             }).then(() => { isFirstChunk = false; markBotActivity(message.channel.id); }),
           );
@@ -59,7 +60,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
-      ...(style.messageReference
+      ...(refStyle.messageReference
         ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
         : {}),
     }).then(() => markBotActivity(message.channel.id));
@@ -77,6 +78,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   const author = message.member?.nick || message.author.username;
   const channel = message.channel as Eris.GuildTextableChannel;
+  const isDM = message.channel.type === 1;
 
   const result: TriggerResult = evaluateMessage(
     message,
@@ -122,15 +124,16 @@ client.on("messageCreate", async (message: Eris.Message) => {
     await new Promise((r) => setTimeout(r, delay));
 
     if (shouldReact()) {
-      const guild = (channel as Eris.GuildTextableChannel).guild;
-      const serverEmojis = guild?.emojis
-        ?.filter((e) => e.id)
-        .map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      const serverEmojis = isDM
+        ? undefined
+        : (channel as Eris.GuildTextableChannel).guild?.emojis
+          ?.filter((e) => e.id)
+          ?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {});
     }
 
-    await triggerLunaReply(message);
+    await triggerLunaReply(message, isDM);
     return;
   }
 
@@ -141,15 +144,16 @@ client.on("messageCreate", async (message: Eris.Message) => {
     await new Promise((r) => setTimeout(r, computeDelay()));
 
     if (shouldReact()) {
-      const guild = (channel as Eris.GuildTextableChannel).guild;
-      const serverEmojis = guild?.emojis
-        ?.filter((e) => e.id)
-        .map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      const serverEmojis = isDM
+        ? undefined
+        : (channel as Eris.GuildTextableChannel).guild?.emojis
+          ?.filter((e) => e.id)
+          ?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {});
     }
 
-    await triggerLunaReply(message);
+    await triggerLunaReply(message, isDM);
   }
 
   trackSpeaker(message.channel.id, message.author.id);

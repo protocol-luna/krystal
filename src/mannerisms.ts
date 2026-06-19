@@ -15,9 +15,8 @@ export function computeDelay(): number {
 }
 
 export function shouldIgnore(reason: string | null): boolean {
-  const chance = reason === "mention" ? ignoreChanceMention : ignoreChance;
+  const chance = reason === "mention" || reason === "dm" ? ignoreChanceMention : ignoreChance;
   if (chance <= 0) {
-    console.log("[mannerisms] ignore=false (chance=0)");
     return false;
   }
   const roll = Math.random();
