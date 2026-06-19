@@ -1,7 +1,7 @@
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { spawn } from "child_process";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 import "dotenv/config";
 import * as Eris from "eris";
 
@@ -96,7 +96,7 @@ llama.stdout!.on("data", (data: Buffer) => {
     if (str.includes("> ") || str.includes("Enter no prompt")) {
       isModelReady = true;
       console.log("-> Le modèle llama.cpp est prêt à recevoir des messages !");
-      processQueue();
+      void processQueue();
     }
     return;
   }
@@ -114,7 +114,7 @@ llama.stdout!.on("data", (data: Buffer) => {
 
       cleanResponse = cleanResponse.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
 
-      const userTagRegex = new RegExp(`\\[\\s*User:\\s*.*?\\s*\\]`, "gi");
+      const userTagRegex = /\[\s*User:\s*.*?\s*\]/gi;
       cleanResponse = cleanResponse.replace(userTagRegex, "");
 
       const namePrefixRegex = new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i");
@@ -122,7 +122,7 @@ llama.stdout!.on("data", (data: Buffer) => {
 
       currentCallback(cleanResponse.trim(), true);
     } else {
-      let streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
+      const streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
       currentCallback(streamingClean, false);
     }
   }
@@ -140,8 +140,8 @@ llama.on("close", (code: number | null) => {
   process.exit(code ?? 1);
 });
 
-async function processQueue(): Promise<void> {
-  if (isProcessing || requestQueue.length === 0 || !isModelReady) return;
+function processQueue(): void {
+  if (isProcessing || requestQueue.length === 0 || !isModelReady) { return; }
   isProcessing = true;
 
   const { userMessage, onFirstToken, resolve } = requestQueue.shift()!;
@@ -167,7 +167,7 @@ function askLLM(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     requestQueue.push({ userMessage, onFirstToken, resolve, reject });
-    processQueue();
+    void processQueue();
   });
 }
 
@@ -175,20 +175,20 @@ function splitMessage(text: string, max = 2000): string[] {
   const chunks: string[] = [];
   let current = "";
   for (const line of text.split("\n")) {
-    if ((current + "\n" + line).length > max) {
+    if ((`${current}\n${line}`).length > max) {
       chunks.push(current);
       current = line;
     } else {
-      current = current ? current + "\n" + line : line;
+      current = current ? `${current}\n${line}` : line;
     }
   }
-  if (current) chunks.push(current);
+  if (current) { chunks.push(current); }
   return chunks;
 }
 
 client.on("ready", () => {
   console.log(`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`);
-  if (isModelReady) processQueue();
+  if (isModelReady) { void processQueue(); }
 });
 
 // Eris: pas de sendTyping() sur channel, on passe par client.sendChannelTyping(channelId)
@@ -210,7 +210,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     const displayName = (message.member as Eris.Member | null)?.nick || message.author.username;
 
     const reply = await askLLM({ username: displayName, text: content }, startTyping);
-    if (typingInterval) clearInterval(typingInterval);
+    if (typingInterval) { clearInterval(typingInterval); }
 
 	const chunks = splitMessage(reply);
 	for (let i = 0; i < chunks.length; i++) {
@@ -221,7 +221,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
 	  });
 	}
   } catch (err) {
-    if (typingInterval) clearInterval(typingInterval);
+    if (typingInterval) { clearInterval(typingInterval); }
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
@@ -231,7 +231,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
 }
 
 client.on("messageCreate", async (message: Eris.Message) => {
-  if (message.author.bot) return;
+  if (message.author.bot) { return; }
 
   if (messageWait.has(message.channel.id)) {
     clearTimeout(messageWait.get(message.channel.id)!);
@@ -254,7 +254,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
     isProcessing = false;
     currentCallback = null;
     stdoutBuffer = "";
-    llama.stdin!.write(`/clear\n`);
+    llama.stdin!.write("/clear\n");
     await client.createMessage(message.channel.id, "Historique et mémoire effacés !");
     return;
   }
