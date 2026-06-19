@@ -1,10 +1,11 @@
-// src/index.ts
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { spawn } from "child_process";
-import "dotenv/config";
+// src/bot.ts
 import * as Eris from "eris";
+
+// src/config.ts
+import "dotenv/config";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 var __dirname = dirname(fileURLToPath(import.meta.url));
 function loadSystemPrompt() {
   const promptPath = join(__dirname, "prompt.txt");
@@ -16,23 +17,13 @@ function loadSystemPrompt() {
   }
 }
 var SYSTEM_PROMPT = loadSystemPrompt();
-var {
-  DISCORD_TOKEN,
-  LLAMA_CLI_PATH = "../llama-b9682/llama-cli",
-  LLAMA_MODEL_PATH = join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf")
-} = process.env;
-if (!DISCORD_TOKEN) {
+var rawDiscordToken = process.env.DISCORD_TOKEN;
+var DISCORD_TOKEN = rawDiscordToken ?? (() => {
   console.error("DISCORD_TOKEN manquant dans .env");
   process.exit(1);
-}
-var client = new Eris.Client(DISCORD_TOKEN, {
-  intents: [
-    "guilds",
-    "guildMessages",
-    "messageContent",
-    "directMessages"
-  ]
-});
+})();
+var LLAMA_CLI_PATH = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
+var LLAMA_MODEL_PATH = process.env.LLAMA_MODEL_PATH ?? join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
 var jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
 var llamaArgs = [
   "-m",
@@ -71,6 +62,9 @@ var llamaArgs = [
   "--chat-template",
   jinjaTemplate
 ];
+
+// src/llm.ts
+import { spawn } from "node:child_process";
 console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 var llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 var requestQueue = [];
@@ -80,14 +74,13 @@ var currentOnFirstToken = null;
 var isModelReady = false;
 var stdoutBuffer = "";
 var currentUsername = "";
-var messageWait = /* @__PURE__ */ new Map();
 llama.stdout.on("data", (data) => {
   const str = data.toString();
   if (!isModelReady) {
     if (str.includes("> ") || str.includes("Enter no prompt")) {
       isModelReady = true;
       console.log("-> Le mod\xE8le llama.cpp est pr\xEAt \xE0 recevoir des messages !");
-      processQueue();
+      void processQueue();
     }
     return;
   }
@@ -100,13 +93,13 @@ llama.stdout.on("data", (data) => {
     if (stdoutBuffer.includes("\n> ") || stdoutBuffer.endsWith("> ")) {
       let cleanResponse = stdoutBuffer.replace(/[\n\r]*>[\s]*$/, "");
       cleanResponse = cleanResponse.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
-      const userTagRegex = new RegExp(`\\[\\s*User:\\s*.*?\\s*\\]`, "gi");
+      const userTagRegex = /\[\s*User:\s*.*?\s*\]/gi;
       cleanResponse = cleanResponse.replace(userTagRegex, "");
       const namePrefixRegex = new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i");
       cleanResponse = cleanResponse.replace(namePrefixRegex, "");
       currentCallback(cleanResponse.trim(), true);
     } else {
-      let streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
+      const streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
       currentCallback(streamingClean, false);
     }
   }
@@ -121,8 +114,10 @@ llama.on("close", (code) => {
   console.error(`Le processus llama-cli s'est arr\xEAt\xE9 avec le code : ${code}`);
   process.exit(code ?? 1);
 });
-async function processQueue() {
-  if (isProcessing || requestQueue.length === 0 || !isModelReady) return;
+function processQueue() {
+  if (isProcessing || requestQueue.length === 0 || !isModelReady) {
+    return;
+  }
   isProcessing = true;
   const { userMessage, onFirstToken, resolve } = requestQueue.shift();
   stdoutBuffer = "";
@@ -142,27 +137,45 @@ async function processQueue() {
 function askLLM(userMessage, onFirstToken) {
   return new Promise((resolve, reject) => {
     requestQueue.push({ userMessage, onFirstToken, resolve, reject });
-    processQueue();
+    void processQueue();
   });
 }
+function resetLLM() {
+  requestQueue.length = 0;
+  isProcessing = false;
+  currentCallback = null;
+  stdoutBuffer = "";
+  llama.stdin.write("/clear\n");
+}
+
+// src/bot.ts
+var client = new Eris.Client(DISCORD_TOKEN, {
+  intents: [
+    "guilds",
+    "guildMessages",
+    "messageContent",
+    "directMessages"
+  ]
+});
+var messageWait = /* @__PURE__ */ new Map();
 function splitMessage(text, max = 2e3) {
   const chunks = [];
   let current = "";
   for (const line of text.split("\n")) {
-    if ((current + "\n" + line).length > max) {
+    if (`${current}
+${line}`.length > max) {
       chunks.push(current);
       current = line;
     } else {
-      current = current ? current + "\n" + line : line;
+      current = current ? `${current}
+${line}` : line;
     }
   }
-  if (current) chunks.push(current);
+  if (current) {
+    chunks.push(current);
+  }
   return chunks;
 }
-client.on("ready", () => {
-  console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
-  if (isModelReady) processQueue();
-});
 async function triggerLunaReply(message) {
   let typingInterval = null;
   const startTyping = () => {
@@ -175,20 +188,21 @@ async function triggerLunaReply(message) {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
     const reply = await askLLM({ username: displayName, text: content }, startTyping);
-    if (typingInterval) clearInterval(typingInterval);
+    if (typingInterval) {
+      clearInterval(typingInterval);
+    }
     const chunks = splitMessage(reply);
     for (let i = 0; i < chunks.length; i++) {
       await client.createMessage(message.channel.id, {
         content: chunks[i],
         messageReference: { messageID: message.id },
-        allowedMentions: {
-          repliedUser: false
-          /*i === 0*/
-        }
+        allowedMentions: { repliedUser: false }
       });
     }
   } catch (err) {
-    if (typingInterval) clearInterval(typingInterval);
+    if (typingInterval) {
+      clearInterval(typingInterval);
+    }
     console.error(err);
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${err.message}`,
@@ -196,8 +210,13 @@ async function triggerLunaReply(message) {
     });
   }
 }
+client.on("ready", () => {
+  console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
+});
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
+  if (message.author.bot) {
+    return;
+  }
   if (messageWait.has(message.channel.id)) {
     clearTimeout(messageWait.get(message.channel.id));
     messageWait.delete(message.channel.id);
@@ -212,12 +231,7 @@ client.on("messageCreate", async (message) => {
   const isMe = client.user.id === message.author.id;
   if (message.content === "-clear") {
     console.log("Commande -clear re\xE7ue.");
-    requestQueue.length = 0;
-    isProcessing = false;
-    currentCallback = null;
-    stdoutBuffer = "";
-    llama.stdin.write(`/clear
-`);
+    resetLLM();
     await client.createMessage(message.channel.id, "Historique et m\xE9moire effac\xE9s !");
     return;
   }
@@ -240,4 +254,9 @@ client.on("messageCreate", async (message) => {
     }
   }
 });
-client.connect();
+function startBot() {
+  client.connect();
+}
+
+// src/index.ts
+startBot();

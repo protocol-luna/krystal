@@ -1,0 +1,53 @@
+import "dotenv/config";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function loadSystemPrompt(): string {
+  const promptPath = join(__dirname, "prompt.txt");
+  try {
+    return readFileSync(promptPath, "utf-8").trim();
+  } catch {
+    console.warn(`prompt.txt introuvable (${promptPath}), fallback sur prompt par défaut.`);
+    return "Your name is Luna. You are playful 21 year old girl";
+  }
+}
+
+export const SYSTEM_PROMPT = loadSystemPrompt();
+
+const rawDiscordToken = process.env.DISCORD_TOKEN;
+export const DISCORD_TOKEN: string = rawDiscordToken ?? (() => {
+  console.error("DISCORD_TOKEN manquant dans .env");
+  process.exit(1);
+})();
+
+export const LLAMA_CLI_PATH: string = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
+
+export const LLAMA_MODEL_PATH: string = process.env.LLAMA_MODEL_PATH ?? join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
+
+export const jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
+
+export const llamaArgs = [
+  "-m", LLAMA_MODEL_PATH,
+  "-t", "4", "-tb", "4",
+  "-b", "4096", "-ub", "256",
+  "--mlock",
+  "-c", "4096",
+  "-cnv",
+  "--simple-io",
+
+  "--temp", "0.75",
+  "--dynatemp-range", "0.15",
+  "--top-k", "40",
+  "--top-p", "0.95",
+  "--min-p", "0.05",
+
+  "--repeat-penalty", "1.12",
+  "--repeat-last-n", "256",
+  "--presence-penalty", "0.1",
+
+  "-sys", SYSTEM_PROMPT,
+  "--chat-template", jinjaTemplate,
+];
