@@ -1,9 +1,21 @@
 import "dotenv/config";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import yaml from "js-yaml";
 
 const ROOT = process.cwd();
 
+// --- YAML config ---
+const configPath = join(ROOT, "config.yml");
+const cfg: Record<string, unknown> = existsSync(configPath)
+	? (yaml.load(readFileSync(configPath, "utf-8")) as Record<string, unknown>)
+	: {};
+
+function v<T>(key: string, fallback: T): T {
+	return (cfg[key] as T) ?? fallback;
+}
+
+// --- System prompt ---
 function loadSystemPrompt(): string {
 	const promptPath = join(ROOT, "prompt.txt");
 	try {
@@ -18,6 +30,7 @@ function loadSystemPrompt(): string {
 
 export const SYSTEM_PROMPT = loadSystemPrompt();
 
+// --- Env (surcharge YAML) ---
 const rawDiscordToken = process.env.DISCORD_TOKEN;
 export const DISCORD_TOKEN: string =
 	rawDiscordToken ??
@@ -33,71 +46,67 @@ export const LLAMA_MODEL_PATH: string =
 	process.env.LLAMA_MODEL_PATH ??
 	join(ROOT, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
 
+export const PORT: string = process.env.PORT ?? "3124";
+
 export const jinjaTemplate =
 	"{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
 
-// --- TRIGGER CONFIG ---
-export const names: string[] = ["Luna", "Pixie"];
+// --- Triggers ---
+export const names: string[] = v<string[]>("names", ["Luna", "Pixie"]);
+export const keywords: string[] = v<string[]>("keywords", [
+	"hello", "hi", "hey", "yo",
+	"help", "question",
+	"ai", "llm", "bot",
+]);
+export const randomChance = v<number>("random_chance", 0.015);
+export const cooldownSeconds = v<number>("cooldown_seconds", 8);
+export const replyInDM = v<boolean>("reply_in_dm", true);
 
-export const keywords: string[] = [
-	"hello",
-	"hi",
-	"hey",
-	"yo",
-	"help",
-	"question",
-	"ai",
-	"llm",
-	"bot",
-];
+// --- Mannerisms ---
+export const responseDelayMin = v<number>("response_delay_min", 800);
+export const responseDelayMax = v<number>("response_delay_max", 4000);
+export const reactionChance = v<number>("reaction_chance", 0.06);
+export const ignoreChance = v<number>("ignore_chance", 0.08);
+export const ignoreChanceMention = v<number>("ignore_chance_mention", 0);
+export const serverEmojiChance = v<number>("server_emoji_chance", 0.3);
+export const reactions: string[] = v<string[]>("reactions", [
+	"👀", "😄", "🤔", "👋", "🔥", "💀", "✨",
+	"😭", "🤨", "👌", "🙏", "💅", "🗿", "🌚",
+]);
 
-export const randomChance = 0.015;
+// --- Spontaneous ---
+export const spontaneousIntervalMs = v<number>("spontaneous_interval_ms", 300_000);
+export const spontaneousChance = v<number>("spontaneous_chance", 0.12);
+export const spontaneousContextMessages = v<number>("spontaneous_context_messages", 5);
 
-export const cooldownSeconds = 8;
-
-export const replyInDM = true;
-
-// --- SPONTANEOUS SPAWN ---
-// --- MANNERISMS ---
-export const responseDelayMin = 800;
-export const responseDelayMax = 4000;
-export const reactionChance = 0.06;
-export const ignoreChance = 0.08;
-export const ignoreChanceMention = 0;
-export const reactions = [
-	"👀",
-	"😄",
-	"🤔",
-	"👋",
-	"🔥",
-	"💀",
-	"✨",
-	"😭",
-	"🤨",
-	"👌",
-	"🙏",
-	"💅",
-	"🗿",
-	"🌚",
-];
-export const serverEmojiChance = 0.3;
-
-export const spontaneousIntervalMs = 5 * 60 * 1000;
-export const spontaneousChance = 0.12;
-export const spontaneousContextMessages = 5;
-
-// --- REPLY STYLE ---
+// --- Reply style ---
 export interface ReplyStyle {
 	messageReference: boolean;
 	mentionRepliedUser: boolean;
 }
 
-const replyStyles: { style: ReplyStyle; weight: number }[] = [
-	{ style: { messageReference: true, mentionRepliedUser: false }, weight: 50 },
-	{ style: { messageReference: true, mentionRepliedUser: true }, weight: 15 },
-	{ style: { messageReference: false, mentionRepliedUser: false }, weight: 30 },
-	{ style: { messageReference: false, mentionRepliedUser: true }, weight: 5 },
-];
+interface ReplyStyleEntry {
+	message_reference: boolean;
+	mention_replied_user: boolean;
+	weight: number;
+}
+
+const rawStyles = v<ReplyStyleEntry[]>("reply_styles", [
+	{ message_reference: true,  mention_replied_user: false, weight: 50 },
+	{ message_reference: true,  mention_replied_user: true,  weight: 15 },
+	{ message_reference: false, mention_replied_user: false, weight: 30 },
+	{ message_reference: false, mention_replied_user: true,  weight: 5  },
+]);
+
+const replyStyles: { style: ReplyStyle; weight: number }[] = rawStyles.map(
+	(s) => ({
+		style: {
+			messageReference: s.message_reference,
+			mentionRepliedUser: s.mention_replied_user,
+		},
+		weight: s.weight,
+	}),
+);
 
 export function pickReplyStyle(isActiveConversation: boolean): ReplyStyle {
 	if (!isActiveConversation) {
@@ -122,43 +131,31 @@ export function pickReplyStyle(isActiveConversation: boolean): ReplyStyle {
 	return replyStyles[0].style;
 }
 
+// --- LLM args ---
+import { cpus } from "node:os";
+
+const cpuCount = cpus().length;
+
 export const llamaArgs = [
-	"-m",
-	LLAMA_MODEL_PATH,
-	"-t",
-	"4",
-	"-tb",
-	"4",
-	"-b",
-	"4096",
-	"-ub",
-	"256",
-	"--mlock",
-	"-c",
-	"4096",
-	"-cnv",
+	"-m", LLAMA_MODEL_PATH,
+	"-t", String(cpuCount),
+	"-tb", String(cpuCount),
+	"-b", "4096",
+	"-ub", "256",
+	"--mlock","-c",
+	"4096", "-cnv",
 	"--simple-io",
 
-	"--temp",
-	"0.75",
-	"--dynatemp-range",
-	"0.15",
-	"--top-k",
-	"40",
-	"--top-p",
-	"0.95",
-	"--min-p",
-	"0.05",
+	"--temp", "0.75",
+	"--dynatemp-range", "0.15",
+	"--top-k", "40",
+	"--top-p", "0.95",
+	"--min-p", "0.05",
 
-	"--repeat-penalty",
-	"1.12",
-	"--repeat-last-n",
-	"256",
-	"--presence-penalty",
-	"0.1",
+	"--repeat-penalty", "1.12", 
+  "--repeat-last-n", "256",
+  "--presence-penalty", "0.1",
 
-	"-sys",
-	SYSTEM_PROMPT,
-	"--chat-template",
-	jinjaTemplate,
+	"-sys", SYSTEM_PROMPT,
+	"--chat-template", jinjaTemplate,
 ];

@@ -21,7 +21,25 @@ Deux processus séparés — le LLM (llama-cli avec chargement du modèle) et le
 
 ## Dataset
 
-Le modèle utilisé est fine-tuné sur [**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) — un dataset de conversations Discord réelles, avec pseudos, langage naturel, emojis et slapements. Le bot est prévu pour tourner sur un GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`).
+Le modèle utilisé est fine-tuné sur [**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) — **7.3M échanges**, **16.9M turns**, **140M mots**, collectés sur Discord printemps-été 2025. Conversations humaines réelles filtrées (PII, ToS, bots, commandes). Licence Apache 2.0.
+
+```mermaid
+xychart-beta
+  title "Distribution du nombre de turns par échange"
+  x-axis ["2", "3", "4", "5", "6", "7+"]
+  y-axis "Échanges (millions)" 0 --> 6
+  bar [5.80, 1.04, 0.30, 0.10, 0.04, 0.04]
+```
+
+| Métrique | Valeur |
+|---|---|
+| Échantillons | 7 303 464 |
+| Turns total | 16 881 010 |
+| Mots total | 139 922 950 |
+| Tokens moyen | 32.8 |
+| Tokenizer | Hermes-3-Llama-3.1-8B |
+
+Le bot est prévu pour tourner sur un GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`).
 
 ---
 
@@ -191,6 +209,40 @@ flowchart LR
 
 ## Configuration
 
+Deux couches, la YAML écrase les valeurs par défaut, puis `.env` écrase pour les secrets et chemins.
+
+### `config.yml` (recommandé)
+
+Toute la configuration du bot : triggers, mannerisms, styles de reply. Exemple :
+
+```yaml
+names:
+  - "Luna"
+  - "Pixie"
+
+keywords:
+  - "hello"
+  - "hi"
+  - "hey"
+  - "ai"
+  - "bot"
+
+random_chance: 0.015
+cooldown_seconds: 8
+reply_in_dm: true
+
+response_delay_min: 800
+response_delay_max: 4000
+
+reaction_chance: 0.06
+ignore_chance: 0.08
+
+spontaneous_interval_ms: 300000
+spontaneous_chance: 0.12
+```
+
+Voir le fichier complet à la racine.
+
 ### `.env`
 
 | Variable | Défaut | Description |
@@ -202,7 +254,7 @@ flowchart LR
 
 ### `prompt.txt`
 
-Fichier lu au démarrage, contient le system prompt :
+Fichier lu au démarrage, contient le system prompt. Exemple :
 
 ```
 Your name is pixieglow. You are a 21-year-old girl studying art.
@@ -210,6 +262,8 @@ Talk naturally and never prefix your replies with your name.
 ```
 
 ### Paramètres LLM (llama-cli)
+
+Les flags `-t` / `-tb` (thread count) sont automatiquement détectés via `os.cpus().length`.
 
 ```yaml
 temp: 0.75
@@ -220,9 +274,14 @@ min-p: 0.05
 repeat-penalty: 1.12
 repeat-last-n: 256
 presence-penalty: 0.1
+batch: 4096
+ubatch: 256
+context: 4096
 ```
 
 Chat template : ChatML (`<|im_start|>/<|im_end|>`)
+
+Ces paramètres sont codés en dur dans `src/config.ts` (non modifiables via `config.yml`).
 
 ---
 
@@ -250,6 +309,7 @@ npm install
 # Configuration
 cp .env.example .env
 # éditer DISCORD_TOKEN dans .env
+# éditer config.yml (triggers, mannerisms, LLM, etc.)
 
 # System prompt
 echo "Your name is pixieglow. You are a 21-year-old girl studying art." > prompt.txt

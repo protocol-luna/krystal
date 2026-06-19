@@ -3,9 +3,16 @@ import * as Eris from "eris";
 
 // src/config.ts
 import "dotenv/config";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import yaml from "js-yaml";
+import { cpus } from "node:os";
 var ROOT = process.cwd();
+var configPath = join(ROOT, "config.yml");
+var cfg = existsSync(configPath) ? yaml.load(readFileSync(configPath, "utf-8")) : {};
+function v(key, fallback) {
+  return cfg[key] ?? fallback;
+}
 function loadSystemPrompt() {
   const promptPath = join(ROOT, "prompt.txt");
   try {
@@ -25,8 +32,10 @@ var DISCORD_TOKEN = rawDiscordToken ?? (() => {
 })();
 var LLAMA_CLI_PATH = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
 var LLAMA_MODEL_PATH = process.env.LLAMA_MODEL_PATH ?? join(ROOT, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
-var names = ["Luna", "Pixie"];
-var keywords = [
+var PORT = process.env.PORT ?? "3124";
+var jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
+var names = v("names", ["Luna", "Pixie"]);
+var keywords = v("keywords", [
   "hello",
   "hi",
   "hey",
@@ -36,16 +45,17 @@ var keywords = [
   "ai",
   "llm",
   "bot"
-];
-var randomChance = 0.015;
-var cooldownSeconds = 8;
-var replyInDM = true;
-var responseDelayMin = 800;
-var responseDelayMax = 4e3;
-var reactionChance = 0.06;
-var ignoreChance = 0.08;
-var ignoreChanceMention = 0;
-var reactions = [
+]);
+var randomChance = v("random_chance", 0.015);
+var cooldownSeconds = v("cooldown_seconds", 8);
+var replyInDM = v("reply_in_dm", true);
+var responseDelayMin = v("response_delay_min", 800);
+var responseDelayMax = v("response_delay_max", 4e3);
+var reactionChance = v("reaction_chance", 0.06);
+var ignoreChance = v("ignore_chance", 0.08);
+var ignoreChanceMention = v("ignore_chance_mention", 0);
+var serverEmojiChance = v("server_emoji_chance", 0.3);
+var reactions = v("reactions", [
   "\u{1F440}",
   "\u{1F604}",
   "\u{1F914}",
@@ -60,17 +70,25 @@ var reactions = [
   "\u{1F485}",
   "\u{1F5FF}",
   "\u{1F31A}"
-];
-var serverEmojiChance = 0.3;
-var spontaneousIntervalMs = 5 * 60 * 1e3;
-var spontaneousChance = 0.12;
-var spontaneousContextMessages = 5;
-var replyStyles = [
-  { style: { messageReference: true, mentionRepliedUser: false }, weight: 50 },
-  { style: { messageReference: true, mentionRepliedUser: true }, weight: 15 },
-  { style: { messageReference: false, mentionRepliedUser: false }, weight: 30 },
-  { style: { messageReference: false, mentionRepliedUser: true }, weight: 5 }
-];
+]);
+var spontaneousIntervalMs = v("spontaneous_interval_ms", 3e5);
+var spontaneousChance = v("spontaneous_chance", 0.12);
+var spontaneousContextMessages = v("spontaneous_context_messages", 5);
+var rawStyles = v("reply_styles", [
+  { message_reference: true, mention_replied_user: false, weight: 50 },
+  { message_reference: true, mention_replied_user: true, weight: 15 },
+  { message_reference: false, mention_replied_user: false, weight: 30 },
+  { message_reference: false, mention_replied_user: true, weight: 5 }
+]);
+var replyStyles = rawStyles.map(
+  (s) => ({
+    style: {
+      messageReference: s.message_reference,
+      mentionRepliedUser: s.mention_replied_user
+    },
+    weight: s.weight
+  })
+);
 function pickReplyStyle(isActiveConversation) {
   if (!isActiveConversation) {
     const roll2 = Math.random();
@@ -92,6 +110,44 @@ function pickReplyStyle(isActiveConversation) {
   }
   return replyStyles[0].style;
 }
+var cpuCount = cpus().length;
+var llamaArgs = [
+  "-m",
+  LLAMA_MODEL_PATH,
+  "-t",
+  String(cpuCount),
+  "-tb",
+  String(cpuCount),
+  "-b",
+  "4096",
+  "-ub",
+  "256",
+  "--mlock",
+  "-c",
+  "4096",
+  "-cnv",
+  "--simple-io",
+  "--temp",
+  "0.75",
+  "--dynatemp-range",
+  "0.15",
+  "--top-k",
+  "40",
+  "--top-p",
+  "0.95",
+  "--min-p",
+  "0.05",
+  "--repeat-penalty",
+  "1.12",
+  "--repeat-last-n",
+  "256",
+  "--presence-penalty",
+  "0.1",
+  "-sys",
+  SYSTEM_PROMPT,
+  "--chat-template",
+  jinjaTemplate
+];
 
 // src/llm-client.ts
 var LLM_PORT = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
@@ -174,8 +230,8 @@ var responseCount = /* @__PURE__ */ new Map();
 var MAX_FOLLOWUPS = 3;
 var FOLLOWUP_WINDOW = 6e4;
 var paused = false;
-function setPaused(v) {
-  paused = v;
+function setPaused(v2) {
+  paused = v2;
 }
 function isOnCooldown(channelId) {
   const last = channelCooldowns.get(channelId);

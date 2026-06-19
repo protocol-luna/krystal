@@ -1,0 +1,69 @@
+# Configuration pixieglow Discord Bot
+# Surchargé par .env pour DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH
+# Surchargé par prompt.txt pour le system prompt
+
+# --- Triggers ---
+names:
+  - "Luna"
+  - "Pixie"
+
+keywords:
+  - "hello"
+  - "hi"
+  - "hey"
+  - "yo"
+  - "help"
+  - "question"
+  - "ai"
+  - "llm"
+  - "bot"
+
+random_chance: 0.015
+cooldown_seconds: 8
+reply_in_dm: true
+
+# --- Mannerisms ---
+response_delay_min: 800
+response_delay_max: 4000
+
+reaction_chance: 0.06
+ignore_chance: 0.08
+ignore_chance_mention: 0
+server_emoji_chance: 0.3
+
+reactions:
+  - "👀"
+  - "😄"
+  - "🤔"
+  - "👋"
+  - "🔥"
+  - "💀"
+  - "✨"
+  - "😭"
+  - "🤨"
+  - "👌"
+  - "🙏"
+  - "💅"
+  - "🗿"
+  - "🌚"
+
+# --- Spontaneous ---
+spontaneous_interval_ms: 300000     # 5 min
+spontaneous_chance: 0.12
+spontaneous_context_messages: 5
+
+# --- Reply styles (poids en pourcentage) ---
+reply_styles:
+  - message_reference: true
+    mention_replied_user: false
+    weight: 50
+  - message_reference: true
+    mention_replied_user: true
+    weight: 15
+  - message_reference: false
+    mention_replied_user: false
+    weight: 30
+  - message_reference: false
+    mention_replied_user: true
+    weight: 5
+
