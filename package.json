@@ -5,8 +5,8 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
     "start": "concurrently --kill-others \"bun src/llm-server.ts\" \"node self-cli.js\"",
-    "dev": "concurrently --kill-others \"bun --hot src/llm-server.ts\" \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --hot self-cli.js\"",
-    "client-only": "concurrently --kill-others \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --hot self-cli.js\"",
+    "dev": "concurrently --kill-others \"bun --hot src/llm-server.ts\" \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --watch src/index.ts\"",
+    "client-only": "concurrently --kill-others \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --watch src/index.ts\"",
     "server-only": "bun src/llm-server.ts",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
