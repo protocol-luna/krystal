@@ -6,7 +6,7 @@
     "build": "npm run build-client && npm run build-server",
     "build-client": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
     "build-server": "esbuild src/llm-server.ts --bundle --platform=node --format=esm --packages=external --outfile=llm-server.js",
-    "start": "concurrently --kill-others \"node llm-server.ks\" \"node self-cli.js\"",
+    "start": "concurrently --kill-others \"node llm-server.js\" \"node self-cli.js\"",
     "dev": "concurrently --kill-others \"bun --hot src/llm-server.ts\" \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --watch src/index.ts\"",
     "client-only": "node self-cli.js",
     "server-only": "node llm-server.js",
