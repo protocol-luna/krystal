@@ -6,9 +6,14 @@ interface UserMessage {
   text: string;
 }
 
+interface LLMCallbacks {
+  onFirstToken: () => void;
+  onChunk: (chunk: string) => void;
+}
+
 interface QueueItem {
   userMessage: UserMessage;
-  onFirstToken: () => void;
+  callbacks: LLMCallbacks;
   resolve: (value: string) => void;
   reject: (reason: unknown) => void;
 }
@@ -18,11 +23,28 @@ const llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 
 const requestQueue: QueueItem[] = [];
 let isProcessing = false;
-let currentCallback: ((text: string, isDone: boolean) => void) | null = null;
+let currentOnChunk: ((chunk: string) => void) | null = null;
+let currentOnDone: ((text: string) => void) | null = null;
 let currentOnFirstToken: (() => void) | null = null;
 let isModelReady = false;
 let stdoutBuffer = "";
 let currentUsername = "";
+
+function cleanLine(line: string): string {
+  let cleaned = line;
+  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
+  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
+  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"), "");
+  return cleaned.trim();
+}
+
+function cleanFullResponse(text: string): string {
+  let cleaned = text;
+  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
+  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
+  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"), "");
+  return cleaned.trim();
+}
 
 llama.stdout!.on("data", (data: Buffer) => {
   const str = data.toString();
@@ -38,29 +60,40 @@ llama.stdout!.on("data", (data: Buffer) => {
 
   stdoutBuffer += str;
 
-  if (currentCallback && stdoutBuffer.length > 0) {
-    if (currentOnFirstToken) {
-      currentOnFirstToken();
-      currentOnFirstToken = null;
-    }
+  if (!(currentOnChunk || currentOnDone)) { return; }
 
-    if (stdoutBuffer.includes("\n> ") || stdoutBuffer.endsWith("> ")) {
-      let cleanResponse = stdoutBuffer.replace(/[\n\r]*>[\s]*$/, "");
-
-      cleanResponse = cleanResponse.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
-
-      const userTagRegex = /\[\s*User:\s*.*?\s*\]/gi;
-      cleanResponse = cleanResponse.replace(userTagRegex, "");
-
-      const namePrefixRegex = new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i");
-      cleanResponse = cleanResponse.replace(namePrefixRegex, "");
-
-      currentCallback(cleanResponse.trim(), true);
-    } else {
-      const streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
-      currentCallback(streamingClean, false);
-    }
+  if (currentOnFirstToken) {
+    currentOnFirstToken();
+    currentOnFirstToken = null;
   }
+
+  // Check if response is complete (prompt marker at end)
+  const endMatch = stdoutBuffer.match(/\n> $/);
+  if (endMatch) {
+    const fullText = stdoutBuffer.slice(0, endMatch.index);
+    stdoutBuffer = "";
+    const cleaned = cleanFullResponse(fullText);
+    // Emit any remaining lines from the full response
+    for (const line of cleaned.split("\n")) {
+      const l = line.trim();
+      if (l) { currentOnChunk?.(l); }
+    }
+    if (currentOnDone) { currentOnDone(cleaned); }
+    return;
+  }
+
+  // Don't emit if buffer looks like it just contains a prompt marker
+  if (stdoutBuffer.trim() === ">") { return; }
+
+  // Extract complete lines (everything before the last \n)
+  const lastNewline = stdoutBuffer.lastIndexOf("\n");
+  if (lastNewline === -1) { return; }
+
+  const chunk = stdoutBuffer.slice(0, lastNewline);
+  stdoutBuffer = stdoutBuffer.slice(lastNewline + 1);
+
+  const cleaned = cleanLine(chunk);
+  if (cleaned) { currentOnChunk?.(cleaned); }
 });
 
 llama.stderr!.on("data", (data: Buffer) => {
@@ -79,18 +112,18 @@ function processQueue(): void {
   if (isProcessing || requestQueue.length === 0 || !isModelReady) { return; }
   isProcessing = true;
 
-  const { userMessage, onFirstToken, resolve } = requestQueue.shift()!;
+  const { userMessage, callbacks, resolve } = requestQueue.shift()!;
   stdoutBuffer = "";
   currentUsername = userMessage.username;
 
-  currentOnFirstToken = onFirstToken;
-  currentCallback = (text: string, isDone: boolean) => {
-    if (isDone) {
-      currentCallback = null;
-      resolve(text.trim());
-      isProcessing = false;
-      setTimeout(() => processQueue(), 100);
-    }
+  currentOnFirstToken = callbacks.onFirstToken;
+  currentOnChunk = callbacks.onChunk;
+  currentOnDone = (text: string) => {
+    currentOnChunk = null;
+    currentOnDone = null;
+    resolve(text);
+    isProcessing = false;
+    setTimeout(() => processQueue(), 100);
   };
 
   llama.stdin!.write(`${userMessage.username}: ${userMessage.text}\n`);
@@ -98,10 +131,10 @@ function processQueue(): void {
 
 export function askLLM(
   userMessage: UserMessage,
-  onFirstToken: () => void,
+  callbacks: LLMCallbacks,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    requestQueue.push({ userMessage, onFirstToken, resolve, reject });
+    requestQueue.push({ userMessage, callbacks, resolve, reject });
     void processQueue();
   });
 }
@@ -109,7 +142,8 @@ export function askLLM(
 export function resetLLM(): void {
   requestQueue.length = 0;
   isProcessing = false;
-  currentCallback = null;
+  currentOnChunk = null;
+  currentOnDone = null;
   stdoutBuffer = "";
   llama.stdin!.write("/clear\n");
 }

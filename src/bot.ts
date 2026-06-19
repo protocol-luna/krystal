@@ -13,21 +13,6 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 
 const messageWait = new Map<string, ReturnType<typeof setTimeout>>();
 
-function splitMessage(text: string, max = 2000): string[] {
-  const chunks: string[] = [];
-  let current = "";
-  for (const line of text.split("\n")) {
-    if ((`${current}\n${line}`).length > max) {
-      chunks.push(current);
-      current = line;
-    } else {
-      current = current ? `${current}\n${line}` : line;
-    }
-  }
-  if (current) { chunks.push(current); }
-  return chunks;
-}
-
 async function triggerLunaReply(message: Eris.Message): Promise<void> {
   let typingInterval: ReturnType<typeof setInterval> | null = null;
   const startTyping = () => {
@@ -44,17 +29,25 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
 
     const displayName = (message.member as Eris.Member | null)?.nick || message.author.username;
 
-    const reply = await askLLM({ username: displayName, text: content }, startTyping);
-    if (typingInterval) { clearInterval(typingInterval); }
+    let sendChain: Promise<unknown> = Promise.resolve();
 
-    const chunks = splitMessage(reply);
-    for (let i = 0; i < chunks.length; i++) {
-      await client.createMessage(message.channel.id, {
-        content: chunks[i],
-        messageReference: { messageID: message.id },
-        allowedMentions: { repliedUser: false },
-      });
-    }
+    await askLLM(
+      { username: displayName, text: content },
+      {
+        onFirstToken: startTyping,
+        onChunk: (chunk: string) => {
+          sendChain = sendChain.then(() =>
+            client.createMessage(message.channel.id, {
+              content: chunk,
+              messageReference: { messageID: message.id },
+              allowedMentions: { repliedUser: false },
+            }),
+          );
+        },
+      },
+    );
+
+    await sendChain;
   } catch (err) {
     if (typingInterval) { clearInterval(typingInterval); }
     console.error(err);

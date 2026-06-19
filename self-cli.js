@@ -69,11 +69,26 @@ console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 var llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 var requestQueue = [];
 var isProcessing = false;
-var currentCallback = null;
+var currentOnChunk = null;
+var currentOnDone = null;
 var currentOnFirstToken = null;
 var isModelReady = false;
 var stdoutBuffer = "";
 var currentUsername = "";
+function cleanLine(line) {
+  let cleaned = line;
+  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
+  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
+  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"), "");
+  return cleaned.trim();
+}
+function cleanFullResponse(text) {
+  let cleaned = text;
+  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
+  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
+  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"), "");
+  return cleaned.trim();
+}
 llama.stdout.on("data", (data) => {
   const str = data.toString();
   if (!isModelReady) {
@@ -85,23 +100,41 @@ llama.stdout.on("data", (data) => {
     return;
   }
   stdoutBuffer += str;
-  if (currentCallback && stdoutBuffer.length > 0) {
-    if (currentOnFirstToken) {
-      currentOnFirstToken();
-      currentOnFirstToken = null;
+  if (!(currentOnChunk || currentOnDone)) {
+    return;
+  }
+  if (currentOnFirstToken) {
+    currentOnFirstToken();
+    currentOnFirstToken = null;
+  }
+  const endMatch = stdoutBuffer.match(/\n> $/);
+  if (endMatch) {
+    const fullText = stdoutBuffer.slice(0, endMatch.index);
+    stdoutBuffer = "";
+    const cleaned2 = cleanFullResponse(fullText);
+    for (const line of cleaned2.split("\n")) {
+      const l = line.trim();
+      if (l) {
+        currentOnChunk?.(l);
+      }
     }
-    if (stdoutBuffer.includes("\n> ") || stdoutBuffer.endsWith("> ")) {
-      let cleanResponse = stdoutBuffer.replace(/[\n\r]*>[\s]*$/, "");
-      cleanResponse = cleanResponse.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
-      const userTagRegex = /\[\s*User:\s*.*?\s*\]/gi;
-      cleanResponse = cleanResponse.replace(userTagRegex, "");
-      const namePrefixRegex = new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i");
-      cleanResponse = cleanResponse.replace(namePrefixRegex, "");
-      currentCallback(cleanResponse.trim(), true);
-    } else {
-      const streamingClean = stdoutBuffer.replace(/\[\s*Prompt:[\s\S]*$/, "");
-      currentCallback(streamingClean, false);
+    if (currentOnDone) {
+      currentOnDone(cleaned2);
     }
+    return;
+  }
+  if (stdoutBuffer.trim() === ">") {
+    return;
+  }
+  const lastNewline = stdoutBuffer.lastIndexOf("\n");
+  if (lastNewline === -1) {
+    return;
+  }
+  const chunk = stdoutBuffer.slice(0, lastNewline);
+  stdoutBuffer = stdoutBuffer.slice(lastNewline + 1);
+  const cleaned = cleanLine(chunk);
+  if (cleaned) {
+    currentOnChunk?.(cleaned);
   }
 });
 llama.stderr.on("data", (data) => {
@@ -119,31 +152,32 @@ function processQueue() {
     return;
   }
   isProcessing = true;
-  const { userMessage, onFirstToken, resolve } = requestQueue.shift();
+  const { userMessage, callbacks, resolve } = requestQueue.shift();
   stdoutBuffer = "";
   currentUsername = userMessage.username;
-  currentOnFirstToken = onFirstToken;
-  currentCallback = (text, isDone) => {
-    if (isDone) {
-      currentCallback = null;
-      resolve(text.trim());
-      isProcessing = false;
-      setTimeout(() => processQueue(), 100);
-    }
+  currentOnFirstToken = callbacks.onFirstToken;
+  currentOnChunk = callbacks.onChunk;
+  currentOnDone = (text) => {
+    currentOnChunk = null;
+    currentOnDone = null;
+    resolve(text);
+    isProcessing = false;
+    setTimeout(() => processQueue(), 100);
   };
   llama.stdin.write(`${userMessage.username}: ${userMessage.text}
 `);
 }
-function askLLM(userMessage, onFirstToken) {
+function askLLM(userMessage, callbacks) {
   return new Promise((resolve, reject) => {
-    requestQueue.push({ userMessage, onFirstToken, resolve, reject });
+    requestQueue.push({ userMessage, callbacks, resolve, reject });
     void processQueue();
   });
 }
 function resetLLM() {
   requestQueue.length = 0;
   isProcessing = false;
-  currentCallback = null;
+  currentOnChunk = null;
+  currentOnDone = null;
   stdoutBuffer = "";
   llama.stdin.write("/clear\n");
 }
@@ -158,24 +192,6 @@ var client = new Eris.Client(DISCORD_TOKEN, {
   ]
 });
 var messageWait = /* @__PURE__ */ new Map();
-function splitMessage(text, max = 2e3) {
-  const chunks = [];
-  let current = "";
-  for (const line of text.split("\n")) {
-    if (`${current}
-${line}`.length > max) {
-      chunks.push(current);
-      current = line;
-    } else {
-      current = current ? `${current}
-${line}` : line;
-    }
-  }
-  if (current) {
-    chunks.push(current);
-  }
-  return chunks;
-}
 async function triggerLunaReply(message) {
   let typingInterval = null;
   const startTyping = () => {
@@ -187,18 +203,23 @@ async function triggerLunaReply(message) {
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
-    const reply = await askLLM({ username: displayName, text: content }, startTyping);
-    if (typingInterval) {
-      clearInterval(typingInterval);
-    }
-    const chunks = splitMessage(reply);
-    for (let i = 0; i < chunks.length; i++) {
-      await client.createMessage(message.channel.id, {
-        content: chunks[i],
-        messageReference: { messageID: message.id },
-        allowedMentions: { repliedUser: false }
-      });
-    }
+    let sendChain = Promise.resolve();
+    await askLLM(
+      { username: displayName, text: content },
+      {
+        onFirstToken: startTyping,
+        onChunk: (chunk) => {
+          sendChain = sendChain.then(
+            () => client.createMessage(message.channel.id, {
+              content: chunk,
+              messageReference: { messageID: message.id },
+              allowedMentions: { repliedUser: false }
+            })
+          );
+        }
+      }
+    );
+    await sendChain;
   } catch (err) {
     if (typingInterval) {
       clearInterval(typingInterval);
