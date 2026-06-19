@@ -5,6 +5,8 @@ import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, t
 import { trySpawn } from "./spontaneous.js";
 import { computeDelay, shouldIgnore, shouldReact, pickReaction } from "./mannerisms.js";
 
+const followUpTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
     "guilds",
@@ -13,8 +15,6 @@ const client = new Eris.Client(DISCORD_TOKEN, {
     "directMessages",
   ],
 });
-
-const followUpTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 async function triggerLunaReply(message: Eris.Message): Promise<void> {
   let typingInterval: ReturnType<typeof setInterval> | null = null;
@@ -35,6 +35,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     const displayName = (message.member as Eris.Member | null)?.nick || message.author.username;
 
     let sendChain: Promise<unknown> = Promise.resolve();
+    let isFirstChunk = true;
 
     await askLLM(
       { username: displayName, text: content },
@@ -44,16 +45,17 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
           sendChain = sendChain.then(() =>
             client.createMessage(message.channel.id, {
               content: chunk,
-              ...(style.messageReference
+              ...(isFirstChunk && style.messageReference
                 ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
                 : {}),
-            }).then(() => markBotActivity(message.channel.id)),
+            }).then(() => { isFirstChunk = false; markBotActivity(message.channel.id); }),
           );
         },
       },
     );
 
     await sendChain;
+    trackSpeaker(message.channel.id, client.user.id);
   } catch (err) {
     console.error(err);
     await client.createMessage(message.channel.id, {
@@ -74,7 +76,6 @@ client.on("ready", () => {
 client.on("messageCreate", async (message: Eris.Message) => {
   if (message.author.id === client.user.id) { return; }
 
-  // Cancel any pending follow-up timer for this channel
   if (followUpTimers.has(message.channel.id)) {
     clearTimeout(followUpTimers.get(message.channel.id)!);
     followUpTimers.delete(message.channel.id);
@@ -130,12 +131,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
     return;
   }
 
-  // Follow-up: only if bot was the last speaker and is within the response budget
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username);
       if (followUp.shouldRespond) {
         await triggerLunaReply(message);
       }

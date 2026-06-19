@@ -387,6 +387,7 @@ function pickReaction(customEmojis) {
 }
 
 // src/bot.ts
+var followUpTimers = /* @__PURE__ */ new Map();
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
     "guilds",
@@ -395,7 +396,6 @@ var client = new Eris.Client(DISCORD_TOKEN, {
     "directMessages"
   ]
 });
-var followUpTimers = /* @__PURE__ */ new Map();
 async function triggerLunaReply(message) {
   let typingInterval = null;
   const startTyping = () => {
@@ -409,6 +409,7 @@ async function triggerLunaReply(message) {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
     let sendChain = Promise.resolve();
+    let isFirstChunk = true;
     await askLLM(
       { username: displayName, text: content },
       {
@@ -417,13 +418,17 @@ async function triggerLunaReply(message) {
           sendChain = sendChain.then(
             () => client.createMessage(message.channel.id, {
               content: chunk,
-              ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
-            }).then(() => markBotActivity(message.channel.id))
+              ...isFirstChunk && style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
+            }).then(() => {
+              isFirstChunk = false;
+              markBotActivity(message.channel.id);
+            })
           );
         }
       }
     );
     await sendChain;
+    trackSpeaker(message.channel.id, client.user.id);
   } catch (err) {
     console.error(err);
     await client.createMessage(message.channel.id, {
@@ -494,7 +499,7 @@ client.on("messageCreate", async (message) => {
     trackSpeaker(message.channel.id, message.author.id);
     const timer = setTimeout(async () => {
       followUpTimers.delete(message.channel.id);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username);
       if (followUp.shouldRespond) {
         await triggerLunaReply(message);
       }
