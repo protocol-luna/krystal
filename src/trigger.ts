@@ -35,7 +35,7 @@ function isOnCooldown(channelId: string): boolean {
   return Date.now() - last < cooldownSeconds * 1000;
 }
 
-function markReplied(channelId: string): void {
+export function markReplied(channelId: string): void {
   const now = Date.now();
   channelCooldowns.set(channelId, now);
   botActivity.set(channelId, now);

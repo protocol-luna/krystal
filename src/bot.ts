@@ -1,11 +1,9 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN, pickReplyStyle, spontaneousIntervalMs, spontaneousChance } from "./config.js";
 import { askLLM, resetLLM } from "./llm-client.js";
-import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, trackSpeaker, canFollowUp, setPaused, type TriggerResult } from "./trigger.js";
+import { evaluateMessage, isRecentBotActivity, markBotActivity, markReplied, clearCooldown, trackSpeaker, canFollowUp, setPaused, type TriggerResult } from "./trigger.js";
 import { trySpawn } from "./spontaneous.js";
 import { computeDelay, shouldIgnore, shouldReact, pickReaction } from "./mannerisms.js";
-
-const followUpTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -80,12 +78,6 @@ client.on("messageCreate", async (message: Eris.Message) => {
   const author = message.member?.nick || message.author.username;
   const channel = message.channel as Eris.GuildTextableChannel;
 
-  if (followUpTimers.has(message.channel.id)) {
-    clearTimeout(followUpTimers.get(message.channel.id)!);
-    followUpTimers.delete(message.channel.id);
-    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer annulé (nouveau message)`);
-  }
-
   const result: TriggerResult = evaluateMessage(
     message,
     client.user.id,
@@ -144,21 +136,23 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   if (canFollowUp(message.channel.id, client.user.id)) {
     trackSpeaker(message.channel.id, message.author.id);
-    console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer armé (4.5s)`);
-    const timer = setTimeout(async () => {
-      followUpTimers.delete(message.channel.id);
-      console.log(`[bot] #${channel.name ?? message.channel.id} followUpTimer déclenché`);
-      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
-      if (followUp.shouldRespond) {
-        console.log(`[bot] #${channel.name ?? message.channel.id} followUp → réponse`);
-        await triggerLunaReply(message);
-      }
-    }, 4500);
+    markReplied(message.channel.id);
+    console.log(`[bot] #${channel.name ?? message.channel.id} ${author}: follow-up immédiat`);
+    await new Promise((r) => setTimeout(r, computeDelay()));
 
-    followUpTimers.set(message.channel.id, timer);
-  } else {
-    trackSpeaker(message.channel.id, message.author.id);
+    if (shouldReact()) {
+      const guild = (channel as Eris.GuildTextableChannel).guild;
+      const serverEmojis = guild?.emojis
+        ?.filter((e) => e.id)
+        .map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      const reaction = pickReaction(serverEmojis);
+      await message.addReaction(reaction).catch(() => {});
+    }
+
+    await triggerLunaReply(message);
   }
+
+  trackSpeaker(message.channel.id, message.author.id);
 });
 
 export function startBot(): void {
