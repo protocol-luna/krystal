@@ -73,6 +73,10 @@ client.on("ready", () => {
   console.log(`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`);
 });
 
+client.on("error", (err: Error) => {
+  console.error("[eris] error:", err.message);
+});
+
 client.on("messageCreate", async (message: Eris.Message) => {
   if (message.author.id === client.user.id) { return; }
 

@@ -485,6 +485,9 @@ async function triggerLunaReply(message, isDM = false) {
 client.on("ready", () => {
   console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
 });
+client.on("error", (err) => {
+  console.error("[eris] error:", err.message);
+});
 client.on("messageCreate", async (message) => {
   if (message.author.id === client.user.id) {
     return;
