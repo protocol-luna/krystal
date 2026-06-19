@@ -29,6 +29,21 @@ export const LLAMA_MODEL_PATH: string = process.env.LLAMA_MODEL_PATH ?? join(__d
 
 export const jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
 
+// --- TRIGGER CONFIG ---
+export const names: string[] = ["Luna", "Pixie"];
+
+export const keywords: string[] = [
+  "hello", "hi", "hey", "yo",
+  "help", "question",
+  "ai", "llm", "bot",
+];
+
+export const randomChance = 0.015;
+
+export const cooldownSeconds = 8;
+
+export const replyInDM = true;
+
 export const llamaArgs = [
   "-m", LLAMA_MODEL_PATH,
   "-t", "4", "-tb", "4",

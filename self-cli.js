@@ -25,6 +25,21 @@ var DISCORD_TOKEN = rawDiscordToken ?? (() => {
 var LLAMA_CLI_PATH = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
 var LLAMA_MODEL_PATH = process.env.LLAMA_MODEL_PATH ?? join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
 var jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
+var names = ["Luna", "Pixie"];
+var keywords = [
+  "hello",
+  "hi",
+  "hey",
+  "yo",
+  "help",
+  "question",
+  "ai",
+  "llm",
+  "bot"
+];
+var randomChance = 0.015;
+var cooldownSeconds = 8;
+var replyInDM = true;
 var llamaArgs = [
   "-m",
   LLAMA_MODEL_PATH,
@@ -182,17 +197,80 @@ function resetLLM() {
   llama.stdin.write("/clear\n");
 }
 
-// src/detect.ts
-function detectTrigger(message, botId, botUsername) {
-  const isMentioned = message.mentions.some((u) => u.id === botId);
-  const isDM = message.channel.type === 1;
+// src/trigger.ts
+var channelCooldowns = /* @__PURE__ */ new Map();
+function isOnCooldown(channelId) {
+  const last = channelCooldowns.get(channelId);
+  if (!last) {
+    return false;
+  }
+  return Date.now() - last < cooldownSeconds * 1e3;
+}
+function markReplied(channelId) {
+  channelCooldowns.set(channelId, Date.now());
+}
+function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
+  if (message.author.bot) {
+    return { shouldRespond: false, reason: null, botName: "" };
+  }
+  if (message.content === "-clear") {
+    return { shouldRespond: true, reason: "clear", botName: "" };
+  }
+  const isMe = botId === message.author.id;
+  if (isMe) {
+    return { shouldRespond: false, reason: null, botName: "" };
+  }
   const guild = message.channel.guild;
   const botMember = guild?.members?.get(botId);
   const botName = botMember?.nick || botUsername;
-  const hasBotName = message.content.toLowerCase().includes(botName.toLowerCase());
-  const hasPixie = message.content.toLowerCase().includes("pixie");
-  const isMe = botId === message.author.id;
-  return { isMentioned, isDM, botName, hasBotName, hasPixie, isMe };
+  const contentLower = message.content.toLowerCase();
+  const isMentioned = message.mentions.some((u) => u.id === botId);
+  const isDM = message.channel.type === 1;
+  if (isMentioned) {
+    return { shouldRespond: true, reason: "mention", botName };
+  }
+  if (isDM && replyInDM) {
+    return { shouldRespond: true, reason: "dm", botName };
+  }
+  if (isDM) {
+    return { shouldRespond: false, reason: null, botName };
+  }
+  if (isOnCooldown(message.channel.id) && !isMentioned && !isFollowUp) {
+    return { shouldRespond: false, reason: null, botName };
+  }
+  if (contentLower.includes(botName.toLowerCase())) {
+    markReplied(message.channel.id);
+    return { shouldRespond: true, reason: "name", botName };
+  }
+  for (const name of names) {
+    if (contentLower.includes(name.toLowerCase())) {
+      markReplied(message.channel.id);
+      return { shouldRespond: true, reason: "name", botName };
+    }
+  }
+  for (const keyword of keywords) {
+    if (contentLower.includes(keyword.toLowerCase())) {
+      markReplied(message.channel.id);
+      return { shouldRespond: true, reason: "keyword", botName };
+    }
+  }
+  if (isFollowUp) {
+    return { shouldRespond: true, reason: "follow-up", botName };
+  }
+  if (randomChance > 0 && Math.random() < randomChance) {
+    markReplied(message.channel.id);
+    return { shouldRespond: true, reason: "random", botName };
+  }
+  return { shouldRespond: false, reason: null, botName };
+}
+function isFollowUpMessage(prevMsg, currentMsg, botId) {
+  if (!prevMsg) {
+    return false;
+  }
+  return prevMsg.author.id === botId && currentMsg.author.id !== botId;
+}
+function clearCooldown(channelId) {
+  channelCooldowns.delete(channelId);
 }
 
 // src/bot.ts
@@ -248,41 +326,41 @@ client.on("ready", () => {
   console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
 });
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) {
-    return;
-  }
   if (messageWait.has(message.channel.id)) {
     clearTimeout(messageWait.get(message.channel.id));
     messageWait.delete(message.channel.id);
   }
-  const { isMentioned, isDM, hasBotName, hasPixie, isMe } = detectTrigger(
+  const result = evaluateMessage(
     message,
     client.user.id,
     client.user.username
   );
-  if (message.content === "-clear") {
+  if (result.reason === "clear") {
     console.log("Commande -clear re\xE7ue.");
     resetLLM();
+    clearCooldown(message.channel.id);
     await client.createMessage(message.channel.id, "Historique et m\xE9moire effac\xE9s !");
     return;
   }
-  if (!isMe && (isMentioned || isDM || hasBotName || hasPixie)) {
+  if (result.shouldRespond) {
     await triggerLunaReply(message);
-  } else {
-    try {
-      const messages = await client.getMessages(message.channel.id, { limit: 2 });
-      const currentMsg = messages[0];
-      const prevMsg = messages[1];
-      if (prevMsg && prevMsg.author.id === client.user.id && currentMsg.author.id === message.author.id) {
-        const timer = setTimeout(async () => {
-          messageWait.delete(message.channel.id);
+    return;
+  }
+  try {
+    const messages = await client.getMessages(message.channel.id, { limit: 2 });
+    const prevMsg = messages[1];
+    if (isFollowUpMessage(prevMsg, message, client.user.id)) {
+      const timer = setTimeout(async () => {
+        messageWait.delete(message.channel.id);
+        const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+        if (followUp.shouldRespond) {
           await triggerLunaReply(message);
-        }, 4500);
-        messageWait.set(message.channel.id, timer);
-      }
-    } catch (e) {
-      console.error("Erreur lors du fetch de l'historique court :", e);
+        }
+      }, 4500);
+      messageWait.set(message.channel.id, timer);
     }
+  } catch (e) {
+    console.error("Erreur lors du fetch de l'historique court :", e);
   }
 });
 function startBot() {

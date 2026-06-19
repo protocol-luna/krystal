@@ -1,7 +1,7 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN } from "./config.js";
 import { askLLM, resetLLM } from "./llm.js";
-import { detectTrigger } from "./detect.js";
+import { evaluateMessage, isFollowUpMessage, clearCooldown, type TriggerResult } from "./trigger.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -64,45 +64,48 @@ client.on("ready", () => {
 });
 
 client.on("messageCreate", async (message: Eris.Message) => {
-  if (message.author.bot) { return; }
-
   if (messageWait.has(message.channel.id)) {
     clearTimeout(messageWait.get(message.channel.id)!);
     messageWait.delete(message.channel.id);
   }
 
-  const { isMentioned, isDM, hasBotName, hasPixie, isMe } = detectTrigger(
+  const result: TriggerResult = evaluateMessage(
     message,
     client.user.id,
     client.user.username,
   );
 
-  if (message.content === "-clear") {
+  if (result.reason === "clear") {
     console.log("Commande -clear reçue.");
     resetLLM();
+    clearCooldown(message.channel.id);
     await client.createMessage(message.channel.id, "Historique et mémoire effacés !");
     return;
   }
 
-  if (!isMe && (isMentioned || isDM || hasBotName || hasPixie)) {
+  if (result.shouldRespond) {
     await triggerLunaReply(message);
-  } else {
-    try {
-      const messages = await client.getMessages(message.channel.id, { limit: 2 }) as Eris.Message[];
-      const currentMsg = messages[0];
-      const prevMsg = messages[1];
+    return;
+  }
 
-      if (prevMsg && prevMsg.author.id === client.user.id && currentMsg.author.id === message.author.id) {
-        const timer = setTimeout(async () => {
-          messageWait.delete(message.channel.id);
+  // Follow-up detection: if the bot replied last, set a timer
+  try {
+    const messages = await client.getMessages(message.channel.id, { limit: 2 }) as Eris.Message[];
+    const prevMsg = messages[1];
+
+    if (isFollowUpMessage(prevMsg, message, client.user.id)) {
+      const timer = setTimeout(async () => {
+        messageWait.delete(message.channel.id);
+        const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+        if (followUp.shouldRespond) {
           await triggerLunaReply(message);
-        }, 4500);
+        }
+      }, 4500);
 
-        messageWait.set(message.channel.id, timer);
-      }
-    } catch (e) {
-      console.error("Erreur lors du fetch de l'historique court :", e);
+      messageWait.set(message.channel.id, timer);
     }
+  } catch (e) {
+    console.error("Erreur lors du fetch de l'historique court :", e);
   }
 });
 
