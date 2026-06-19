@@ -2,7 +2,7 @@ import type * as Eris from "eris";
 
 const TEXT_CHANNEL_TYPES = new Set([0, 5, 11, 12]);
 
-function isTextChannel(c: Eris.AnyChannel): c is Eris.TextChannel {
+export function isTextChannel(c: Eris.AnyChannel): c is Eris.TextChannel {
   return TEXT_CHANNEL_TYPES.has(c.type);
 }
 

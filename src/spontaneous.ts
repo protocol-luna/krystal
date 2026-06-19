@@ -1,13 +1,29 @@
 import type * as Eris from "eris";
-import { findMostActiveChannel } from "./guild.js";
+import { findMostActiveChannel, isTextChannel } from "./guild.js";
 import { askLLM, resetLLM, isLLMBusy } from "./llm-client.js";
 import { markBotActivity } from "./trigger.js";
 import { spontaneousContextMessages } from "./config.js";
 
-function pickRandomGuild(client: Eris.Client): Eris.Guild | null {
-  const guilds = [...client.guilds.values()];
+function pickWeightedGuild(client: Eris.Client): Eris.Guild | null {
+  const guilds = [...client.guilds.values()]
+    .filter((g) => [...g.channels.values()].some((c) => isTextChannel(c)));
   if (guilds.length === 0) { return null; }
-  return guilds[Math.floor(Math.random() * guilds.length)];
+
+  // Sort by most recent message across all text channels
+  const ranked = guilds
+    .map((g) => ({ guild: g, lastID: findMostActiveChannel(g)?.lastMessageID ?? "0" }))
+    .sort((a, b) => b.lastID.localeCompare(a.lastID));
+
+  // Linear weight: top guild = N, second = N-1, ..., last = 1
+  const total = ranked.length * (ranked.length + 1) / 2;
+  let roll = Math.random() * total;
+
+  for (let i = 0; i < ranked.length; i++) {
+    roll -= ranked.length - i;
+    if (roll <= 0) { return ranked[i].guild; }
+  }
+
+  return ranked[ranked.length - 1].guild;
 }
 
 async function fetchContext(
@@ -30,7 +46,7 @@ async function fetchContext(
 export async function trySpawn(client: Eris.Client): Promise<void> {
   if (await isLLMBusy()) { return; }
 
-  const guild = pickRandomGuild(client);
+  const guild = pickWeightedGuild(client);
   if (!guild) { return; }
 
   const channel = findMostActiveChannel(guild);

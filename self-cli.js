@@ -328,12 +328,21 @@ function findMostActiveChannel(guild) {
 }
 
 // src/spontaneous.ts
-function pickRandomGuild(client2) {
-  const guilds = [...client2.guilds.values()];
+function pickWeightedGuild(client2) {
+  const guilds = [...client2.guilds.values()].filter((g) => [...g.channels.values()].some((c) => isTextChannel(c)));
   if (guilds.length === 0) {
     return null;
   }
-  return guilds[Math.floor(Math.random() * guilds.length)];
+  const ranked = guilds.map((g) => ({ guild: g, lastID: findMostActiveChannel(g)?.lastMessageID ?? "0" })).sort((a, b) => b.lastID.localeCompare(a.lastID));
+  const total = ranked.length * (ranked.length + 1) / 2;
+  let roll = Math.random() * total;
+  for (let i = 0; i < ranked.length; i++) {
+    roll -= ranked.length - i;
+    if (roll <= 0) {
+      return ranked[i].guild;
+    }
+  }
+  return ranked[ranked.length - 1].guild;
 }
 async function fetchContext(channel, count) {
   try {
@@ -352,7 +361,7 @@ async function trySpawn(client2) {
   if (await isLLMBusy()) {
     return;
   }
-  const guild = pickRandomGuild(client2);
+  const guild = pickWeightedGuild(client2);
   if (!guild) {
     return;
   }

@@ -56,7 +56,7 @@ export const reactions = [
 ];
 export const serverEmojiChance = 0.3;
 
-export const spontaneousIntervalMs = 5 * 60 * 1000;
+export const  spontaneousIntervalMs = 5 * 60 * 1000;
 export const spontaneousChance = 0.12;
 export const spontaneousContextMessages = 5;
 
