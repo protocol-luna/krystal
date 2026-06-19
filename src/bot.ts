@@ -99,7 +99,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
     await new Promise((r) => setTimeout(r, delay));
 
     if (shouldReact()) {
-      await message.addReaction(pickReaction()).catch(() => {});
+      const guild = (message.channel as Eris.GuildTextableChannel).guild;
+      const serverEmojis = guild?.emojis
+        ?.filter((e) => e.id)
+        .map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      await message.addReaction(pickReaction(serverEmojis)).catch(() => {});
     }
 
     await triggerLunaReply(message);

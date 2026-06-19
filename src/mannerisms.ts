@@ -5,6 +5,7 @@ import {
   ignoreChance,
   ignoreChanceMention,
   reactions,
+  serverEmojiChance,
 } from "./config.js";
 
 export function computeDelay(): number {
@@ -22,6 +23,9 @@ export function shouldReact(): boolean {
   return Math.random() < reactionChance;
 }
 
-export function pickReaction(): string {
+export function pickReaction(customEmojis?: string[]): string {
+  if (customEmojis && customEmojis.length > 0 && Math.random() < serverEmojiChance) {
+    return customEmojis[Math.floor(Math.random() * customEmojis.length)];
+  }
   return reactions[Math.floor(Math.random() * reactions.length)];
 }

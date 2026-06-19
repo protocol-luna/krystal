@@ -59,6 +59,7 @@ var reactions = [
   "\u{1F5FF}",
   "\u{1F31A}"
 ];
+var serverEmojiChance = 0.3;
 var spontaneousIntervalMs = 5 * 60 * 1e3;
 var spontaneousChance = 0.12;
 var spontaneousContextMessages = 5;
@@ -337,7 +338,10 @@ function shouldIgnore(reason) {
 function shouldReact() {
   return Math.random() < reactionChance;
 }
-function pickReaction() {
+function pickReaction(customEmojis) {
+  if (customEmojis && customEmojis.length > 0 && Math.random() < serverEmojiChance) {
+    return customEmojis[Math.floor(Math.random() * customEmojis.length)];
+  }
   return reactions[Math.floor(Math.random() * reactions.length)];
 }
 
@@ -418,7 +422,9 @@ client.on("messageCreate", async (message) => {
     await client.sendChannelTyping(message.channel.id);
     await new Promise((r) => setTimeout(r, delay));
     if (shouldReact()) {
-      await message.addReaction(pickReaction()).catch(() => {
+      const guild = message.channel.guild;
+      const serverEmojis = guild?.emojis?.filter((e) => e.id).map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
+      await message.addReaction(pickReaction(serverEmojis)).catch(() => {
       });
     }
     await triggerLunaReply(message);
