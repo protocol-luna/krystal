@@ -7,7 +7,7 @@ import * as Eris from "eris";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function loadSystemPrompt() {
+function loadSystemPrompt(): string {
   const promptPath = join(__dirname, "prompt.txt");
   try {
     return readFileSync(promptPath, "utf-8").trim();
@@ -71,18 +71,25 @@ const llamaArgs = [
 console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 const llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 
-const requestQueue = [];
+interface QueueItem {
+  userMessage: { username: string; text: string };
+  onFirstToken: () => void;
+  resolve: (value: string) => void;
+  reject: (reason: unknown) => void;
+}
+
+const requestQueue: QueueItem[] = [];
 let isProcessing = false;
 
-let currentCallback = null;
-let currentOnFirstToken = null;
+let currentCallback: ((text: string, isDone: boolean) => void) | null = null;
+let currentOnFirstToken: (() => void) | null = null;
 let isModelReady = false;
 let stdoutBuffer = "";
 let currentUsername = "";
 
-const messageWait = new Map();
+const messageWait = new Map<string, ReturnType<typeof setTimeout>>();
 
-llama.stdout.on("data", (data) => {
+llama.stdout!.on("data", (data: Buffer) => {
   const str = data.toString();
 
   if (!isModelReady) {
@@ -121,28 +128,28 @@ llama.stdout.on("data", (data) => {
   }
 });
 
-llama.stderr.on("data", (data) => {
+llama.stderr!.on("data", (data: Buffer) => {
   const msg = data.toString();
   if (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("failed")) {
     process.stderr.write(msg);
   }
 });
 
-llama.on("close", (code) => {
+llama.on("close", (code: number | null) => {
   console.error(`Le processus llama-cli s'est arrêté avec le code : ${code}`);
-  process.exit(code);
+  process.exit(code ?? 1);
 });
 
-async function processQueue() {
+async function processQueue(): Promise<void> {
   if (isProcessing || requestQueue.length === 0 || !isModelReady) return;
   isProcessing = true;
 
-  const { userMessage, onFirstToken, resolve } = requestQueue.shift();
+  const { userMessage, onFirstToken, resolve } = requestQueue.shift()!;
   stdoutBuffer = "";
   currentUsername = userMessage.username;
 
   currentOnFirstToken = onFirstToken;
-  currentCallback = (text, isDone) => {
+  currentCallback = (text: string, isDone: boolean) => {
     if (isDone) {
       currentCallback = null;
       resolve(text.trim());
@@ -151,18 +158,21 @@ async function processQueue() {
     }
   };
 
-  llama.stdin.write(`${userMessage.username}: ${userMessage.text}\n`);
+  llama.stdin!.write(`${userMessage.username}: ${userMessage.text}\n`);
 }
 
-function askLLM(userMessage, onFirstToken) {
+function askLLM(
+  userMessage: { username: string; text: string },
+  onFirstToken: () => void
+): Promise<string> {
   return new Promise((resolve, reject) => {
     requestQueue.push({ userMessage, onFirstToken, resolve, reject });
     processQueue();
   });
 }
 
-function splitMessage(text, max = 2000) {
-  const chunks = [];
+function splitMessage(text: string, max = 2000): string[] {
+  const chunks: string[] = [];
   let current = "";
   for (const line of text.split("\n")) {
     if ((current + "\n" + line).length > max) {
@@ -177,13 +187,13 @@ function splitMessage(text, max = 2000) {
 }
 
 client.on("ready", () => {
-  console.log(`Connecté comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
+  console.log(`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`);
   if (isModelReady) processQueue();
 });
 
 // Eris: pas de sendTyping() sur channel, on passe par client.sendChannelTyping(channelId)
-async function triggerLunaReply(message) {
-  let typingInterval = null;
+async function triggerLunaReply(message: Eris.Message): Promise<void> {
+  let typingInterval: ReturnType<typeof setInterval> | null = null;
   const startTyping = () => {
     client.sendChannelTyping(message.channel.id);
     typingInterval = setInterval(() => {
@@ -197,7 +207,7 @@ async function triggerLunaReply(message) {
       .trim();
 
     // Eris n'a pas displayName direct: member.nick si en guild, sinon username
-    const displayName = message.member?.nick || message.author.username;
+    const displayName = (message.member as Eris.Member | null)?.nick || message.author.username;
 
     const reply = await askLLM({ username: displayName, text: content }, startTyping);
     if (typingInterval) clearInterval(typingInterval);
@@ -214,24 +224,24 @@ async function triggerLunaReply(message) {
     if (typingInterval) clearInterval(typingInterval);
     console.error(err);
     await client.createMessage(message.channel.id, {
-      content: `Erreur interne avec le processus llama-cli : ${err.message}`,
+      content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
       messageReference: { messageID: message.id },
     });
   }
 }
 
-client.on("messageCreate", async (message) => {
+client.on("messageCreate", async (message: Eris.Message) => {
   if (message.author.bot) return;
 
   if (messageWait.has(message.channel.id)) {
-    clearTimeout(messageWait.get(message.channel.id));
+    clearTimeout(messageWait.get(message.channel.id)!);
     messageWait.delete(message.channel.id);
   }
 
   // mentions.has() n'existe pas en Eris -> message.mentions est un array d'objets user
   const isMentioned = message.mentions.some((u) => u.id === client.user.id);
   const isDM = message.channel.type === 1; // 1 = DM en Eris
-  const guild = message.channel.guild;
+  const guild = (message.channel as Eris.GuildTextableChannel).guild;
   const botMember = guild?.members?.get(client.user.id);
   const botName = botMember?.nick || client.user.username;
   const hasBotName = message.content.toLowerCase().includes(botName.toLowerCase());
@@ -244,7 +254,7 @@ client.on("messageCreate", async (message) => {
     isProcessing = false;
     currentCallback = null;
     stdoutBuffer = "";
-    llama.stdin.write(`/clear\n`);
+    llama.stdin!.write(`/clear\n`);
     await client.createMessage(message.channel.id, "Historique et mémoire effacés !");
     return;
   }
@@ -253,7 +263,7 @@ client.on("messageCreate", async (message) => {
     await triggerLunaReply(message);
   } else {
     try {
-      const messages = await client.getMessages(message.channel.id, { limit: 2 });
+      const messages = await client.getMessages(message.channel.id, { limit: 2 }) as Eris.Message[];
       // getMessages renvoie du plus récent au plus ancien
       const currentMsg = messages[0];
       const prevMsg = messages[1];

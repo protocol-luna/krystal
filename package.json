@@ -10,5 +10,9 @@
     "discord.js-selfbot-v13": "^3.7.1",
     "dotenv": "^16.4.5",
     "eris": "^0.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3"
   }
 }
