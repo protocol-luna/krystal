@@ -187,8 +187,8 @@ export const llamaArgs = [
 	"--min-p", "0.05",
 
 	"--repeat-penalty", "1.12", 
-  "--repeat-last-n", "256",
-  "--presence-penalty", "0.1",
+    "--repeat-last-n", "256",
+    "--presence-penalty", "0.1",
 
 	"-sys", SYSTEM_PROMPT,
 	"--chat-template", jinjaTemplate,
