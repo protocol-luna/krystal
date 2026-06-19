@@ -1,12 +1,11 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = process.cwd();
 
 function loadSystemPrompt(): string {
-  const promptPath = join(__dirname, "prompt.txt");
+  const promptPath = join(ROOT, "prompt.txt");
   try {
     return readFileSync(promptPath, "utf-8").trim();
   } catch {
@@ -25,7 +24,7 @@ export const DISCORD_TOKEN: string = rawDiscordToken ?? (() => {
 
 export const LLAMA_CLI_PATH: string = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
 
-export const LLAMA_MODEL_PATH: string = process.env.LLAMA_MODEL_PATH ?? join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
+export const LLAMA_MODEL_PATH: string = process.env.LLAMA_MODEL_PATH ?? join(ROOT, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
 
 export const jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
 

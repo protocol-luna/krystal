@@ -4,11 +4,10 @@ import * as Eris from "eris";
 // src/config.ts
 import "dotenv/config";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-var __dirname = dirname(fileURLToPath(import.meta.url));
+import { join } from "node:path";
+var ROOT = process.cwd();
 function loadSystemPrompt() {
-  const promptPath = join(__dirname, "prompt.txt");
+  const promptPath = join(ROOT, "prompt.txt");
   try {
     return readFileSync(promptPath, "utf-8").trim();
   } catch {
@@ -23,8 +22,7 @@ var DISCORD_TOKEN = rawDiscordToken ?? (() => {
   process.exit(1);
 })();
 var LLAMA_CLI_PATH = process.env.LLAMA_CLI_PATH ?? "../llama-b9682/llama-cli";
-var LLAMA_MODEL_PATH = process.env.LLAMA_MODEL_PATH ?? join(__dirname, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
-var jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
+var LLAMA_MODEL_PATH = process.env.LLAMA_MODEL_PATH ?? join(ROOT, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
 var names = ["Luna", "Pixie"];
 var keywords = [
   "hello",
@@ -70,164 +68,75 @@ function pickReplyStyle(isActiveConversation) {
   }
   return replyStyles[0].style;
 }
-var llamaArgs = [
-  "-m",
-  LLAMA_MODEL_PATH,
-  "-t",
-  "4",
-  "-tb",
-  "4",
-  "-b",
-  "4096",
-  "-ub",
-  "256",
-  "--mlock",
-  "-c",
-  "4096",
-  "-cnv",
-  "--simple-io",
-  "--temp",
-  "0.75",
-  "--dynatemp-range",
-  "0.15",
-  "--top-k",
-  "40",
-  "--top-p",
-  "0.95",
-  "--min-p",
-  "0.05",
-  "--repeat-penalty",
-  "1.12",
-  "--repeat-last-n",
-  "256",
-  "--presence-penalty",
-  "0.1",
-  "-sys",
-  SYSTEM_PROMPT,
-  "--chat-template",
-  jinjaTemplate
-];
 
-// src/llm.ts
-import { spawn } from "node:child_process";
-console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
-var llama = spawn(LLAMA_CLI_PATH, llamaArgs);
-var requestQueue = [];
-var isProcessing = false;
-var currentOnChunk = null;
-var currentOnDone = null;
-var currentOnFirstToken = null;
-var isModelReady = false;
-var stdoutBuffer = "";
-var currentUsername = "";
-function cleanLine(line) {
-  let cleaned = line;
-  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
-  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
-  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"), "");
-  return cleaned.trim();
-}
-function cleanFullResponse(text) {
-  let cleaned = text;
-  cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
-  cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
-  cleaned = cleaned.replace(new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"), "");
-  return cleaned.trim();
-}
-llama.stdout.on("data", (data) => {
-  const str = data.toString();
-  if (!isModelReady) {
-    if (str.includes("> ") || str.includes("Enter no prompt")) {
-      isModelReady = true;
-      console.log("-> Le mod\xE8le llama.cpp est pr\xEAt \xE0 recevoir des messages !");
-      void processQueue();
+// src/llm-client.ts
+var LLM_PORT = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
+var BASE = `http://localhost:${LLM_PORT}`;
+async function askLLM(userMessage, callbacks) {
+  const response = await fetch(`${BASE}/ask`, {
+    method: "POST",
+    body: JSON.stringify(userMessage),
+    headers: { "Content-Type": "application/json" }
+  });
+  if (!(response.ok && response.body)) {
+    throw new Error(`LLM server error: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
     }
-    return;
-  }
-  stdoutBuffer += str;
-  if (!(currentOnChunk || currentOnDone)) {
-    return;
-  }
-  if (currentOnFirstToken) {
-    currentOnFirstToken();
-    currentOnFirstToken = null;
-  }
-  const endMatch = stdoutBuffer.match(/\n> $/);
-  if (endMatch) {
-    const fullText = stdoutBuffer.slice(0, endMatch.index);
-    stdoutBuffer = "";
-    const cleaned2 = cleanFullResponse(fullText);
-    for (const line of cleaned2.split("\n")) {
-      const l = line.trim();
-      if (l) {
-        currentOnChunk?.(l);
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        const event = JSON.parse(line);
+        switch (event.type) {
+          case "firstToken":
+            callbacks.onFirstToken();
+            break;
+          case "chunk":
+            callbacks.onChunk(event.data);
+            break;
+          case "done":
+            fullText = event.data;
+            break;
+          case "error":
+            throw new Error(event.data);
+          default:
+            break;
+        }
+      } catch {
       }
     }
-    if (currentOnDone) {
-      currentOnDone(cleaned2);
+  }
+  return fullText;
+}
+async function resetLLM() {
+  const response = await fetch(`${BASE}/reset`, { method: "POST" });
+  if (!response.ok) {
+    console.error("LLM reset failed:", response.status);
+  }
+}
+async function isLLMBusy() {
+  try {
+    const response = await fetch(`${BASE}/health`);
+    if (!response.ok) {
+      return true;
     }
-    return;
+    const data = await response.json();
+    return data.busy;
+  } catch {
+    return true;
   }
-  if (stdoutBuffer.trim() === ">") {
-    return;
-  }
-  const lastNewline = stdoutBuffer.lastIndexOf("\n");
-  if (lastNewline === -1) {
-    return;
-  }
-  const chunk = stdoutBuffer.slice(0, lastNewline);
-  stdoutBuffer = stdoutBuffer.slice(lastNewline + 1);
-  const cleaned = cleanLine(chunk);
-  if (cleaned) {
-    currentOnChunk?.(cleaned);
-  }
-});
-llama.stderr.on("data", (data) => {
-  const msg = data.toString();
-  if (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("failed")) {
-    process.stderr.write(msg);
-  }
-});
-llama.on("close", (code) => {
-  console.error(`Le processus llama-cli s'est arr\xEAt\xE9 avec le code : ${code}`);
-  process.exit(code ?? 1);
-});
-function processQueue() {
-  if (isProcessing || requestQueue.length === 0 || !isModelReady) {
-    return;
-  }
-  isProcessing = true;
-  const { userMessage, callbacks, resolve } = requestQueue.shift();
-  stdoutBuffer = "";
-  currentUsername = userMessage.username;
-  currentOnFirstToken = callbacks.onFirstToken;
-  currentOnChunk = callbacks.onChunk;
-  currentOnDone = (text) => {
-    currentOnChunk = null;
-    currentOnDone = null;
-    resolve(text);
-    isProcessing = false;
-    setTimeout(() => processQueue(), 100);
-  };
-  llama.stdin.write(`${userMessage.username}: ${userMessage.text}
-`);
-}
-function askLLM(userMessage, callbacks) {
-  return new Promise((resolve, reject) => {
-    requestQueue.push({ userMessage, callbacks, resolve, reject });
-    void processQueue();
-  });
-}
-function isLLMBusy() {
-  return isProcessing || requestQueue.length > 0;
-}
-function resetLLM() {
-  requestQueue.length = 0;
-  isProcessing = false;
-  currentOnChunk = null;
-  currentOnDone = null;
-  stdoutBuffer = "";
-  llama.stdin.write("/clear\n");
 }
 
 // src/trigger.ts
@@ -356,7 +265,7 @@ async function fetchContext(channel, count) {
   }
 }
 async function trySpawn(client2) {
-  if (isLLMBusy()) {
+  if (await isLLMBusy()) {
     return;
   }
   const guild = pickRandomGuild(client2);
@@ -368,7 +277,7 @@ async function trySpawn(client2) {
     return;
   }
   const context = await fetchContext(channel, spontaneousContextMessages);
-  resetLLM();
+  await resetLLM();
   let reply = "";
   await askLLM(
     {
@@ -391,7 +300,7 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
     markBotActivity(channel.id);
     console.log(`[spontaneous] \u2192 #${channel.name} : ${reply.slice(0, 80)}`);
   }
-  resetLLM();
+  await resetLLM();
 }
 
 // src/bot.ts
@@ -458,7 +367,7 @@ client.on("messageCreate", async (message) => {
   );
   if (result.reason === "clear") {
     console.log("Commande -clear re\xE7ue.");
-    resetLLM();
+    await resetLLM();
     clearCooldown(message.channel.id);
     await client.createMessage(message.channel.id, "Historique et m\xE9moire effac\xE9s !");
     return;

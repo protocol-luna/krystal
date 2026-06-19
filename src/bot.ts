@@ -1,6 +1,6 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN, pickReplyStyle, spontaneousIntervalMs, spontaneousChance } from "./config.js";
-import { askLLM, resetLLM } from "./llm.js";
+import { askLLM, resetLLM } from "./llm-client.js";
 import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, type TriggerResult } from "./trigger.js";
 import { trySpawn } from "./spontaneous.js";
 
@@ -84,7 +84,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
   if (result.reason === "clear") {
     console.log("Commande -clear reçue.");
-    resetLLM();
+    await resetLLM();
     clearCooldown(message.channel.id);
     await client.createMessage(message.channel.id, "Historique et mémoire effacés !");
     return;

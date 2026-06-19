@@ -1,6 +1,6 @@
 import type * as Eris from "eris";
 import { findMostActiveChannel } from "./guild.js";
-import { askLLM, resetLLM, isLLMBusy } from "./llm.js";
+import { askLLM, resetLLM, isLLMBusy } from "./llm-client.js";
 import { markBotActivity } from "./trigger.js";
 import { spontaneousContextMessages } from "./config.js";
 
@@ -28,7 +28,7 @@ async function fetchContext(
 }
 
 export async function trySpawn(client: Eris.Client): Promise<void> {
-  if (isLLMBusy()) { return; }
+  if (await isLLMBusy()) { return; }
 
   const guild = pickRandomGuild(client);
   if (!guild) { return; }
@@ -38,7 +38,7 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 
   const context = await fetchContext(channel, spontaneousContextMessages);
 
-  resetLLM();
+  await resetLLM();
 
   let reply = "";
 
@@ -63,5 +63,5 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
     console.log(`[spontaneous] → #${channel.name} : ${reply.slice(0, 80)}`);
   }
 
-  resetLLM();
+  await resetLLM();
 }
