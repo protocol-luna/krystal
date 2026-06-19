@@ -3,6 +3,7 @@ import { DISCORD_TOKEN, pickReplyStyle, spontaneousIntervalMs, spontaneousChance
 import { askLLM, resetLLM } from "./llm-client.js";
 import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, type TriggerResult } from "./trigger.js";
 import { trySpawn } from "./spontaneous.js";
+import { computeDelay, shouldIgnore, shouldReact, pickReaction } from "./mannerisms.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -91,6 +92,16 @@ client.on("messageCreate", async (message: Eris.Message) => {
   }
 
   if (result.shouldRespond) {
+    if (shouldIgnore(result.reason)) { return; }
+
+    const delay = computeDelay();
+    await client.sendChannelTyping(message.channel.id);
+    await new Promise((r) => setTimeout(r, delay));
+
+    if (shouldReact()) {
+      await message.addReaction(pickReaction()).catch(() => {});
+    }
+
     await triggerLunaReply(message);
     return;
   }

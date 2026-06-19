@@ -38,6 +38,27 @@ var keywords = [
 var randomChance = 0.015;
 var cooldownSeconds = 8;
 var replyInDM = true;
+var responseDelayMin = 800;
+var responseDelayMax = 4e3;
+var reactionChance = 0.06;
+var ignoreChance = 0.08;
+var ignoreChanceMention = 0;
+var reactions = [
+  "\u{1F440}",
+  "\u{1F604}",
+  "\u{1F914}",
+  "\u{1F44B}",
+  "\u{1F525}",
+  "\u{1F480}",
+  "\u2728",
+  "\u{1F62D}",
+  "\u{1F928}",
+  "\u{1F44C}",
+  "\u{1F64F}",
+  "\u{1F485}",
+  "\u{1F5FF}",
+  "\u{1F31A}"
+];
 var spontaneousIntervalMs = 5 * 60 * 1e3;
 var spontaneousChance = 0.12;
 var spontaneousContextMessages = 5;
@@ -303,6 +324,23 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
   await resetLLM();
 }
 
+// src/mannerisms.ts
+function computeDelay() {
+  return responseDelayMin + Math.random() * (responseDelayMax - responseDelayMin);
+}
+function shouldIgnore(reason) {
+  if (reason === "mention") {
+    return Math.random() < ignoreChanceMention;
+  }
+  return Math.random() < ignoreChance;
+}
+function shouldReact() {
+  return Math.random() < reactionChance;
+}
+function pickReaction() {
+  return reactions[Math.floor(Math.random() * reactions.length)];
+}
+
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -373,6 +411,16 @@ client.on("messageCreate", async (message) => {
     return;
   }
   if (result.shouldRespond) {
+    if (shouldIgnore(result.reason)) {
+      return;
+    }
+    const delay = computeDelay();
+    await client.sendChannelTyping(message.channel.id);
+    await new Promise((r) => setTimeout(r, delay));
+    if (shouldReact()) {
+      await message.addReaction(pickReaction()).catch(() => {
+      });
+    }
     await triggerLunaReply(message);
     return;
   }

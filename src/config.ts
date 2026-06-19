@@ -44,6 +44,17 @@ export const cooldownSeconds = 8;
 export const replyInDM = true;
 
 // --- SPONTANEOUS SPAWN ---
+// --- MANNERISMS ---
+export const responseDelayMin = 800;
+export const responseDelayMax = 4000;
+export const reactionChance = 0.06;
+export const ignoreChance = 0.08;
+export const ignoreChanceMention = 0;
+export const reactions = [
+  "👀", "😄", "🤔", "👋", "🔥", "💀", "✨",
+  "😭", "🤨", "👌", "🙏", "💅", "🗿", "🌚",
+];
+
 export const spontaneousIntervalMs = 5 * 60 * 1000;
 export const spontaneousChance = 0.12;
 export const spontaneousContextMessages = 5;
