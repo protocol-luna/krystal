@@ -4,7 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
-    "start": "node self-cli.js"
+    "start": "node self-cli.js",
+    "format": "bunx --bun @biomejs/biome format --write ./src",
+    "check": "bunx --bun @biomejs/biome check ./src",
+    "lint": "bunx --bun @biomejs/biome lint ./src",
+    "lint:write": "bunx --bun @biomejs/biome lint --write ./src"
   },
   "dependencies": {
     "discord.js": "^14.16.3",
@@ -13,6 +17,7 @@
     "eris": "^0.18.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
     "@types/node": "^25.9.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
