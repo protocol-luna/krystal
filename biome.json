@@ -10,31 +10,17 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"nursery": {
 				"useAwaitThenable": "error",
 				"noFloatingPromises": "error",
 				"noMisusedPromises": "error",
-				"noReturnAssign": "error",
-				"noMultiAssign": "error",
 				"noImpliedEval": "error",
-				"noScriptUrl": "error",
-				"noProto": "error",
-				"noUselessReturn": "error",
 				"noBaseToString": "off",
-				"noEqualsToNull": "error",
-				"noForIn": "error",
 				"noLoopFunc": "off",
 				"noExcessiveNestedCallbacks": "off",
-				"noUnnecessaryConditions": "off",
 				"noUnsafePlusOperands": "error",
-				"noUselessTypeConversion": "error",
-				"noShadow": "off",
-				"noContinue": "off",
-				"noTernary": "off",
-				"noIncrementDecrement": "off",
-				"noMultiStr": "off",
-				"noDivRegex": "off"
+				"noUselessTypeConversion": "error"
 			},
 			"suspicious": {
 				"noDebugger": "off",
@@ -58,7 +44,13 @@
 				"useAwait": "error",
 				"useErrorMessage": "error",
 				"useNumberToFixedDigitsArgument": "error",
-				"useNamespaceKeyword": "error"
+				"useNamespaceKeyword": "error",
+				"noReturnAssign": "error",
+				"noProto": "error",
+				"noEqualsToNull": "error",
+				"noForIn": "error",
+				"noUnnecessaryConditions": "off",
+				"noShadow": "off"
 			},
 			"correctness": {
 				"noUnusedVariables": "error",
@@ -139,7 +131,9 @@
 				"noExcessiveLinesPerFunction": "off",
 				"noForEach": "off",
 				"noImplicitCoercions": "error",
-				"noEmptyTypeParameters": "error"
+				"noEmptyTypeParameters": "error",
+				"noUselessReturn": "error",
+				"noDivRegex": "off"
 			},
 			"style": {
 				"noShoutyConstants": "warn",
@@ -229,12 +223,18 @@
 				"useNumericSeparators": "off",
 				"useObjectSpread": "error",
 				"useSelfClosingElements": "error",
-				"useShorthandFunctionType": "error"
+				"useShorthandFunctionType": "error",
+				"noMultiAssign": "error",
+				"noContinue": "off",
+				"noTernary": "off",
+				"noIncrementDecrement": "off",
+				"noMultilineString": "off"
 			},
 			"security": {
 				"noGlobalEval": "error",
 				"noDangerouslySetInnerHtml": "error",
-				"noDangerouslySetInnerHtmlWithChildren": "error"
+				"noDangerouslySetInnerHtmlWithChildren": "error",
+				"noScriptUrl": "error"
 			},
 			"performance": {
 				"noAccumulatingSpread": "error",
