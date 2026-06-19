@@ -57,7 +57,14 @@ const replyStyles: { style: ReplyStyle; weight: number }[] = [
   { style: { messageReference: false, mentionRepliedUser: true  }, weight: 5  },
 ];
 
-export function pickReplyStyle(): ReplyStyle {
+export function pickReplyStyle(isActiveConversation: boolean): ReplyStyle {
+  if (!isActiveConversation) {
+    const roll = Math.random();
+    if (roll < 0.70) { return { messageReference: true, mentionRepliedUser: false }; }
+    if (roll < 0.90) { return { messageReference: true, mentionRepliedUser: true  }; }
+    return { messageReference: false, mentionRepliedUser: false };
+  }
+
   const total = replyStyles.reduce((s, e) => s + e.weight, 0);
   let roll = Math.random() * total;
   for (const entry of replyStyles) {

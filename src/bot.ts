@@ -1,7 +1,7 @@
 import * as Eris from "eris";
 import { DISCORD_TOKEN, pickReplyStyle } from "./config.js";
 import { askLLM, resetLLM } from "./llm.js";
-import { evaluateMessage, isFollowUpMessage, clearCooldown, type TriggerResult } from "./trigger.js";
+import { evaluateMessage, isRecentBotActivity, markBotActivity, clearCooldown, type TriggerResult } from "./trigger.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
   intents: [
@@ -12,7 +12,7 @@ const client = new Eris.Client(DISCORD_TOKEN, {
   ],
 });
 
-const messageWait = new Map<string, ReturnType<typeof setTimeout>>();
+const followUpTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 async function triggerLunaReply(message: Eris.Message): Promise<void> {
   let typingInterval: ReturnType<typeof setInterval> | null = null;
@@ -23,7 +23,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
     }, 8000);
   };
 
-  const style = pickReplyStyle();
+  const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
 
   try {
     const content = message.content
@@ -45,7 +45,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
               ...(style.messageReference
                 ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
                 : {}),
-            }),
+            }).then(() => markBotActivity(message.channel.id)),
           );
         },
       },
@@ -60,7 +60,7 @@ async function triggerLunaReply(message: Eris.Message): Promise<void> {
       ...(style.messageReference
         ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } }
         : {}),
-    });
+    }).then(() => markBotActivity(message.channel.id));
   }
 }
 
@@ -69,9 +69,10 @@ client.on("ready", () => {
 });
 
 client.on("messageCreate", async (message: Eris.Message) => {
-  if (messageWait.has(message.channel.id)) {
-    clearTimeout(messageWait.get(message.channel.id)!);
-    messageWait.delete(message.channel.id);
+  // Cancel any pending follow-up timer for this channel
+  if (followUpTimers.has(message.channel.id)) {
+    clearTimeout(followUpTimers.get(message.channel.id)!);
+    followUpTimers.delete(message.channel.id);
   }
 
   const result: TriggerResult = evaluateMessage(
@@ -93,24 +94,18 @@ client.on("messageCreate", async (message: Eris.Message) => {
     return;
   }
 
-  // Follow-up detection: if the bot replied last, set a timer
-  try {
-    const messages = await client.getMessages(message.channel.id, { limit: 2 }) as Eris.Message[];
-    const prevMsg = messages[1];
+  // Follow-up: if the bot sent a message recently in this channel,
+  // the user might be continuing the conversation
+  if (isRecentBotActivity(message.channel.id)) {
+    const timer = setTimeout(async () => {
+      followUpTimers.delete(message.channel.id);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+      if (followUp.shouldRespond) {
+        await triggerLunaReply(message);
+      }
+    }, 4500);
 
-    if (isFollowUpMessage(prevMsg, message, client.user.id)) {
-      const timer = setTimeout(async () => {
-        messageWait.delete(message.channel.id);
-        const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
-        if (followUp.shouldRespond) {
-          await triggerLunaReply(message);
-        }
-      }, 4500);
-
-      messageWait.set(message.channel.id, timer);
-    }
-  } catch (e) {
-    console.error("Erreur lors du fetch de l'historique court :", e);
+    followUpTimers.set(message.channel.id, timer);
   }
 });
 

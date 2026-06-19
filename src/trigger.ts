@@ -2,6 +2,7 @@ import type * as Eris from "eris";
 import { randomChance, names, keywords, cooldownSeconds, replyInDM } from "./config.js";
 
 const channelCooldowns = new Map<string, number>();
+const botActivity = new Map<string, number>();
 
 export interface TriggerResult {
   shouldRespond: boolean;
@@ -16,7 +17,19 @@ function isOnCooldown(channelId: string): boolean {
 }
 
 function markReplied(channelId: string): void {
-  channelCooldowns.set(channelId, Date.now());
+  const now = Date.now();
+  channelCooldowns.set(channelId, now);
+  botActivity.set(channelId, now);
+}
+
+export function markBotActivity(channelId: string): void {
+  botActivity.set(channelId, Date.now());
+}
+
+export function isRecentBotActivity(channelId: string, windowMs = 15000): boolean {
+  const last = botActivity.get(channelId);
+  if (!last) { return false; }
+  return Date.now() - last < windowMs;
 }
 
 export function evaluateMessage(
@@ -83,7 +96,7 @@ export function evaluateMessage(
     }
   }
 
-  // Follow-up: bot replied last, same author continues
+  // Follow-up: bot replied recently in this channel
   if (isFollowUp) {
     return { shouldRespond: true, reason: "follow-up", botName };
   }
@@ -97,15 +110,7 @@ export function evaluateMessage(
   return { shouldRespond: false, reason: null, botName };
 }
 
-export function isFollowUpMessage(
-  prevMsg: Eris.Message | undefined,
-  currentMsg: Eris.Message,
-  botId: string,
-): boolean {
-  if (!prevMsg) { return false; }
-  return prevMsg.author.id === botId && currentMsg.author.id !== botId;
-}
-
 export function clearCooldown(channelId: string): void {
   channelCooldowns.delete(channelId);
+  botActivity.delete(channelId);
 }

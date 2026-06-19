@@ -46,7 +46,17 @@ var replyStyles = [
   { style: { messageReference: false, mentionRepliedUser: false }, weight: 30 },
   { style: { messageReference: false, mentionRepliedUser: true }, weight: 5 }
 ];
-function pickReplyStyle() {
+function pickReplyStyle(isActiveConversation) {
+  if (!isActiveConversation) {
+    const roll2 = Math.random();
+    if (roll2 < 0.7) {
+      return { messageReference: true, mentionRepliedUser: false };
+    }
+    if (roll2 < 0.9) {
+      return { messageReference: true, mentionRepliedUser: true };
+    }
+    return { messageReference: false, mentionRepliedUser: false };
+  }
   const total = replyStyles.reduce((s, e) => s + e.weight, 0);
   let roll = Math.random() * total;
   for (const entry of replyStyles) {
@@ -216,6 +226,7 @@ function resetLLM() {
 
 // src/trigger.ts
 var channelCooldowns = /* @__PURE__ */ new Map();
+var botActivity = /* @__PURE__ */ new Map();
 function isOnCooldown(channelId) {
   const last = channelCooldowns.get(channelId);
   if (!last) {
@@ -224,7 +235,19 @@ function isOnCooldown(channelId) {
   return Date.now() - last < cooldownSeconds * 1e3;
 }
 function markReplied(channelId) {
-  channelCooldowns.set(channelId, Date.now());
+  const now = Date.now();
+  channelCooldowns.set(channelId, now);
+  botActivity.set(channelId, now);
+}
+function markBotActivity(channelId) {
+  botActivity.set(channelId, Date.now());
+}
+function isRecentBotActivity(channelId, windowMs = 15e3) {
+  const last = botActivity.get(channelId);
+  if (!last) {
+    return false;
+  }
+  return Date.now() - last < windowMs;
 }
 function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   if (message.author.bot) {
@@ -280,14 +303,9 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
   }
   return { shouldRespond: false, reason: null, botName };
 }
-function isFollowUpMessage(prevMsg, currentMsg, botId) {
-  if (!prevMsg) {
-    return false;
-  }
-  return prevMsg.author.id === botId && currentMsg.author.id !== botId;
-}
 function clearCooldown(channelId) {
   channelCooldowns.delete(channelId);
+  botActivity.delete(channelId);
 }
 
 // src/bot.ts
@@ -299,7 +317,7 @@ var client = new Eris.Client(DISCORD_TOKEN, {
     "directMessages"
   ]
 });
-var messageWait = /* @__PURE__ */ new Map();
+var followUpTimers = /* @__PURE__ */ new Map();
 async function triggerLunaReply(message) {
   let typingInterval = null;
   const startTyping = () => {
@@ -308,7 +326,7 @@ async function triggerLunaReply(message) {
       client.sendChannelTyping(message.channel.id);
     }, 8e3);
   };
-  const style = pickReplyStyle();
+  const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
   try {
     const content = message.content.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
     const displayName = message.member?.nick || message.author.username;
@@ -322,7 +340,7 @@ async function triggerLunaReply(message) {
             () => client.createMessage(message.channel.id, {
               content: chunk,
               ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
-            })
+            }).then(() => markBotActivity(message.channel.id))
           );
         }
       }
@@ -336,16 +354,16 @@ async function triggerLunaReply(message) {
     await client.createMessage(message.channel.id, {
       content: `Erreur interne avec le processus llama-cli : ${err.message}`,
       ...style.messageReference ? { messageReference: { messageID: message.id }, allowedMentions: { repliedUser: style.mentionRepliedUser } } : {}
-    });
+    }).then(() => markBotActivity(message.channel.id));
   }
 }
 client.on("ready", () => {
   console.log(`Connect\xE9 comme ${client.user.username}#${client.user.discriminator} (Mode CLI Interactif Strict)`);
 });
 client.on("messageCreate", async (message) => {
-  if (messageWait.has(message.channel.id)) {
-    clearTimeout(messageWait.get(message.channel.id));
-    messageWait.delete(message.channel.id);
+  if (followUpTimers.has(message.channel.id)) {
+    clearTimeout(followUpTimers.get(message.channel.id));
+    followUpTimers.delete(message.channel.id);
   }
   const result = evaluateMessage(
     message,
@@ -363,21 +381,15 @@ client.on("messageCreate", async (message) => {
     await triggerLunaReply(message);
     return;
   }
-  try {
-    const messages = await client.getMessages(message.channel.id, { limit: 2 });
-    const prevMsg = messages[1];
-    if (isFollowUpMessage(prevMsg, message, client.user.id)) {
-      const timer = setTimeout(async () => {
-        messageWait.delete(message.channel.id);
-        const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
-        if (followUp.shouldRespond) {
-          await triggerLunaReply(message);
-        }
-      }, 4500);
-      messageWait.set(message.channel.id, timer);
-    }
-  } catch (e) {
-    console.error("Erreur lors du fetch de l'historique court :", e);
+  if (isRecentBotActivity(message.channel.id)) {
+    const timer = setTimeout(async () => {
+      followUpTimers.delete(message.channel.id);
+      const followUp = evaluateMessage(message, client.user.id, client.user.username, true);
+      if (followUp.shouldRespond) {
+        await triggerLunaReply(message);
+      }
+    }, 4500);
+    followUpTimers.set(message.channel.id, timer);
   }
 });
 function startBot() {
