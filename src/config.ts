@@ -44,7 +44,7 @@ export const LLAMA_CLI_PATH: string =
 
 export const LLAMA_MODEL_PATH: string =
 	process.env.LLAMA_MODEL_PATH ??
-	join(ROOT, "models", "Discord-Hermes-3-8B.Q3_K_M.gguf");
+	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
 
 export const PORT: string = process.env.PORT ?? "3124";
 
