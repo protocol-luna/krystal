@@ -1,3 +1,4 @@
+import { voiceMessageChance } from "../config.js";
 import { isTTSReady, synthesize } from "./piper.js";
 import {
 	sanitizeForTTS,
@@ -51,4 +52,16 @@ export async function sendTextAsVoiceMessage(
 	} catch (err) {
 		console.error("[tts] Error sending voice message:", err);
 	}
+}
+
+export function shouldSendVoice(): boolean {
+	if (voiceMessageChance <= 0) {
+		return false;
+	}
+	const roll = Math.random();
+	const send = roll < voiceMessageChance;
+	console.log(
+		`[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${voiceMessageChance})`,
+	);
+	return send;
 }

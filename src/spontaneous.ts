@@ -1,6 +1,6 @@
 import type * as Eris from "eris";
 import { findMostActiveChannel, isTextChannel } from "./guild.js";
-import { askLLM, resetLLM, isLLMBusy } from "./llm-client.js";
+import { askLLM, resetLLM, isLLMBusy } from "./core/llm-client.js";
 import { markBotActivity } from "./state/state.js";
 import { spontaneousContextMessages, spontaneousWhitelist } from "./config.js";
 

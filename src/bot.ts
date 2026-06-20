@@ -30,12 +30,12 @@ import {
 	shouldReact,
 	pickReaction,
 } from "./behavior/mannerisms.js";
+import { initTTS } from "./tts/piper.js";
 import {
-	initTTS,
 	sendTextAsVoiceMessage,
 	shouldSendVoice,
-	hasUnsafeTTSText,
-} from "./tts.js";
+} from "./tts/voice-message.js";
+import { hasUnsafeTTSText } from "./tts/audio.js";
 import { getSleepBehavior } from "./behavior/sleep.js";
 import { applyTypo } from "./behavior/typo.js";
 import { loadState } from "./state/persistence.js";
