@@ -65,6 +65,8 @@ export interface TypoResult {
 	charIndex: number;
 	originalChar: string;
 	typoChar: string;
+	originalWord: string;
+	correctedWord: string;
 }
 
 function pickLetter(text: string): number | null {
@@ -88,5 +90,10 @@ export function applyTypo(text: string, layout: TypoLayout): TypoResult | null {
 		text[idx] === originalChar ? typoChar : typoChar.toUpperCase();
 	const newText = text.slice(0, idx) + typed + text.slice(idx + 1);
 
-	return { text: newText, original: text, charIndex: idx, originalChar, typoChar };
+	const wordStart = text.slice(0, idx).search(/\S*$/);
+	const wordEnd = text.slice(idx).search(/\s|$/) + idx;
+	const originalWord = text.slice(wordStart, wordEnd);
+	const correctedWord = newText.slice(wordStart, wordEnd);
+
+	return { text: newText, original: text, charIndex: idx, originalChar, typoChar, originalWord, correctedWord };
 }

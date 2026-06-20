@@ -25,7 +25,7 @@ import {
 	pickReaction,
 } from "./mannerisms.js";
 import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
-import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout } from "./config.js";
+import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle } from "./config.js";
 import { getSleepBehavior } from "./sleep.js";
 import { applyTypo } from "./typo.js";
 
@@ -99,9 +99,10 @@ async function triggerLunaReply(
 		} else {
 			let typoIndex = -1;
 			let typoOriginal = "";
+			let result: ReturnType<typeof applyTypo> = null;
 			if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
 				typoIndex = Math.floor(Math.random() * chunks.length);
-				const result = applyTypo(chunks[typoIndex], typoLayout);
+				result = applyTypo(chunks[typoIndex], typoLayout);
 				if (result) {
 					typoOriginal = result.original;
 					chunks[typoIndex] = result.text;
@@ -137,11 +138,21 @@ async function triggerLunaReply(
 
 			if (typoMessageId && typoOriginal) {
 				const delay = typoCorrectionDelay + Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+				const style = typoCorrectionStyle === "mixed"
+					? (Math.random() < 0.5 ? "edit" : "message")
+					: typoCorrectionStyle;
 				await (async () => {
 					await new Promise((r) => setTimeout(r, delay));
 					try {
-						await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
-						console.log(`[bot] typo corrigé dans le message ${typoMessageId}`);
+						if (style === "edit") {
+							await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
+							console.log(`[bot] typo corrigé par edit sur ${typoMessageId}`);
+						} else {
+							await client.createMessage(message.channel.id, {
+								content: `${result!.correctedWord}*`,
+							});
+							console.log(`[bot] typo corrigé par message: ${result!.correctedWord}*`);
+						}
 					} catch {
 						// message déjà supprimé ou édité par quelqu'un
 					}

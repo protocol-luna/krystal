@@ -112,6 +112,10 @@ export const typoChance = v<number>("typo_chance", 0.06);
 export const typoCorrectionDelay = v<number>("typo_correction_delay_min", 2000);
 export const typoCorrectionDelayMax = v<number>("typo_correction_delay_max", 4000);
 export const typoLayout = v<"azerty" | "qwerty">("typo_layout", "azerty");
+export const typoCorrectionStyle = v<"edit" | "message" | "mixed">(
+	"typo_correction_style",
+	"mixed"
+);
 
 // --- Chunk delays ---
 export const chunkDelayMin = v<number>("chunk_delay_min", 300);

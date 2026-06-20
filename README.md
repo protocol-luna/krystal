@@ -161,13 +161,19 @@ Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devi
 
 ### Simulation de fautes de frappe
 
-Avec une probabilité configurable (`typo_chance`), le bot introduit une faute de frappe sur une lettre aléatoire d'un des messages (remplacement par une touche adjacente sur le clavier, layout AZERTY ou QWERTY). Après un court délai (2–4s), il édite le message pour corriger la faute — comme un humain qui tape vite et corrige.
+Avec une probabilité configurable (`typo_chance`), le bot introduit une faute de frappe sur une lettre aléatoire d'un des messages (remplacement par une touche adjacente sur le clavier, layout AZERTY ou QWERTY). Après un court délai (2–4s), il corrige la faute — comme un humain qui tape vite et corrige.
+
+Le mode de correction est configurable via `typo_correction_style` :
+- `"edit"` — édite le message entier pour le remplacer par la version corrigée.
+- `"message"` — envoie un nouveau message avec `mot_corrigé*` (convention humaine standard sur Discord).
+- `"mixed"` — 50/50 aléatoire entre les deux (défaut).
 
 ```yaml
 typo_chance: 0.06
 typo_correction_delay_min: 2000
 typo_correction_delay_max: 4000
 typo_layout: "azerty"
+typo_correction_style: "mixed"
 ```
 
 Exemple de fautes AZERTY : `bonjour → bonjpur`, `salut → slaut`, `comment → cpmment`.
@@ -495,7 +501,11 @@ sequenceDiagram
                     bot.ts->>trigger.ts: markBotActivity()
                 end
                 alt typo appliqué
-                    bot.ts->>Discord: editMessage (correction après 2-4s)
+                    alt style = "edit"
+                        bot.ts->>Discord: editMessage (correction après 2-4s)
+                    else style = "message"
+                        bot.ts->>Discord: createMessage("mot_corrigé*")
+                    end
                 end
                 bot.ts->>trigger.ts: trackSpeaker(bot)
                 bot.ts->>bot.ts: pendingMessages["C:U"] ?
