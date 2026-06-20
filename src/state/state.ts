@@ -2,11 +2,13 @@ import { cooldownSeconds } from "../config.js";
 
 const channelCooldowns = new Map<string, number>();
 const botActivity = new Map<string, number>();
-const lastSpeaker = new Map<string, string>();
+const lastSpeaker = new Map<string, { userId: string; timestamp: number }>();
 const responseCount = new Map<string, number>();
 
 export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_WINDOW = 60_000;
+const PRUNE_INTERVAL = 5 * 60_000;
+const PRUNE_CUTOFF = 3_600_000;
 
 let paused = false;
 
@@ -58,23 +60,26 @@ export function trackSpeaker(
 	authorId: string
 ): string | undefined {
 	const previous = lastSpeaker.get(channelId);
-	lastSpeaker.set(channelId, authorId);
-	return previous;
+	lastSpeaker.set(channelId, { userId: authorId, timestamp: Date.now() });
+	return previous?.userId;
 }
 
 export function canFollowUp(channelId: string, botId: string): boolean {
 	const recent = isRecentBotActivity(channelId);
 	const speaker = lastSpeaker.get(channelId);
 	const count = responseCount.get(channelId) ?? 0;
-	const ok = recent && speaker === botId && count < MAX_FOLLOWUPS;
+	const ok = recent && speaker?.userId === botId && count < MAX_FOLLOWUPS;
 	console.log(
-		`[state] canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker === botId ? "bot" : (speaker?.slice(0, 6) ?? "?")} followCount=${count})`
+		`[state] canFollowUp=${ok} (recentBot=${recent} lastSpeaker=${speaker?.userId === botId ? "bot" : (speaker?.userId?.slice(0, 6) ?? "?")} followCount=${count})`
 	);
 	return ok;
 }
 
 export function isInConversation(channelId: string, botId: string): boolean {
-	return isRecentBotActivity(channelId) && lastSpeaker.get(channelId) === botId;
+	return (
+		isRecentBotActivity(channelId) &&
+		lastSpeaker.get(channelId)?.userId === botId
+	);
 }
 
 export function clearCooldown(channelId: string): void {
@@ -108,4 +113,32 @@ export function restoreState(data: ReturnType<typeof dumpState>): void {
 		responseCount.set(k, v);
 	}
 	paused = data.paused;
+}
+
+export function startPruning(): void {
+	setInterval(() => {
+		const now = Date.now();
+		const cutoff = now - PRUNE_CUTOFF;
+
+		for (const [key, ts] of channelCooldowns) {
+			if (ts < cutoff) {
+				channelCooldowns.delete(key);
+			}
+		}
+		for (const [key, ts] of botActivity) {
+			if (ts < cutoff) {
+				botActivity.delete(key);
+			}
+		}
+		for (const [key, entry] of lastSpeaker) {
+			if (entry.timestamp < cutoff) {
+				lastSpeaker.delete(key);
+			}
+		}
+		for (const [key, count] of responseCount) {
+			if (count <= 0) {
+				responseCount.delete(key);
+			}
+		}
+	}, PRUNE_INTERVAL);
 }

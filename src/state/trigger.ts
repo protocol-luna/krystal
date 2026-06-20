@@ -1,16 +1,6 @@
 import type * as Eris from "eris";
-import {
-	randomChance,
-	names,
-	keywords,
-	replyInDM,
-} from "../config.js";
-import {
-	isOnCooldown,
-	setPaused,
-	markReplied,
-	isPaused,
-} from "./state.js";
+import { randomChance, names, keywords, replyInDM } from "../config.js";
+import { isOnCooldown, setPaused, markReplied, isPaused } from "./state.js";
 
 function log(channel: string, msg: string): void {
 	console.log(`[trigger] #${channel} ${msg}`);

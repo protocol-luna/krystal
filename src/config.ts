@@ -97,32 +97,77 @@ export interface ConcentrationThresholds {
 }
 
 const DEFAULT_CONCENTRATION: ConcentrationThresholds = {
-	mention: { delay_min: 300, delay_max: 1500, ignore_chance: 0, reaction_chance: 0.08 },
-	dm: { delay_min: 400, delay_max: 1800, ignore_chance: 0, reaction_chance: 0.05 },
-	name: { delay_min: 800, delay_max: 4000, ignore_chance: 0.05, reaction_chance: 0.06 },
-	keyword: { delay_min: 1000, delay_max: 3500, ignore_chance: 0.08, reaction_chance: 0.04 },
-	"follow-up": { delay_min: 500, delay_max: 2000, ignore_chance: 0, reaction_chance: 0.03 },
-	random: { delay_min: 1500, delay_max: 5000, ignore_chance: 0.15, reaction_chance: 0.02 },
-	default: { delay_min: 800, delay_max: 4000, ignore_chance: 0.08, reaction_chance: 0.06 },
+	mention: {
+		delay_min: 300,
+		delay_max: 1500,
+		ignore_chance: 0,
+		reaction_chance: 0.08,
+	},
+	dm: {
+		delay_min: 400,
+		delay_max: 1800,
+		ignore_chance: 0,
+		reaction_chance: 0.05,
+	},
+	name: {
+		delay_min: 800,
+		delay_max: 4000,
+		ignore_chance: 0.05,
+		reaction_chance: 0.06,
+	},
+	keyword: {
+		delay_min: 1000,
+		delay_max: 3500,
+		ignore_chance: 0.08,
+		reaction_chance: 0.04,
+	},
+	"follow-up": {
+		delay_min: 500,
+		delay_max: 2000,
+		ignore_chance: 0,
+		reaction_chance: 0.03,
+	},
+	random: {
+		delay_min: 1500,
+		delay_max: 5000,
+		ignore_chance: 0.15,
+		reaction_chance: 0.02,
+	},
+	default: {
+		delay_min: 800,
+		delay_max: 4000,
+		ignore_chance: 0.08,
+		reaction_chance: 0.06,
+	},
 };
 
 const rawConcentration = v<Record<string, unknown>>("concentration", {});
-function mergeConcentration(raw: Record<string, unknown>, defaults: ConcentrationThresholds): ConcentrationThresholds {
+function mergeConcentration(
+	raw: Record<string, unknown>,
+	defaults: ConcentrationThresholds
+): ConcentrationThresholds {
 	const merged = { ...defaults };
-	for (const key of Object.keys(defaults) as (keyof ConcentrationThresholds)[]) {
+	for (const key of Object.keys(
+		defaults
+	) as (keyof ConcentrationThresholds)[]) {
 		const entry = raw[key] as Record<string, unknown> | undefined;
 		if (entry) {
 			merged[key] = {
 				delay_min: (entry.delay_min as number) ?? defaults[key].delay_min,
 				delay_max: (entry.delay_max as number) ?? defaults[key].delay_max,
-				ignore_chance: (entry.ignore_chance as number) ?? defaults[key].ignore_chance,
-				reaction_chance: (entry.reaction_chance as number) ?? defaults[key].reaction_chance,
+				ignore_chance:
+					(entry.ignore_chance as number) ?? defaults[key].ignore_chance,
+				reaction_chance:
+					(entry.reaction_chance as number) ?? defaults[key].reaction_chance,
 			};
 		}
 	}
 	return merged;
 }
-export const concentration = mergeConcentration(rawConcentration, DEFAULT_CONCENTRATION);
+export const concentration = mergeConcentration(
+	rawConcentration,
+	DEFAULT_CONCENTRATION
+);
 
 export const serverEmojiChance = v<number>("server_emoji_chance", 0.3);
 export const reactions: string[] = v<string[]>("reactions", [
@@ -152,15 +197,15 @@ export const spontaneousContextMessages = v<number>(
 	"spontaneous_context_messages",
 	5
 );
-export const spontaneousWhitelist = v<string>(
-	"spontaneous_whitelist",
-	"*"
-);
+export const spontaneousWhitelist = v<string>("spontaneous_whitelist", "*");
 
 // --- Typos ---
 export const typoChance = v<number>("typo_chance", 0.06);
 export const typoCorrectionDelay = v<number>("typo_correction_delay_min", 2000);
-export const typoCorrectionDelayMax = v<number>("typo_correction_delay_max", 4000);
+export const typoCorrectionDelayMax = v<number>(
+	"typo_correction_delay_max",
+	4000
+);
 export const typoLayout = v<"azerty" | "qwerty">("typo_layout", "azerty");
 export const typoCorrectionStyle = v<"edit" | "message" | "mixed">(
 	"typo_correction_style",
@@ -205,7 +250,8 @@ export const ttsModelPath: string =
 
 export const ttsBinaryPath: string =
 	v<string | null>("tts_binary_path", null) ??
-	process.env.TTS_BINARY_PATH ?? join(ROOT, "bin/piper/piper");
+	process.env.TTS_BINARY_PATH ??
+	join(ROOT, "bin/piper/piper");
 
 export const ffmpegPath: string =
 	v<string | null>("ffmpeg_path", null) ??
@@ -275,25 +321,42 @@ import { cpus } from "node:os";
 const cpuCount = cpus().length;
 
 export const llamaArgs = [
-	"-m", LLAMA_MODEL_PATH,
-	"-t", String(cpuCount),
-	"-tb", String(cpuCount),
-	"-b", "4096",
-	"-ub", "256",
-	"--mlock","-c",
-	"4096", "-cnv",
+	"-m",
+	LLAMA_MODEL_PATH,
+	"-t",
+	String(cpuCount),
+	"-tb",
+	String(cpuCount),
+	"-b",
+	"4096",
+	"-ub",
+	"256",
+	"--mlock",
+	"-c",
+	"4096",
+	"-cnv",
 	"--simple-io",
 
-	"--temp", "0.75",
-	"--dynatemp-range", "0.15",
-	"--top-k", "40",
-	"--top-p", "0.95",
-	"--min-p", "0.05",
+	"--temp",
+	"0.75",
+	"--dynatemp-range",
+	"0.15",
+	"--top-k",
+	"40",
+	"--top-p",
+	"0.95",
+	"--min-p",
+	"0.05",
 
-	"--repeat-penalty", "1.12", 
-    "--repeat-last-n", "256",
-    "--presence-penalty", "0.1",
+	"--repeat-penalty",
+	"1.12",
+	"--repeat-last-n",
+	"256",
+	"--presence-penalty",
+	"0.1",
 
-	"-sys", SYSTEM_PROMPT,
-	"--chat-template", jinjaTemplate,
+	"-sys",
+	SYSTEM_PROMPT,
+	"--chat-template",
+	jinjaTemplate,
 ];

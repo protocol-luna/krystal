@@ -16,7 +16,7 @@ export async function initTTS(): Promise<void> {
 		});
 		piperReady = true;
 		console.log(
-			`[tts] Piper TTS initialized (model=${path.basename(ttsModelPath)})`,
+			`[tts] Piper TTS initialized (model=${path.basename(ttsModelPath)})`
 		);
 	} catch (err) {
 		console.warn("[tts] Piper TTS init failed, voice messages disabled:", err);

@@ -19,6 +19,7 @@ interface QueueItem {
 }
 
 const requestQueue: QueueItem[] = [];
+let queueHead = 0;
 let isProcessing = false;
 let currentOnChunk: ((chunk: string) => void) | null = null;
 let currentOnDone: ((text: string) => void) | null = null;
@@ -62,9 +63,7 @@ function spawnLlama(): void {
 			console.log("[llm-core] llama-cli arrêté proprement");
 			return;
 		}
-		console.error(
-			`[llm-core] llama-cli crashé (code=${code}), redémarrage...`,
-		);
+		console.error(`[llm-core] llama-cli crashé (code=${code}), redémarrage...`);
 		scheduleRestart();
 	});
 
@@ -78,7 +77,7 @@ function scheduleRestart(): void {
 	restartCount++;
 	if (restartCount > MAX_RESTARTS) {
 		console.error(
-			`[llm-core] ${MAX_RESTARTS} tentatives de redémarrage échouées, abandon`,
+			`[llm-core] ${MAX_RESTARTS} tentatives de redémarrage échouées, abandon`
 		);
 		process.exit(1);
 	}
@@ -86,7 +85,7 @@ function scheduleRestart(): void {
 	const delay = restartDelay;
 	restartDelay = Math.min(restartDelay * 2, 30_000);
 	console.log(
-		`[llm-core] nouvelle tentative dans ${delay}ms (tentative ${restartCount}/${MAX_RESTARTS})`,
+		`[llm-core] nouvelle tentative dans ${delay}ms (tentative ${restartCount}/${MAX_RESTARTS})`
 	);
 
 	setTimeout(() => {
@@ -100,7 +99,7 @@ function cleanLine(line: string): string {
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
 	cleaned = cleaned.replace(
 		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"),
-		"",
+		""
 	);
 	return cleaned.trim();
 }
@@ -111,7 +110,7 @@ function cleanFullResponse(text: string): string {
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
 	cleaned = cleaned.replace(
 		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"),
-		"",
+		""
 	);
 	return cleaned.trim();
 }
@@ -177,12 +176,19 @@ function handleStdout(data: Buffer): void {
 }
 
 function processQueue(): void {
-	if (isProcessing || requestQueue.length === 0 || !isModelReady) {
+	if (isProcessing || queueHead >= requestQueue.length || !isModelReady) {
 		return;
 	}
 	isProcessing = true;
 
-	const { userMessage, callbacks, resolve } = requestQueue.shift()!;
+	const item = requestQueue[queueHead];
+	queueHead++;
+	if (queueHead > 100 && queueHead >= requestQueue.length / 2) {
+		requestQueue.splice(0, queueHead);
+		queueHead = 0;
+	}
+
+	const { userMessage, callbacks, resolve } = item;
 	stdoutBuffer = "";
 	currentUsername = userMessage.username;
 
@@ -201,7 +207,7 @@ function processQueue(): void {
 
 export function askLLM(
 	userMessage: UserMessage,
-	callbacks: LLMCallbacks,
+	callbacks: LLMCallbacks
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
 		requestQueue.push({ userMessage, callbacks, resolve, reject });
@@ -210,11 +216,12 @@ export function askLLM(
 }
 
 export function isLLMBusy(): boolean {
-	return isProcessing || requestQueue.length > 0;
+	return isProcessing || queueHead < requestQueue.length;
 }
 
 export async function resetLLM(): Promise<void> {
 	requestQueue.length = 0;
+	queueHead = 0;
 	isProcessing = false;
 	currentOnChunk = null;
 	currentOnDone = null;

@@ -62,14 +62,21 @@ export function drainPending(key: string): {
 }
 
 export function restorePending(
-	entries: { channelId: string; messageId: string; userId: string; reason: string }[],
+	entries: {
+		channelId: string;
+		messageId: string;
+		userId: string;
+		reason: string;
+	}[],
 	client: Eris.Client
 ): void {
 	for (const entry of entries) {
 		const key = pendingKey(entry.channelId, entry.userId);
 		if (!processing.has(key)) {
 			try {
-				const channel = client.getChannel(entry.channelId) as Eris.GuildTextableChannel | undefined;
+				const channel = client.getChannel(entry.channelId) as
+					| Eris.GuildTextableChannel
+					| undefined;
 				if (channel) {
 					client
 						.getMessage(entry.channelId, entry.messageId)

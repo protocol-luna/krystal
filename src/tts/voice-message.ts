@@ -15,7 +15,7 @@ import {
 export async function sendTextAsVoiceMessage(
 	channelId: string,
 	replyToMessageId: string,
-	text: string,
+	text: string
 ): Promise<void> {
 	if (!isTTSReady()) {
 		console.warn("[tts] Piper not ready, skipping voice message");
@@ -38,7 +38,7 @@ export async function sendTextAsVoiceMessage(
 		const { uploadUrl, uploadFilename } = await requestUploadUrl(
 			channelId,
 			oggBuf.byteLength,
-			durationSecs,
+			durationSecs
 		);
 		await putFileToUploadUrl(uploadUrl, oggBuf);
 		await postVoiceMessage(
@@ -46,7 +46,7 @@ export async function sendTextAsVoiceMessage(
 			uploadFilename,
 			durationSecs,
 			waveform,
-			replyToMessageId,
+			replyToMessageId
 		);
 		console.log("[tts] Voice message sent");
 	} catch (err) {
@@ -61,7 +61,7 @@ export function shouldSendVoice(): boolean {
 	const roll = Math.random();
 	const send = roll < voiceMessageChance;
 	console.log(
-		`[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${voiceMessageChance})`,
+		`[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${voiceMessageChance})`
 	);
 	return send;
 }

@@ -46,7 +46,7 @@ export async function wavToOgg(wavBuf: Buffer): Promise<Buffer> {
 					"1",
 					tmpOgg,
 				],
-				(err) => (err ? reject(err) : resolve()),
+				(err) => (err ? reject(err) : resolve())
 			);
 		});
 		return fs.readFileSync(tmpOgg);
@@ -83,7 +83,7 @@ export async function getAudioDuration(oggBuf: Buffer): Promise<number> {
 					tmpOgg,
 				],
 				(err, stdout) =>
-					err ? reject(err) : resolve(Number.parseFloat(stdout.trim())),
+					err ? reject(err) : resolve(Number.parseFloat(stdout.trim()))
 			);
 		});
 		return Math.ceil(duration);
@@ -102,5 +102,7 @@ export async function getAudioDuration(oggBuf: Buffer): Promise<number> {
 
 export function hasUnsafeTTSText(text: string): boolean {
 	// biome-ignore lint/suspicious/noMisleadingCharacterClass: emoji ranges intentionally broad
-	return /[\u{1F000}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/u.test(text);
+	return /[\u{1F000}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/u.test(
+		text
+	);
 }

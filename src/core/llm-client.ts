@@ -4,7 +4,7 @@ const BASE = `http://localhost:${LLM_PORT}`;
 
 export async function askLLM(
 	userMessage: { username: string; text: string },
-	callbacks: { onFirstToken?: () => void; onChunk: (chunk: string) => void },
+	callbacks: { onFirstToken?: () => void; onChunk: (chunk: string) => void }
 ): Promise<string> {
 	const response = await fetch(`${BASE}/ask`, {
 		method: "POST",

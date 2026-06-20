@@ -11,12 +11,17 @@ export interface PendingEntry {
 	timestamp: number;
 }
 
+export interface LastSpeakerEntry {
+	userId: string;
+	timestamp: number;
+}
+
 export interface PersistedState {
 	pendingMessages: PendingEntry[];
 	paused: boolean;
 	channelCooldowns: [string, number][];
 	botActivity: [string, number][];
-	lastSpeaker: [string, string][];
+	lastSpeaker: [string, LastSpeakerEntry][];
 	responseCount: [string, number][];
 }
 
@@ -39,7 +44,7 @@ export async function loadState(): Promise<PersistedState> {
 			throw new Error("invalid paused");
 		}
 		console.log(
-			`[persist] loaded state: ${parsed.pendingMessages.length} pending, paused=${parsed.paused}`,
+			`[persist] loaded state: ${parsed.pendingMessages.length} pending, paused=${parsed.paused}`
 		);
 		return parsed;
 	} catch {
@@ -50,15 +55,12 @@ export async function loadState(): Promise<PersistedState> {
 export async function persistState(state: PersistedState): Promise<void> {
 	await fs.writeFile(STATE_FILE, JSON.stringify(state), "utf-8");
 	console.log(
-		`[persist] saved state: ${state.pendingMessages.length} pending, paused=${state.paused}`,
+		`[persist] saved state: ${state.pendingMessages.length} pending, paused=${state.paused}`
 	);
 }
 
 export function buildPending(
-	pending: Map<
-		string,
-		{ message: import("eris").Message; reason: string }
-	>,
+	pending: Map<string, { message: import("eris").Message; reason: string }>
 ): PendingEntry[] {
 	const out: PendingEntry[] = [];
 	for (const [, { message, reason }] of pending) {

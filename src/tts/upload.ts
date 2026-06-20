@@ -8,7 +8,7 @@ interface UploadResult {
 export async function requestUploadUrl(
 	channelId: string,
 	size: number,
-	duration: number,
+	duration: number
 ): Promise<UploadResult> {
 	const token = DISCORD_TOKEN;
 	const res = await fetch(
@@ -29,7 +29,7 @@ export async function requestUploadUrl(
 					},
 				],
 			}),
-		},
+		}
 	);
 	if (!res.ok) {
 		const txt = await res.text().catch(() => "");
@@ -48,7 +48,7 @@ export async function requestUploadUrl(
 
 export async function putFileToUploadUrl(
 	uploadUrl: string,
-	buffer: Buffer,
+	buffer: Buffer
 ): Promise<void> {
 	const res = await fetch(uploadUrl, {
 		method: "PUT",
@@ -69,7 +69,7 @@ export async function postVoiceMessage(
 	uploadFilename: string,
 	durationSecs: number,
 	waveformB64: string,
-	replyToMessageId?: string,
+	replyToMessageId?: string
 ): Promise<void> {
 	const body: Record<string, unknown> = {
 		flags: 8192,
@@ -101,7 +101,7 @@ export async function postVoiceMessage(
 				Authorization: `${token}`,
 			},
 			body: JSON.stringify(body),
-		},
+		}
 	);
 	if (!res.ok) {
 		const txt = await res.text().catch(() => "");

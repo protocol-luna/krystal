@@ -4,10 +4,33 @@ import { askLLM, resetLLM, isLLMBusy } from "./core/llm-client.js";
 import { markBotActivity } from "./state/state.js";
 import { spontaneousContextMessages, spontaneousWhitelist } from "./config.js";
 
-function pickWeightedGuild(client: Eris.Client): Eris.Guild | null {
-	const whitelist = spontaneousWhitelist === "*"
-		? null
-		: new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+const CACHE_TTL = 60_000;
+const activeChannelCache = new Map<
+	string,
+	{ channel: Eris.TextChannel; timestamp: number }
+>();
+
+function getCachedActiveChannel(
+	guild: Eris.Guild
+): Eris.TextChannel | undefined {
+	const cached = activeChannelCache.get(guild.id);
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+		return cached.channel;
+	}
+	const channel = findMostActiveChannel(guild);
+	if (channel) {
+		activeChannelCache.set(guild.id, { channel, timestamp: Date.now() });
+		return channel;
+	}
+}
+
+function pickWeightedGuild(
+	client: Eris.Client
+): { guild: Eris.Guild; channel: Eris.TextChannel } | null {
+	const whitelist =
+		spontaneousWhitelist === "*"
+			? null
+			: new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
 
 	const guilds = [...client.guilds.values()].filter((g) => {
 		if (whitelist && !whitelist.has(g.id)) {
@@ -19,26 +42,36 @@ function pickWeightedGuild(client: Eris.Client): Eris.Guild | null {
 		return null;
 	}
 
-	// Sort by most recent message across all text channels
 	const ranked = guilds
 		.map((g) => ({
 			guild: g,
-			lastID: findMostActiveChannel(g)?.lastMessageID ?? "0",
+			channel: getCachedActiveChannel(g),
 		}))
-		.sort((a, b) => b.lastID.localeCompare(a.lastID));
+		.filter(
+			(entry): entry is { guild: Eris.Guild; channel: Eris.TextChannel } =>
+				entry.channel !== undefined
+		)
+		.sort((a, b) =>
+			(b.channel.lastMessageID ?? "0").localeCompare(
+				a.channel.lastMessageID ?? "0"
+			)
+		);
 
-	// Linear weight: top guild = N, second = N-1, ..., last = 1
+	if (ranked.length === 0) {
+		return null;
+	}
+
 	const total = (ranked.length * (ranked.length + 1)) / 2;
 	let roll = Math.random() * total;
 
 	for (let i = 0; i < ranked.length; i++) {
 		roll -= ranked.length - i;
 		if (roll <= 0) {
-			return ranked[i].guild;
+			return ranked[i];
 		}
 	}
 
-	return ranked[ranked.length - 1].guild;
+	return ranked[ranked.length - 1];
 }
 
 async function fetchContext(
@@ -63,17 +96,15 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		return;
 	}
 
-	const guild = pickWeightedGuild(client);
-	if (!guild) {
+	const picked = pickWeightedGuild(client);
+	if (!picked) {
 		return;
 	}
 
-	const channel = findMostActiveChannel(guild);
-	if (!channel) {
-		return;
-	}
-
-	const context = await fetchContext(channel, spontaneousContextMessages);
+	const context = await fetchContext(
+		picked.channel,
+		spontaneousContextMessages
+	);
 
 	await resetLLM();
 
@@ -83,8 +114,8 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		{
 			username: "system",
 			text: context
-				? `Recent conversation in #${channel.name}:\n${context}\n\nJoin the conversation naturally. Keep it short and relevant to what was just said.`
-				: `You are in #${channel.name}. The channel is quiet. Say something engaging to spark conversation. Keep it short.`,
+				? `Recent conversation in #${picked.channel.name}:\n${context}\n\nJoin the conversation naturally. Keep it short and relevant to what was just said.`
+				: `You are in #${picked.channel.name}. The channel is quiet. Say something engaging to spark conversation. Keep it short.`,
 		},
 		{
 			onFirstToken: () => {},
@@ -95,13 +126,13 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 	);
 
 	if (reply.trim()) {
-		await client.createMessage(channel.id, { content: reply.trim() });
-		markBotActivity(channel.id);
+		await client.createMessage(picked.channel.id, { content: reply.trim() });
+		markBotActivity(picked.channel.id);
 		console.log(
-			`[spontaneous] #${channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`
+			`[spontaneous] #${picked.channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`
 		);
 	} else {
-		console.log(`[spontaneous] #${channel.name} : réponse vide`);
+		console.log(`[spontaneous] #${picked.channel.name} : réponse vide`);
 	}
 
 	await resetLLM();

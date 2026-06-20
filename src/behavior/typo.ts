@@ -70,24 +70,29 @@ export interface TypoResult {
 }
 
 function pickLetter(text: string): number | null {
-	const letters = text.split("").map((c, i) => ({ c, i }));
+	const letters = [...text].map((c, i) => ({ c, i }));
 	const candidates = letters.filter(({ c }) => /[a-zA-Z]/.test(c));
-	if (candidates.length === 0) { return null; }
+	if (candidates.length === 0) {
+		return null;
+	}
 	return candidates[Math.floor(Math.random() * candidates.length)].i;
 }
 
 export function applyTypo(text: string, layout: TypoLayout): TypoResult | null {
 	const map = layout === "azerty" ? azertyAdjacent : qwertyAdjacent;
 	const idx = pickLetter(text);
-	if (idx === null) { return null; }
+	if (idx === null) {
+		return null;
+	}
 
 	const originalChar = text[idx].toLowerCase();
 	const adjacent = map[originalChar];
-	if (!adjacent || adjacent.length === 0) { return null; }
+	if (!adjacent || adjacent.length === 0) {
+		return null;
+	}
 
 	const typoChar = adjacent[Math.floor(Math.random() * adjacent.length)];
-	const typed =
-		text[idx] === originalChar ? typoChar : typoChar.toUpperCase();
+	const typed = text[idx] === originalChar ? typoChar : typoChar.toUpperCase();
 	const newText = text.slice(0, idx) + typed + text.slice(idx + 1);
 
 	const wordStart = text.slice(0, idx).search(/\S*$/);
@@ -95,5 +100,13 @@ export function applyTypo(text: string, layout: TypoLayout): TypoResult | null {
 	const originalWord = text.slice(wordStart, wordEnd);
 	const correctedWord = newText.slice(wordStart, wordEnd);
 
-	return { text: newText, original: text, charIndex: idx, originalChar, typoChar, originalWord, correctedWord };
+	return {
+		text: newText,
+		original: text,
+		charIndex: idx,
+		originalChar,
+		typoChar,
+		originalWord,
+		correctedWord,
+	};
 }

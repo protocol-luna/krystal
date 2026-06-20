@@ -10,10 +10,7 @@ import {
 	typoLayout,
 } from "./config.js";
 import { askLLM, resetLLM } from "./core/llm-core.js";
-import {
-	evaluateMessage,
-	type TriggerResult,
-} from "./state/trigger.js";
+import { evaluateMessage, type TriggerResult } from "./state/trigger.js";
 import {
 	isRecentBotActivity,
 	markBotActivity,
@@ -22,6 +19,7 @@ import {
 	clearCooldown,
 	setPaused,
 	restoreState,
+	startPruning,
 } from "./state/state.js";
 import { trySpawn } from "./spontaneous.js";
 import {
@@ -68,14 +66,14 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 async function triggerLunaReply(
 	message: Eris.Message,
 	isDM = false,
-	reason: string | null = null,
+	reason: string | null = null
 ): Promise<void> {
 	const key = pendingKey(message.channel.id, message.author.id);
 
 	if (processing.has(key)) {
 		queuePending(key, message, reason ?? "mention");
 		console.log(
-			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: mis en attente (déjà en cours)`,
+			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: mis en attente (déjà en cours)`
 		);
 		return;
 	}
@@ -113,7 +111,7 @@ async function triggerLunaReply(
 				onChunk: (chunk: string) => {
 					chunks.push(chunk);
 				},
-			},
+			}
 		);
 
 		if (isVoice && !hasUnsafeTTSText(fullText)) {
@@ -121,11 +119,7 @@ async function triggerLunaReply(
 		} else {
 			let typoState: TypoCorrectionState | null = null;
 
-			if (
-				typoChance > 0 &&
-				Math.random() < typoChance &&
-				chunks.length > 0
-			) {
+			if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
 				const idx = Math.floor(Math.random() * chunks.length);
 				const result = applyTypo(chunks[idx], typoLayout);
 				if (result) {
@@ -174,7 +168,7 @@ async function triggerLunaReply(
 					client,
 					message.channel.id,
 					typoMessageId,
-					typoState,
+					typoState
 				);
 			}
 		}
@@ -196,12 +190,12 @@ async function triggerLunaReply(
 		const queued = drainPending(key);
 		if (queued) {
 			console.log(
-				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente (${queued.reason})`,
+				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente (${queued.reason})`
 			);
 			await triggerLunaReply(
 				queued.message,
 				queued.message.channel.type === 1,
-				queued.reason,
+				queued.reason
 			);
 		}
 	}
@@ -212,7 +206,7 @@ async function handleCommand(
 	author: string,
 	channelName: string,
 	channelId: string,
-	result: TriggerResult,
+	result: TriggerResult
 ): Promise<boolean> {
 	if (result.reason === "stop") {
 		await resetLLM();
@@ -220,7 +214,11 @@ async function handleCommand(
 		trackSpeaker(channelId, message.author.id);
 		setPaused(true);
 		saveAllState();
-		try { await message.addReaction("✅"); } catch { /* ignore */ }
+		try {
+			await message.addReaction("✅");
+		} catch {
+			/* ignore */
+		}
 		console.log(`[bot] #${channelName} ${author}: -stop → pause`);
 		return true;
 	}
@@ -228,7 +226,11 @@ async function handleCommand(
 	if (result.reason === "start") {
 		setPaused(false);
 		saveAllState();
-		try { await message.addReaction("✅"); } catch { /* ignore */ }
+		try {
+			await message.addReaction("✅");
+		} catch {
+			/* ignore */
+		}
 		console.log(`[bot] #${channelName} ${author}: -start → reprise`);
 		return true;
 	}
@@ -238,7 +240,11 @@ async function handleCommand(
 		clearCooldown(channelId);
 		trackSpeaker(channelId, message.author.id);
 		saveAllState();
-		try { await message.addReaction("✅"); } catch { /* ignore */ }
+		try {
+			await message.addReaction("✅");
+		} catch {
+			/* ignore */
+		}
 		console.log(`[bot] #${channelName} ${author}: -clear → reset`);
 		return true;
 	}
@@ -248,7 +254,7 @@ async function handleCommand(
 
 function getServerEmojis(
 	message: Eris.Message,
-	isDM: boolean,
+	isDM: boolean
 ): string[] | undefined {
 	if (isDM) {
 		return;
@@ -263,9 +269,13 @@ function handleSleep(
 	result: TriggerResult,
 	sleepBehavior: string | null,
 	author: string,
-	channelName: string,
+	channelName: string
 ): boolean {
-	if (sleepBehavior === "sleep" && result.reason !== "mention" && result.reason !== "dm") {
+	if (
+		sleepBehavior === "sleep" &&
+		result.reason !== "mention" &&
+		result.reason !== "dm"
+	) {
 		console.log(`[bot] #${channelName} ${author}: ignoré (sommeil)`);
 		return true;
 	}
@@ -277,11 +287,11 @@ function logAndReact(
 	author: string,
 	channelName: string,
 	reason: string | null,
-	sleepBehavior: string | null,
+	sleepBehavior: string | null
 ): void {
 	const delay = computeDelay(reason, sleepBehavior);
 	console.log(
-		`[bot] #${channelName} ${author}: répond (${reason}) delay=${delay.toFixed(0)}ms`,
+		`[bot] #${channelName} ${author}: répond (${reason}) delay=${delay.toFixed(0)}ms`
 	);
 
 	setTimeout(async () => {
@@ -295,7 +305,7 @@ function logAndReact(
 
 client.on("ready", () => {
 	console.log(
-		`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`,
+		`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`
 	);
 });
 
@@ -316,10 +326,18 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	const result: TriggerResult = evaluateMessage(
 		message,
 		client.user.id,
-		client.user.username,
+		client.user.username
 	);
 
-	if (await handleCommand(message, author, channelName, message.channel.id, result)) {
+	if (
+		await handleCommand(
+			message,
+			author,
+			channelName,
+			message.channel.id,
+			result
+		)
+	) {
 		return;
 	}
 
@@ -331,9 +349,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	if (result.shouldRespond) {
 		trackSpeaker(message.channel.id, message.author.id);
 		if (shouldIgnore(result.reason, sleepBehavior)) {
-			console.log(
-				`[bot] #${channelName} ${author}: ignoré (${result.reason})`,
-			);
+			console.log(`[bot] #${channelName} ${author}: ignoré (${result.reason})`);
 			return;
 		}
 
@@ -352,9 +368,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		trackSpeaker(message.channel.id, message.author.id);
 		const { markReplied } = await import("./state/state.js");
 		markReplied(message.channel.id);
-		console.log(
-			`[bot] #${channelName} ${author}: follow-up immédiat`,
-		);
+		console.log(`[bot] #${channelName} ${author}: follow-up immédiat`);
 
 		const delay = computeDelay("follow-up", sleepBehavior);
 		await new Promise((r) => setTimeout(r, delay));
@@ -376,7 +390,7 @@ client.on(
 	async (
 		message: Eris.Message,
 		emoji: { name: string; id?: string },
-		userId: string,
+		userId: string
 	) => {
 		if (userId === client.user.id) {
 			return;
@@ -389,7 +403,7 @@ client.on(
 		}
 
 		await handleReactionCommand(message, emoji.name, userId);
-	},
+	}
 );
 
 export async function startBot(): Promise<void> {
@@ -398,6 +412,7 @@ export async function startBot(): Promise<void> {
 	const saved = await loadState();
 	restoreState(saved);
 	restorePending(saved.pendingMessages, client);
+	startPruning();
 
 	client.connect();
 

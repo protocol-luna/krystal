@@ -1,13 +1,13 @@
 # IDEAS — Améliorations du réalisme humain
 
 ## Comportement de "frappe"
-- [ ] Streamer le message lettre par lettre (au lieu de chunks) avec délai type "wpm" humain
-- [ ] Commencer par une hésitation aléatoire ("Euh...", "Hmm...", "Bah...", "Bon...")
-- [ ] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond
+- [?] Streamer le message lettre par lettre (au lieu de chunks) avec délai type "wpm" humain
+- [/] Commencer par une hésitation aléatoire ("Euh...", "Hmm...", "Bah...", "Bon...") [Cause de la dépréciation: le message peut être généré en anglais, donc pas optimal]
+- [~] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond
 
 ## Corrections et erreurs
-- [ ] Fautes de grammaire intentionnelles (rare, type "j'ai vu" → "j'ai vue")
-- [ ] Auto-correction "humaine" (corriger un doigt qui a dérapé entre deux mots différents, pas seulement adjacent)
+- [/] Fautes de grammaire intentionnelles (rare, type "j'ai vu" → "j'ai vue") [Cause dépréciation: la meme qu'en haut]
+- [] Auto-correction "humaine" (corriger un doigt qui a dérapé entre deux mots différents, pas seulement adjacent)
 - [ ] Changer d'avis : éditer le message après envoi pour ajouter/supprimer un mot
 - [ ] Oubli de répondre malgré trigger (probabilité faible)
 
@@ -32,3 +32,10 @@
 - [x] Auto-restart du processus llama-cli en cas de crash (exponential backoff, max 5 tentatives)
 - [ ] Configurer la concentration (ignoreChance, réaction, délai) depuis config.yml au lieu de hardcodé dans mannerisms.ts
 - [ ] Tests unitaires pour chaque module
+
+x - fait
+! - priorité
+~ - intéressant, mais pas priorité
+/ - déprécié
+? - pas compris
+@ - dis m'en plus ?
