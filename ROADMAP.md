@@ -16,8 +16,6 @@ Le délai peut être influencé par la longueur du chunk (plus un message est lo
 
 **Fichiers** : `bot.ts` — `triggerLunaReply`, boucle d'envoi des chunks.
 
-**Variante concentration** : le délai inter-chunks pourrait être réduit pour les `mention`/`dm` (le bot répond vite) et augmenté pour les `random` (le bot est moins attentif).
-
 ---
 
 ## 2. Plages de sommeil / présence variable
@@ -87,24 +85,24 @@ q → w/a, w → q/e/s, e → w/r, r → e/t, t → r/y, y → t/u, u → y/i, i
 
 ---
 
-## 4. Concentration variable / attentiveness
+## 4. Concentration variable / attentiveness ✅
 
 **Problème** : le bot réagit de la même façon quel que soit le type de déclencheur. Un humain est plus attentif quand on l'appelle directement que quand il capte un mot-clé au hasard.
 
-**Solution** : paramétrer le comportement (délai, ignore chance, reaction chance, inter-chunk delay) en fonction de la raison du trigger.
+**Solution** : paramétrer le comportement (délai, ignore chance, reaction chance) en fonction de la raison du trigger. Implémenté dans `mannerisms.ts`.
 
-| Trigger | Delai min | Delai max | Ignore chance | Reaction chance | Inter-chunk |
-|---------|-----------|-----------|---------------|-----------------|-------------|
-| `mention` | 300ms | 1500ms | 0% | 8% | court |
-| `dm` | 400ms | 1800ms | 0% | 5% | court |
-| `name` | 800ms | 3000ms | 5% | 6% | normal |
-| `keyword` | 1000ms | 3500ms | 8% | 4% | normal |
-| `follow-up` | 500ms | 2000ms | 0% | 3% | court |
-| `random` | 1500ms | 5000ms | 15% | 2% | long |
+| Trigger | Delai min | Delai max | Ignore chance | Reaction chance |
+|---------|-----------|-----------|---------------|-----------------|
+| `mention` | 300ms | 1500ms | 0% | 8% |
+| `dm` | 400ms | 1800ms | 0% | 5% |
+| `name` | 800ms | 3000ms | 5% | 6% |
+| `keyword` | 1000ms | 3500ms | 8% | 4% |
+| `follow-up` | 500ms | 2000ms | 0% | 3% |
+| `random` | 1500ms | 5000ms | 15% | 2% |
 
-Ces valeurs seraient configurables dans `config.yml` (section `concentration` ou intégrées aux triggers).
+**Fichiers** : `mannerisms.ts` — `computeDelay(reason)`, `shouldReact(reason)`. `bot.ts` — passage de `reason` à `triggerLunaReply` et aux fonctions mannerisms.
 
-**Fichiers** : `mannerisms.ts` — `computeDelay(reason)`, `shouldReact(reason)`, adapter `triggerLunaReply`.
+**Statut : ✅ Implémenté**.
 
 ---
 
@@ -122,18 +120,18 @@ Ces valeurs seraient configurables dans `config.yml` (section `concentration` ou
 3. msg3 arrive → écrase msg2 dans `pendingMessages["C:U"] = msg3`
 4. La réponse à msg1 se termine → `finally` → `processing.delete("C:U")` → vérifie `pendingMessages` → trouve msg3 → lance `triggerLunaReply(msg3)`
 
-**Résultat** : 20 messages spammés = 1 réponse au premier + 1 réponse au dernier. La queue LLM ne grossit jamais. L'utilisateur a l'impression que le bot lit ses messages et répond au plus récent.
+**Résultat** : 20 messages spammés = 1 réponse au premier + 1 réponse au dernier. La queue LLM ne grossit jamais.
 
 **Fichiers** : `bot.ts` — `triggerLunaReply`.
 
-**Statut : ✅ Implémenté** (`src/bot.ts:33-34`).
+**Statut : ✅ Implémenté**.
 
 ---
 
 ## Ordre de priorité suggéré
 
 1. **✅ Gestion des interruptions** (#5) — implémenté
-2. **Concentration variable** (#4) — impact immédiat, réutilise les mécanismes existants, peu de code nouveau
-3. **Délai inter-chunks** (#1) — simple, effet visible, complète #4 naturellement
+2. **✅ Concentration variable** (#4) — implémenté
+3. **Délai inter-chunks** (#1) — simple, effet visible
 4. **Plages de sommeil** (#2) — indépendant, ajoute une couche de configuration
 5. **Typos + correction** (#3) — le plus complexe (mapping clavier, logique d'edit, gestion des races)
