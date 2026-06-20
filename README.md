@@ -153,7 +153,7 @@ finally: clearInterval      → arrête le typing
 
 ### Réponse multi-chunk
 
-Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé. Seul le premier message a un `messageReference` (reply visuel).
+Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai variable configurable entre chaque (simule le temps d'écrire). Seul le premier message a un `messageReference` (reply visuel).
 
 ### Reply style
 

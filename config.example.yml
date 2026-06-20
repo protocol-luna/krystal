@@ -89,6 +89,12 @@ spontaneous_whitelist: "*"
 # Exemple avec plusieurs serveurs : "123456789,987654321"
 # Exemple avec un seul serveur : "123456789"
 
+# --- Chunk delays (temps entre chaque message d'une réponse multi-chunk) ---
+chunk_delay_min: 300
+chunk_delay_max: 1500
+# Délai variable entre l'envoi de chaque chunk, proportionnel à la longueur du texte.
+# 300-1500ms simulé le temps d'écrire chaque message individuellement.
+
 # --- TTS / Voice messages ---
 voice_message_chance: 0.08
 # Probabilité qu'une réponse soit envoyée sous forme de message vocal (fichier audio)

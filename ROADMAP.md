@@ -1,20 +1,19 @@
 # Roadmap — Fonctionnalités de réalisme humain
 
-## 1. Délai inter-chunks
+## 1. Délai inter-chunks ✅
 
 **Problème** : actuellement, tous les chunks de la réponse LLM sont envoyés instantanément les uns après les autres. Un humain mettrait du temps à écrire chaque message.
 
-**Solution** : ajouter un délai variable configurable entre l'envoi de chaque chunk.
+**Solution** : délai variable configurable entre l'envoi de chaque chunk, proportionnel à la longueur du texte.
 
 ```yaml
-# config.yml
 chunk_delay_min: 300       # ms
 chunk_delay_max: 1500      # ms
 ```
 
-Le délai peut être influencé par la longueur du chunk (plus un message est long, plus il prend de temps à écrire).
+**Fichiers** : `bot.ts` — boucle d'envoi des chunks. `config.ts` — `chunkDelayMin`, `chunkDelayMax`.
 
-**Fichiers** : `bot.ts` — `triggerLunaReply`, boucle d'envoi des chunks.
+**Statut : ✅ Implémenté**.
 
 ---
 
@@ -132,6 +131,6 @@ q → w/a, w → q/e/s, e → w/r, r → e/t, t → r/y, y → t/u, u → y/i, i
 
 1. **✅ Gestion des interruptions** (#5) — implémenté
 2. **✅ Concentration variable** (#4) — implémenté
-3. **Délai inter-chunks** (#1) — simple, effet visible
+3. **✅ Délai inter-chunks** (#1) — implémenté
 4. **Plages de sommeil** (#2) — indépendant, ajoute une couche de configuration
 5. **Typos + correction** (#3) — le plus complexe (mapping clavier, logique d'edit, gestion des races)

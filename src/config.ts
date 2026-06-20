@@ -107,6 +107,10 @@ export const spontaneousWhitelist = v<string>(
 	"*"
 );
 
+// --- Chunk delays ---
+export const chunkDelayMin = v<number>("chunk_delay_min", 300);
+export const chunkDelayMax = v<number>("chunk_delay_max", 1500);
+
 // --- TTS / Voice messages ---
 export const voiceMessageChance = v<number>("voice_message_chance", 0.08);
 

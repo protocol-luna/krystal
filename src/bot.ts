@@ -25,6 +25,7 @@ import {
 	pickReaction,
 } from "./mannerisms.js";
 import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
+import { chunkDelayMin, chunkDelayMax } from "./config.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
@@ -96,6 +97,11 @@ async function triggerLunaReply(
 		} else {
 			let isFirstChunk = true;
 			for (const chunk of chunks) {
+				if (!isFirstChunk) {
+					const ratio = chunk.length / 200;
+					const delay = chunkDelayMin + Math.random() * (chunkDelayMax - chunkDelayMin) * Math.min(ratio, 1);
+					await new Promise((r) => setTimeout(r, delay));
+				}
 				await client.createMessage(message.channel.id, {
 					content: chunk,
 					...(isFirstChunk && refStyle.messageReference

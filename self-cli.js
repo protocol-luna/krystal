@@ -84,6 +84,8 @@ var spontaneousWhitelist = v(
   "spontaneous_whitelist",
   "*"
 );
+var chunkDelayMin = v("chunk_delay_min", 300);
+var chunkDelayMax = v("chunk_delay_max", 1500);
 var voiceMessageChance = v("voice_message_chance", 0.08);
 var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
@@ -886,6 +888,11 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
     } else {
       let isFirstChunk = true;
       for (const chunk of chunks) {
+        if (!isFirstChunk) {
+          const ratio = chunk.length / 200;
+          const delay = chunkDelayMin + Math.random() * (chunkDelayMax - chunkDelayMin) * Math.min(ratio, 1);
+          await new Promise((r) => setTimeout(r, delay));
+        }
         await client.createMessage(message.channel.id, {
           content: chunk,
           ...isFirstChunk && refStyle.messageReference ? {
