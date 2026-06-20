@@ -31,7 +31,7 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 });
 
 const processing = new Set<string>();
-const pendingMessages = new Map<string, Eris.Message>();
+const pendingMessages = new Map<string, { message: Eris.Message; reason: string }>();
 
 function pendingKey(channelId: string, userId: string): string {
 	return `${channelId}:${userId}`;
@@ -39,12 +39,13 @@ function pendingKey(channelId: string, userId: string): string {
 
 async function triggerLunaReply(
 	message: Eris.Message,
-	isDM = false
+	isDM = false,
+	reason: string | null = null
 ): Promise<void> {
 	const key = pendingKey(message.channel.id, message.author.id);
 
 	if (processing.has(key)) {
-		pendingMessages.set(key, message);
+		pendingMessages.set(key, { message, reason: reason ?? "mention" });
 		console.log(
 			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: mis en attente (déjà en cours)`
 		);
@@ -135,9 +136,9 @@ async function triggerLunaReply(
 		if (queued) {
 			pendingMessages.delete(key);
 			console.log(
-				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente`
+				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente (${queued.reason})`
 			);
-			await triggerLunaReply(queued, queued.channel.type === 1);
+			await triggerLunaReply(queued.message, queued.message.channel.type === 1, queued.reason);
 		}
 	}
 }
@@ -214,13 +215,13 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			return;
 		}
 
-		const delay = computeDelay();
+		const delay = computeDelay(result.reason);
 		console.log(
 			`[bot] #${channel.name ?? message.channel.id} ${author}: répond (${result.reason}) delay=${delay.toFixed(0)}ms`
 		);
 		await new Promise((r) => setTimeout(r, delay));
 
-		if (shouldReact()) {
+		if (shouldReact(result.reason)) {
 			const serverEmojis = isDM
 				? undefined
 				: (channel as Eris.GuildTextableChannel).guild?.emojis
@@ -230,7 +231,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			await message.addReaction(reaction).catch(() => {});
 		}
 
-		await triggerLunaReply(message, isDM);
+		await triggerLunaReply(message, isDM, result.reason);
 		return;
 	}
 
@@ -240,9 +241,9 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		console.log(
 			`[bot] #${channel.name ?? message.channel.id} ${author}: follow-up immédiat`
 		);
-		await new Promise((r) => setTimeout(r, computeDelay()));
+		await new Promise((r) => setTimeout(r, computeDelay("follow-up")));
 
-		if (shouldReact()) {
+		if (shouldReact("follow-up")) {
 			const serverEmojis = isDM
 				? undefined
 				: (channel as Eris.GuildTextableChannel).guild?.emojis
@@ -252,7 +253,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			await message.addReaction(reaction).catch(() => {});
 		}
 
-		await triggerLunaReply(message, isDM);
+		await triggerLunaReply(message, isDM, "follow-up");
 	}
 
 	trackSpeaker(message.channel.id, message.author.id);

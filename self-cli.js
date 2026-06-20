@@ -495,13 +495,69 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
 }
 
 // src/mannerisms.ts
-function computeDelay() {
-  const delay = responseDelayMin + Math.random() * (responseDelayMax - responseDelayMin);
-  console.log(`[mannerisms] delay=${delay.toFixed(0)}ms`);
+function pickIgnoreChance(reason) {
+  switch (reason) {
+    case "mention":
+    case "dm":
+    case "follow-up":
+      return 0;
+    case "name":
+      return 0.05;
+    case "random":
+      return 0.15;
+    default:
+      return ignoreChance;
+  }
+}
+function pickReactionChance(reason) {
+  switch (reason) {
+    case "mention":
+      return 0.08;
+    case "dm":
+      return 0.05;
+    case "name":
+      return 0.06;
+    case "keyword":
+      return 0.04;
+    case "follow-up":
+      return 0.03;
+    case "random":
+      return 0.02;
+    default:
+      return reactionChance;
+  }
+}
+function computeDelay(reason = null) {
+  let min = responseDelayMin;
+  let max = responseDelayMax;
+  switch (reason) {
+    case "mention":
+      min = 300;
+      max = 1500;
+      break;
+    case "dm":
+      min = 400;
+      max = 1800;
+      break;
+    case "keyword":
+      min = 1e3;
+      max = 3500;
+      break;
+    case "follow-up":
+      min = 500;
+      max = 2e3;
+      break;
+    case "random":
+      min = 1500;
+      max = 5e3;
+      break;
+  }
+  const delay = min + Math.random() * (max - min);
+  console.log(`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason})`);
   return delay;
 }
 function shouldIgnore(reason) {
-  const chance = reason === "mention" || reason === "dm" ? ignoreChanceMention : ignoreChance;
+  const chance = pickIgnoreChance(reason);
   if (chance <= 0) {
     return false;
   }
@@ -512,15 +568,16 @@ function shouldIgnore(reason) {
   );
   return ignored;
 }
-function shouldReact() {
-  if (reactionChance <= 0) {
+function shouldReact(reason = null) {
+  const chance = pickReactionChance(reason);
+  if (chance <= 0) {
     console.log("[mannerisms] react=false (chance=0)");
     return false;
   }
   const roll = Math.random();
-  const react = roll < reactionChance;
+  const react = roll < chance;
   console.log(
-    `[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${reactionChance})`
+    `[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${chance})`
   );
   return react;
 }
@@ -783,19 +840,21 @@ function shouldSendVoice() {
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
 });
-var pendingRequests = /* @__PURE__ */ new Set();
+var processing = /* @__PURE__ */ new Set();
+var pendingMessages = /* @__PURE__ */ new Map();
 function pendingKey(channelId, userId) {
   return `${channelId}:${userId}`;
 }
-async function triggerLunaReply(message, isDM = false) {
+async function triggerLunaReply(message, isDM = false, reason = null) {
   const key = pendingKey(message.channel.id, message.author.id);
-  if (pendingRequests.has(key)) {
+  if (processing.has(key)) {
+    pendingMessages.set(key, { message, reason: reason ?? "mention" });
     console.log(
-      `[bot] #${message.channel.name ?? message.channel.id} ${message.author.username}: ignor\xE9 (d\xE9j\xE0 une requ\xEAte en cours)`
+      `[bot] #${message.channel.name ?? message.channel.id} ${message.author.username}: mis en attente (d\xE9j\xE0 en cours)`
     );
     return;
   }
-  pendingRequests.add(key);
+  processing.add(key);
   let typingInterval = null;
   const startTyping = () => {
     client.sendChannelTyping(message.channel.id);
@@ -851,9 +910,17 @@ async function triggerLunaReply(message, isDM = false) {
       } : {}
     }).then(() => markBotActivity(message.channel.id));
   } finally {
-    pendingRequests.delete(key);
+    processing.delete(key);
     if (typingInterval) {
       clearInterval(typingInterval);
+    }
+    const queued = pendingMessages.get(key);
+    if (queued) {
+      pendingMessages.delete(key);
+      console.log(
+        `[bot] #${message.channel.name ?? message.channel.id} ${message.author.username}: r\xE9pond au message en attente (${queued.reason})`
+      );
+      await triggerLunaReply(queued.message, queued.message.channel.type === 1, queued.reason);
     }
   }
 }
@@ -920,18 +987,18 @@ client.on("messageCreate", async (message) => {
       );
       return;
     }
-    const delay = computeDelay();
+    const delay = computeDelay(result.reason);
     console.log(
       `[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`
     );
     await new Promise((r) => setTimeout(r, delay));
-    if (shouldReact()) {
+    if (shouldReact(result.reason)) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {
       });
     }
-    await triggerLunaReply(message, isDM);
+    await triggerLunaReply(message, isDM, result.reason);
     return;
   }
   if (canFollowUp(message.channel.id, client.user.id)) {
@@ -940,14 +1007,14 @@ client.on("messageCreate", async (message) => {
     console.log(
       `[bot] #${channel.name ?? message.channel.id} ${author}: follow-up imm\xE9diat`
     );
-    await new Promise((r) => setTimeout(r, computeDelay()));
-    if (shouldReact()) {
+    await new Promise((r) => setTimeout(r, computeDelay("follow-up")));
+    if (shouldReact("follow-up")) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {
       });
     }
-    await triggerLunaReply(message, isDM);
+    await triggerLunaReply(message, isDM, "follow-up");
   }
   trackSpeaker(message.channel.id, message.author.id);
 });

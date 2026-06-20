@@ -130,19 +130,17 @@ Quand le bot répond, il s'enregistre comme `lastSpeaker`. Tout message suivant 
 
 ### Délai variable
 
-```
-delay = 800 + random(0, 3200) ms
-```
+Le délai varie selon le type de déclencheur (voir section [Concentration variable](#concentration-variable)). Plus le message sollicite directement le bot, plus il répond vite.
 
-Simule le temps de réflexion. Aucun typing pendant ce délai — le typing n'apparaît que quand le LLM commence à générer (premier token reçu).
+Aucun typing pendant ce délai — le typing n'apparaît que quand le LLM commence à générer (premier token reçu).
 
 ### Ignore chance
 
-8% des triggers non-mention/non-DM sont ignorés (simule l'inattention humaine). 0% pour les mentions et DMs.
+Probabilité d'ignorer un message malgré un trigger, pour simuler l'inattention humaine. Varie selon le type de déclencheur (voir section [Concentration variable](#concentration-variable)). 0% pour les mentions, DMs et follow-up.
 
 ### Réactions
 
-6% de chance. Quand le bot réagit :
+Probabilité variable selon le type de déclencheur (voir section [Concentration variable](#concentration-variable)). Quand le bot réagit :
 - 30% → émoji personnalisé du serveur (aléatoire parmi les emojis du guild)
 - 70% → émoji unicode depuis une liste prédéfinie
 
@@ -172,6 +170,31 @@ Pondéré selon que le salon est en "conversation active" (bot a parlé récemme
 | Actif | `false` | `true` | 5% |
 
 En DM, `messageReference` est toujours `false`.
+
+### Concentration variable
+
+Le bot adapte son comportement (délai, réaction, inattention) selon le type de déclencheur. Plus on s'adresse directement à lui, plus il répond vite et attentivement.
+
+```mermaid
+flowchart LR
+    A[Trigger reason] --> B{type ?}
+    B -- mention --> C["delai 300-1500ms\nignore=0%\nreact=8%"]
+    B -- dm --> D["delai 400-1800ms\nignore=0%\nreact=5%"]
+    B -- name --> E["delai 800-3000ms\nignore=5%\nreact=6%"]
+    B -- keyword --> F["delai 1000-3500ms\nignore=8%\nreact=4%"]
+    B -- follow-up --> G["delai 500-2000ms\nignore=0%\nreact=3%"]
+    B -- random --> H["delai 1500-5000ms\nignore=15%\nreact=2%"]
+    C & D & E & F & G & H --> I[computeDelay\nshouldIgnore\nshouldReact]
+```
+
+| Trigger | Délai min | Délai max | Ignore chance | Reaction chance |
+|---------|-----------|-----------|---------------|-----------------|
+| `mention` | 300ms | 1500ms | 0% | 8% |
+| `dm` | 400ms | 1800ms | 0% | 5% |
+| `name` | 800ms | 3000ms | 5% | 6% |
+| `keyword` | 1000ms | 3500ms | 8% | 4% |
+| `follow-up` | 500ms | 2000ms | 0% | 3% |
+| `random` | 1500ms | 5000ms | 15% | 2% |
 
 ### Messages spontanés
 
@@ -382,18 +405,18 @@ sequenceDiagram
 
     alt shouldRespond = true
         bot.ts->>trigger.ts: markReplied() + trackSpeaker()
-        bot.ts->>mannerisms.ts: shouldIgnore()
+        bot.ts->>mannerisms.ts: shouldIgnore(reason)
         alt ignoré
             mannerisms.ts-->>bot.ts: true → return
         else pas ignoré
-            bot.ts->>mannerisms.ts: computeDelay()
+            bot.ts->>mannerisms.ts: computeDelay(reason)
             mannerisms.ts-->>bot.ts: delay ms
             bot.ts-->>bot.ts: attend delay
-            bot.ts->>mannerisms.ts: shouldReact() + pickReaction()
+            bot.ts->>mannerisms.ts: shouldReact(reason) + pickReaction()
             alt réaction
                 bot.ts->>Discord: addReaction()
             end
-            bot.ts->>llm-client.ts: askLLM()
+            bot.ts->>llm-client.ts: askLLM({ username, text })
             llm-client.ts->>llm-server.ts: POST /ask (NDJSON)
             llm-server.ts->>llama: stdin (prompt)
             llama-->>llm-server.ts: stdout stream
@@ -414,7 +437,8 @@ sequenceDiagram
         bot.ts->>trigger.ts: canFollowUp()
         alt follow-up
             bot.ts->>trigger.ts: markReplied()
-            bot.ts->>mannerisms.ts: computeDelay()
+            bot.ts->>mannerisms.ts: computeDelay("follow-up")
+            bot.ts->>mannerisms.ts: shouldReact("follow-up")
             bot.ts->>Discord: (delay, réaction, réponse...)
         else
             bot.ts->>trigger.ts: trackSpeaker(user)

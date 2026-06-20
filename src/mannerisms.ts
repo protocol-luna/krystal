@@ -3,23 +3,76 @@ import {
 	responseDelayMax,
 	reactionChance,
 	ignoreChance,
-	ignoreChanceMention,
 	reactions,
 	serverEmojiChance,
 } from "./config.js";
 
-export function computeDelay(): number {
-	const delay =
-		responseDelayMin + Math.random() * (responseDelayMax - responseDelayMin);
-	console.log(`[mannerisms] delay=${delay.toFixed(0)}ms`);
+function pickIgnoreChance(reason: string | null): number {
+	switch (reason) {
+		case "mention":
+		case "dm":
+		case "follow-up":
+			return 0;
+		case "name":
+			return 0.05;
+		case "random":
+			return 0.15;
+		default:
+			return ignoreChance;
+	}
+}
+
+function pickReactionChance(reason: string | null): number {
+	switch (reason) {
+		case "mention":
+			return 0.08;
+		case "dm":
+			return 0.05;
+		case "name":
+			return 0.06;
+		case "keyword":
+			return 0.04;
+		case "follow-up":
+			return 0.03;
+		case "random":
+			return 0.02;
+		default:
+			return reactionChance;
+	}
+}
+
+export function computeDelay(reason: string | null = null): number {
+	let min = responseDelayMin;
+	let max = responseDelayMax;
+	switch (reason) {
+		case "mention":
+			min = 300;
+			max = 1500;
+			break;
+		case "dm":
+			min = 400;
+			max = 1800;
+			break;
+		case "keyword":
+			min = 1000;
+			max = 3500;
+			break;
+		case "follow-up":
+			min = 500;
+			max = 2000;
+			break;
+		case "random":
+			min = 1500;
+			max = 5000;
+			break;
+	}
+	const delay = min + Math.random() * (max - min);
+	console.log(`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason})`);
 	return delay;
 }
 
 export function shouldIgnore(reason: string | null): boolean {
-	const chance =
-		reason === "mention" || reason === "dm"
-			? ignoreChanceMention
-			: ignoreChance;
+	const chance = pickIgnoreChance(reason);
 	if (chance <= 0) {
 		return false;
 	}
@@ -31,15 +84,16 @@ export function shouldIgnore(reason: string | null): boolean {
 	return ignored;
 }
 
-export function shouldReact(): boolean {
-	if (reactionChance <= 0) {
+export function shouldReact(reason: string | null = null): boolean {
+	const chance = pickReactionChance(reason);
+	if (chance <= 0) {
 		console.log("[mannerisms] react=false (chance=0)");
 		return false;
 	}
 	const roll = Math.random();
-	const react = roll < reactionChance;
+	const react = roll < chance;
 	console.log(
-		`[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${reactionChance})`
+		`[mannerisms] react=${react} (roll=${roll.toFixed(3)} < chance=${chance})`
 	);
 	return react;
 }
