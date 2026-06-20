@@ -14,52 +14,20 @@ var __export = (target, all) => {
 };
 
 // src/config.ts
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, watch } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import { cpus } from "node:os";
 function v(key, fallback) {
-  return cfg[key] ?? fallback;
+  return rawCfg[key] ?? fallback;
 }
-function loadSystemPrompt() {
-  const fromYaml = v("system_prompt", null);
-  if (fromYaml) {
-    return fromYaml;
-  }
-  const promptPath = join(ROOT, "prompt.txt");
-  try {
-    return readFileSync(promptPath, "utf-8").trim();
-  } catch {
-    console.warn(
-      "[config] ni system_prompt dans config.yml ni prompt.txt trouv\xE9, fallback sur prompt par d\xE9faut."
-    );
-    return DEFAULT_PROMPT;
-  }
-}
-function mergeConcentration(raw, defaults) {
-  const merged = { ...defaults };
-  for (const key of Object.keys(
-    defaults
-  )) {
-    const entry = raw[key];
-    if (entry) {
-      merged[key] = {
-        delay_min: entry.delay_min ?? defaults[key].delay_min,
-        delay_max: entry.delay_max ?? defaults[key].delay_max,
-        ignore_chance: entry.ignore_chance ?? defaults[key].ignore_chance,
-        reaction_chance: entry.reaction_chance ?? defaults[key].reaction_chance
-      };
-    }
-  }
-  return merged;
-}
-var ROOT, configPath, cfg, DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH, LLM_HOST, LLM_PORT, LLM_MODE, DEFAULT_PROMPT, SYSTEM_PROMPT, jinjaTemplate, names, keywords, randomChance, cooldownSeconds, replyInDM, DEFAULT_CONCENTRATION, rawConcentration, concentration, serverEmojiChance, reactions, spontaneousIntervalMs, spontaneousChance, spontaneousContextMessages, spontaneousWhitelist, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle, chunkDelayMin, chunkDelayMax, rawSleep, sleepSchedule, voiceMessageChance, ttsModelPath, ttsBinaryPath, ffmpegPath, ffprobePath, rawStyles, replyStyles, cpuCount, llamaArgs;
+var ROOT, configPath, rawCfg, DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH, LLM_HOST, LLM_PORT, LLM_MODE, SYSTEM_PROMPT, jinjaTemplate, ttsModelPath, ttsBinaryPath, ffmpegPath, ffprobePath, cpuCount, llamaArgs;
 var init_config = __esm({
   "src/config.ts"() {
     "use strict";
     ROOT = process.cwd();
     configPath = join(ROOT, "config.yml");
-    cfg = existsSync(configPath) ? yaml.load(readFileSync(configPath, "utf-8")) : {};
+    rawCfg = existsSync(configPath) ? yaml.load(readFileSync(configPath, "utf-8")) : {};
     DISCORD_TOKEN = v("discord_token", null) ?? process.env.DISCORD_TOKEN ?? (() => {
       console.error("DISCORD_TOKEN manquant \u2014 mets-le dans config.yml ou .env");
       process.exit(1);
@@ -69,147 +37,26 @@ var init_config = __esm({
     LLM_HOST = v("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";
     LLM_PORT = v("llm_port", null) ?? Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
     LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "cli";
-    DEFAULT_PROMPT = "Your name is Luna. You are playful 21 year old girl";
-    SYSTEM_PROMPT = loadSystemPrompt();
-    jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
-    names = v("names", ["Luna", "Pixie"]);
-    keywords = v("keywords", [
-      "hello",
-      "hi",
-      "hey",
-      "yo",
-      "help",
-      "question",
-      "ai",
-      "llm",
-      "bot"
-    ]);
-    randomChance = v("random_chance", 0.015);
-    cooldownSeconds = v("cooldown_seconds", 8);
-    replyInDM = v("reply_in_dm", true);
-    DEFAULT_CONCENTRATION = {
-      mention: {
-        delay_min: 300,
-        delay_max: 1500,
-        ignore_chance: 0,
-        reaction_chance: 0.08
-      },
-      dm: {
-        delay_min: 400,
-        delay_max: 1800,
-        ignore_chance: 0,
-        reaction_chance: 0.05
-      },
-      name: {
-        delay_min: 800,
-        delay_max: 4e3,
-        ignore_chance: 0.05,
-        reaction_chance: 0.06
-      },
-      keyword: {
-        delay_min: 1e3,
-        delay_max: 3500,
-        ignore_chance: 0.08,
-        reaction_chance: 0.04
-      },
-      "follow-up": {
-        delay_min: 500,
-        delay_max: 2e3,
-        ignore_chance: 0,
-        reaction_chance: 0.03
-      },
-      random: {
-        delay_min: 1500,
-        delay_max: 5e3,
-        ignore_chance: 0.15,
-        reaction_chance: 0.02
-      },
-      default: {
-        delay_min: 800,
-        delay_max: 4e3,
-        ignore_chance: 0.08,
-        reaction_chance: 0.06
+    SYSTEM_PROMPT = (() => {
+      const fromYaml = v("system_prompt", null);
+      if (fromYaml) {
+        return fromYaml;
       }
-    };
-    rawConcentration = v("concentration", {});
-    concentration = mergeConcentration(
-      rawConcentration,
-      DEFAULT_CONCENTRATION
-    );
-    serverEmojiChance = v("server_emoji_chance", 0.3);
-    reactions = v("reactions", [
-      "\u{1F440}",
-      "\u{1F604}",
-      "\u{1F914}",
-      "\u{1F44B}",
-      "\u{1F525}",
-      "\u{1F480}",
-      "\u2728",
-      "\u{1F62D}",
-      "\u{1F928}",
-      "\u{1F44C}",
-      "\u{1F64F}",
-      "\u{1F485}",
-      "\u{1F5FF}",
-      "\u{1F31A}"
-    ]);
-    spontaneousIntervalMs = v(
-      "spontaneous_interval_ms",
-      3e5
-    );
-    spontaneousChance = v("spontaneous_chance", 0.12);
-    spontaneousContextMessages = v(
-      "spontaneous_context_messages",
-      5
-    );
-    spontaneousWhitelist = v("spontaneous_whitelist", "*");
-    typoChance = v("typo_chance", 0.06);
-    typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
-    typoCorrectionDelayMax = v(
-      "typo_correction_delay_max",
-      4e3
-    );
-    typoLayout = v("typo_layout", "azerty");
-    typoCorrectionStyle = v(
-      "typo_correction_style",
-      "mixed"
-    );
-    chunkDelayMin = v("chunk_delay_min", 300);
-    chunkDelayMax = v("chunk_delay_max", 1500);
-    rawSleep = v("sleep_schedule", {
-      enabled: false,
-      start: "23:00",
-      end: "08:00",
-      timezone: "Europe/Paris",
-      behavior: "sleep"
-    });
-    sleepSchedule = {
-      enabled: rawSleep.enabled === true,
-      start: rawSleep.start ?? "23:00",
-      end: rawSleep.end ?? "08:00",
-      timezone: rawSleep.timezone ?? "Europe/Paris",
-      behavior: rawSleep.behavior ?? "sleep"
-    };
-    voiceMessageChance = v("voice_message_chance", 0.08);
+      const promptPath = join(ROOT, "prompt.txt");
+      try {
+        return readFileSync(promptPath, "utf-8").trim();
+      } catch {
+        console.warn(
+          "[config] ni system_prompt dans config.yml ni prompt.txt trouv\xE9, fallback sur prompt par d\xE9faut."
+        );
+        return "Your name is Luna. You are playful 21 year old girl";
+      }
+    })();
+    jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
     ttsModelPath = v("tts_model_path", null) ?? process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
     ttsBinaryPath = v("tts_binary_path", null) ?? process.env.TTS_BINARY_PATH ?? join(ROOT, "bin/piper/piper");
     ffmpegPath = v("ffmpeg_path", null) ?? process.env.FFMPEG_PATH ?? join(ROOT, "bin/ffmpeg/ffmpeg");
     ffprobePath = v("ffprobe_path", null) ?? process.env.FFPROBE_PATH ?? join(ROOT, "bin/ffmpeg/ffprobe");
-    rawStyles = v("reply_styles", [
-      { message_reference: true, mention_replied_user: false, weight: 50 },
-      { message_reference: true, mention_replied_user: true, weight: 15 },
-      { message_reference: false, mention_replied_user: false, weight: 30 },
-      { message_reference: false, mention_replied_user: true, weight: 5 }
-    ]);
-    replyStyles = rawStyles.map(
-      (s) => ({
-        style: {
-          messageReference: s.message_reference,
-          mentionRepliedUser: s.mention_replied_user
-        },
-        weight: s.weight
-      })
-    );
     cpuCount = cpus().length;
     llamaArgs = [
       "-m",

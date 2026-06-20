@@ -14,27 +14,28 @@ var __export = (target, all) => {
 };
 
 // src/config.ts
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, watch } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import { cpus } from "node:os";
 function v(key, fallback) {
-  return cfg[key] ?? fallback;
+  return rawCfg[key] ?? fallback;
 }
-function loadSystemPrompt() {
-  const fromYaml = v("system_prompt", null);
-  if (fromYaml) {
-    return fromYaml;
+function watchConfig() {
+  if (!existsSync(configPath)) {
+    return;
   }
-  const promptPath = join(ROOT, "prompt.txt");
-  try {
-    return readFileSync(promptPath, "utf-8").trim();
-  } catch {
-    console.warn(
-      "[config] ni system_prompt dans config.yml ni prompt.txt trouv\xE9, fallback sur prompt par d\xE9faut."
-    );
-    return DEFAULT_PROMPT;
-  }
+  watch(configPath, (event) => {
+    if (event !== "change") {
+      return;
+    }
+    try {
+      rawCfg = yaml.load(readFileSync(configPath, "utf-8"));
+      console.log("[config] hot-reloaded config.yml");
+    } catch (err) {
+      console.error("[config] failed to reload config.yml:", err);
+    }
+  });
 }
 function mergeConcentration(raw, defaults) {
   const merged = { ...defaults };
@@ -54,6 +55,7 @@ function mergeConcentration(raw, defaults) {
   return merged;
 }
 function pickReplyStyle(isActiveConversation) {
+  const styles = config.replyStyles;
   if (!isActiveConversation) {
     const roll2 = Math.random();
     if (roll2 < 0.7) {
@@ -64,23 +66,23 @@ function pickReplyStyle(isActiveConversation) {
     }
     return { messageReference: false, mentionRepliedUser: false };
   }
-  const total = replyStyles.reduce((s, e) => s + e.weight, 0);
+  const total = styles.reduce((s, e) => s + e.weight, 0);
   let roll = Math.random() * total;
-  for (const entry of replyStyles) {
+  for (const entry of styles) {
     roll -= entry.weight;
     if (roll <= 0) {
       return entry.style;
     }
   }
-  return replyStyles[0].style;
+  return styles[0].style;
 }
-var ROOT, configPath, cfg, DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH, LLM_HOST, LLM_PORT, LLM_MODE, DEFAULT_PROMPT, SYSTEM_PROMPT, jinjaTemplate, names, keywords, randomChance, cooldownSeconds, replyInDM, DEFAULT_CONCENTRATION, rawConcentration, concentration, serverEmojiChance, reactions, spontaneousIntervalMs, spontaneousChance, spontaneousContextMessages, spontaneousWhitelist, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle, chunkDelayMin, chunkDelayMax, rawSleep, sleepSchedule, voiceMessageChance, ttsModelPath, ttsBinaryPath, ffmpegPath, ffprobePath, rawStyles, replyStyles, cpuCount, llamaArgs;
+var ROOT, configPath, rawCfg, DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH, LLM_HOST, LLM_PORT, LLM_MODE, SYSTEM_PROMPT, jinjaTemplate, ttsModelPath, ttsBinaryPath, ffmpegPath, ffprobePath, cpuCount, llamaArgs, DEFAULT_CONCENTRATION, config;
 var init_config = __esm({
   "src/config.ts"() {
     "use strict";
     ROOT = process.cwd();
     configPath = join(ROOT, "config.yml");
-    cfg = existsSync(configPath) ? yaml.load(readFileSync(configPath, "utf-8")) : {};
+    rawCfg = existsSync(configPath) ? yaml.load(readFileSync(configPath, "utf-8")) : {};
     DISCORD_TOKEN = v("discord_token", null) ?? process.env.DISCORD_TOKEN ?? (() => {
       console.error("DISCORD_TOKEN manquant \u2014 mets-le dans config.yml ou .env");
       process.exit(1);
@@ -90,24 +92,64 @@ var init_config = __esm({
     LLM_HOST = v("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";
     LLM_PORT = v("llm_port", null) ?? Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
     LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "cli";
-    DEFAULT_PROMPT = "Your name is Luna. You are playful 21 year old girl";
-    SYSTEM_PROMPT = loadSystemPrompt();
+    SYSTEM_PROMPT = (() => {
+      const fromYaml = v("system_prompt", null);
+      if (fromYaml) {
+        return fromYaml;
+      }
+      const promptPath = join(ROOT, "prompt.txt");
+      try {
+        return readFileSync(promptPath, "utf-8").trim();
+      } catch {
+        console.warn(
+          "[config] ni system_prompt dans config.yml ni prompt.txt trouv\xE9, fallback sur prompt par d\xE9faut."
+        );
+        return "Your name is Luna. You are playful 21 year old girl";
+      }
+    })();
     jinjaTemplate = "{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
-    names = v("names", ["Luna", "Pixie"]);
-    keywords = v("keywords", [
-      "hello",
-      "hi",
-      "hey",
-      "yo",
-      "help",
-      "question",
-      "ai",
-      "llm",
-      "bot"
-    ]);
-    randomChance = v("random_chance", 0.015);
-    cooldownSeconds = v("cooldown_seconds", 8);
-    replyInDM = v("reply_in_dm", true);
+    ttsModelPath = v("tts_model_path", null) ?? process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
+    ttsBinaryPath = v("tts_binary_path", null) ?? process.env.TTS_BINARY_PATH ?? join(ROOT, "bin/piper/piper");
+    ffmpegPath = v("ffmpeg_path", null) ?? process.env.FFMPEG_PATH ?? join(ROOT, "bin/ffmpeg/ffmpeg");
+    ffprobePath = v("ffprobe_path", null) ?? process.env.FFPROBE_PATH ?? join(ROOT, "bin/ffmpeg/ffprobe");
+    cpuCount = cpus().length;
+    llamaArgs = [
+      "-m",
+      LLAMA_MODEL_PATH,
+      "-t",
+      String(cpuCount),
+      "-tb",
+      String(cpuCount),
+      "-b",
+      "4096",
+      "-ub",
+      "256",
+      "--mlock",
+      "-c",
+      "4096",
+      "-cnv",
+      "--simple-io",
+      "--temp",
+      "0.75",
+      "--dynatemp-range",
+      "0.15",
+      "--top-k",
+      "40",
+      "--top-p",
+      "0.95",
+      "--min-p",
+      "0.05",
+      "--repeat-penalty",
+      "1.12",
+      "--repeat-last-n",
+      "256",
+      "--presence-penalty",
+      "0.1",
+      "-sys",
+      SYSTEM_PROMPT,
+      "--chat-template",
+      jinjaTemplate
+    ];
     DEFAULT_CONCENTRATION = {
       mention: {
         delay_min: 300,
@@ -152,123 +194,127 @@ var init_config = __esm({
         reaction_chance: 0.06
       }
     };
-    rawConcentration = v("concentration", {});
-    concentration = mergeConcentration(
-      rawConcentration,
-      DEFAULT_CONCENTRATION
-    );
-    serverEmojiChance = v("server_emoji_chance", 0.3);
-    reactions = v("reactions", [
-      "\u{1F440}",
-      "\u{1F604}",
-      "\u{1F914}",
-      "\u{1F44B}",
-      "\u{1F525}",
-      "\u{1F480}",
-      "\u2728",
-      "\u{1F62D}",
-      "\u{1F928}",
-      "\u{1F44C}",
-      "\u{1F64F}",
-      "\u{1F485}",
-      "\u{1F5FF}",
-      "\u{1F31A}"
-    ]);
-    spontaneousIntervalMs = v(
-      "spontaneous_interval_ms",
-      3e5
-    );
-    spontaneousChance = v("spontaneous_chance", 0.12);
-    spontaneousContextMessages = v(
-      "spontaneous_context_messages",
-      5
-    );
-    spontaneousWhitelist = v("spontaneous_whitelist", "*");
-    typoChance = v("typo_chance", 0.06);
-    typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
-    typoCorrectionDelayMax = v(
-      "typo_correction_delay_max",
-      4e3
-    );
-    typoLayout = v("typo_layout", "azerty");
-    typoCorrectionStyle = v(
-      "typo_correction_style",
-      "mixed"
-    );
-    chunkDelayMin = v("chunk_delay_min", 300);
-    chunkDelayMax = v("chunk_delay_max", 1500);
-    rawSleep = v("sleep_schedule", {
-      enabled: false,
-      start: "23:00",
-      end: "08:00",
-      timezone: "Europe/Paris",
-      behavior: "sleep"
-    });
-    sleepSchedule = {
-      enabled: rawSleep.enabled === true,
-      start: rawSleep.start ?? "23:00",
-      end: rawSleep.end ?? "08:00",
-      timezone: rawSleep.timezone ?? "Europe/Paris",
-      behavior: rawSleep.behavior ?? "sleep"
+    config = {
+      get names() {
+        return v("names", ["Luna", "Pixie"]);
+      },
+      get keywords() {
+        return v("keywords", [
+          "hello",
+          "hi",
+          "hey",
+          "yo",
+          "help",
+          "question",
+          "ai",
+          "llm",
+          "bot"
+        ]);
+      },
+      get randomChance() {
+        return v("random_chance", 0.015);
+      },
+      get cooldownSeconds() {
+        return v("cooldown_seconds", 8);
+      },
+      get replyInDM() {
+        return v("reply_in_dm", true);
+      },
+      get concentration() {
+        return mergeConcentration(
+          v("concentration", {}),
+          DEFAULT_CONCENTRATION
+        );
+      },
+      get serverEmojiChance() {
+        return v("server_emoji_chance", 0.3);
+      },
+      get reactions() {
+        return v("reactions", [
+          "\u{1F440}",
+          "\u{1F604}",
+          "\u{1F914}",
+          "\u{1F44B}",
+          "\u{1F525}",
+          "\u{1F480}",
+          "\u2728",
+          "\u{1F62D}",
+          "\u{1F928}",
+          "\u{1F44C}",
+          "\u{1F64F}",
+          "\u{1F485}",
+          "\u{1F5FF}",
+          "\u{1F31A}"
+        ]);
+      },
+      get spontaneousIntervalMs() {
+        return v("spontaneous_interval_ms", 3e5);
+      },
+      get spontaneousChance() {
+        return v("spontaneous_chance", 0.12);
+      },
+      get spontaneousContextMessages() {
+        return v("spontaneous_context_messages", 5);
+      },
+      get spontaneousWhitelist() {
+        return v("spontaneous_whitelist", "*");
+      },
+      get typoChance() {
+        return v("typo_chance", 0.06);
+      },
+      get typoLayout() {
+        return v("typo_layout", "azerty");
+      },
+      get typoCorrectionDelay() {
+        return v("typo_correction_delay_min", 2e3);
+      },
+      get typoCorrectionDelayMax() {
+        return v("typo_correction_delay_max", 4e3);
+      },
+      get typoCorrectionStyle() {
+        return v("typo_correction_style", "mixed");
+      },
+      get chunkDelayMin() {
+        return v("chunk_delay_min", 300);
+      },
+      get chunkDelayMax() {
+        return v("chunk_delay_max", 1500);
+      },
+      get voiceMessageChance() {
+        return v("voice_message_chance", 0.08);
+      },
+      get sleepSchedule() {
+        const raw = v("sleep_schedule", {
+          enabled: false,
+          start: "23:00",
+          end: "08:00",
+          timezone: "Europe/Paris",
+          behavior: "sleep"
+        });
+        return {
+          enabled: raw.enabled === true,
+          start: raw.start ?? "23:00",
+          end: raw.end ?? "08:00",
+          timezone: raw.timezone ?? "Europe/Paris",
+          behavior: raw.behavior ?? "sleep"
+        };
+      },
+      get replyStyles() {
+        const raw = v("reply_styles", [
+          { message_reference: true, mention_replied_user: false, weight: 50 },
+          { message_reference: true, mention_replied_user: true, weight: 15 },
+          { message_reference: false, mention_replied_user: false, weight: 30 },
+          { message_reference: false, mention_replied_user: true, weight: 5 }
+        ]);
+        return raw.map((s) => ({
+          style: {
+            messageReference: s.message_reference,
+            mentionRepliedUser: s.mention_replied_user
+          },
+          weight: s.weight
+        }));
+      }
     };
-    voiceMessageChance = v("voice_message_chance", 0.08);
-    ttsModelPath = v("tts_model_path", null) ?? process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
-    ttsBinaryPath = v("tts_binary_path", null) ?? process.env.TTS_BINARY_PATH ?? join(ROOT, "bin/piper/piper");
-    ffmpegPath = v("ffmpeg_path", null) ?? process.env.FFMPEG_PATH ?? join(ROOT, "bin/ffmpeg/ffmpeg");
-    ffprobePath = v("ffprobe_path", null) ?? process.env.FFPROBE_PATH ?? join(ROOT, "bin/ffmpeg/ffprobe");
-    rawStyles = v("reply_styles", [
-      { message_reference: true, mention_replied_user: false, weight: 50 },
-      { message_reference: true, mention_replied_user: true, weight: 15 },
-      { message_reference: false, mention_replied_user: false, weight: 30 },
-      { message_reference: false, mention_replied_user: true, weight: 5 }
-    ]);
-    replyStyles = rawStyles.map(
-      (s) => ({
-        style: {
-          messageReference: s.message_reference,
-          mentionRepliedUser: s.mention_replied_user
-        },
-        weight: s.weight
-      })
-    );
-    cpuCount = cpus().length;
-    llamaArgs = [
-      "-m",
-      LLAMA_MODEL_PATH,
-      "-t",
-      String(cpuCount),
-      "-tb",
-      String(cpuCount),
-      "-b",
-      "4096",
-      "-ub",
-      "256",
-      "--mlock",
-      "-c",
-      "4096",
-      "-cnv",
-      "--simple-io",
-      "--temp",
-      "0.75",
-      "--dynatemp-range",
-      "0.15",
-      "--top-k",
-      "40",
-      "--top-p",
-      "0.95",
-      "--min-p",
-      "0.05",
-      "--repeat-penalty",
-      "1.12",
-      "--repeat-last-n",
-      "256",
-      "--presence-penalty",
-      "0.1",
-      "-sys",
-      SYSTEM_PROMPT,
-      "--chat-template",
-      jinjaTemplate
-    ];
   }
 });
 
@@ -690,7 +736,7 @@ function isOnCooldown(channelId) {
   if (!last) {
     return false;
   }
-  return Date.now() - last < cooldownSeconds * 1e3;
+  return Date.now() - last < config.cooldownSeconds * 1e3;
 }
 function markReplied(channelId) {
   const now = Date.now();
@@ -852,7 +898,7 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
     setPaused(false);
     return { shouldRespond: true, reason: "mention", botName };
   }
-  if (isDM && replyInDM) {
+  if (isDM && config.replyInDM) {
     log(channelId, `${author}: "${message.content.slice(0, 60)}" \u2192 dm`);
     return { shouldRespond: true, reason: "dm", botName };
   }
@@ -876,7 +922,7 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
     markReplied(channelId);
     return { shouldRespond: true, reason: "name", botName };
   }
-  for (const name of names) {
+  for (const name of config.names) {
     if (hasWord(contentLower, name.toLowerCase())) {
       log(
         channelId,
@@ -886,7 +932,7 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
       return { shouldRespond: true, reason: "name", botName };
     }
   }
-  for (const keyword of keywords) {
+  for (const keyword of config.keywords) {
     if (hasWord(contentLower, keyword.toLowerCase())) {
       log(
         channelId,
@@ -900,7 +946,7 @@ function evaluateMessage(message, botId, botUsername, isFollowUp = false) {
     log(channelId, `${author}: "${message.content.slice(0, 60)}" \u2192 follow-up`);
     return { shouldRespond: true, reason: "follow-up", botName };
   }
-  if (randomChance > 0 && Math.random() < randomChance) {
+  if (config.randomChance > 0 && Math.random() < config.randomChance) {
     log(channelId, `${author}: "${message.content.slice(0, 60)}" \u2192 random`);
     markReplied(channelId);
     return { shouldRespond: true, reason: "random", botName };
@@ -1031,7 +1077,7 @@ function getCachedActiveChannel(guild) {
   }
 }
 function pickWeightedGuild(client2) {
-  const whitelist = spontaneousWhitelist === "*" ? null : new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+  const whitelist = config.spontaneousWhitelist === "*" ? null : new Set(config.spontaneousWhitelist.split(",").map((id) => id.trim()));
   const guilds = [...client2.guilds.values()].filter((g) => {
     if (whitelist && !whitelist.has(g.id)) {
       return false;
@@ -1087,7 +1133,7 @@ async function trySpawn(client2) {
   }
   const context = await fetchContext(
     picked.channel,
-    spontaneousContextMessages
+    config.spontaneousContextMessages
   );
   await resetLLM2();
   let reply = "";
@@ -1134,9 +1180,9 @@ var init_spontaneous = __esm({
 // src/behavior/mannerisms.ts
 function getThresholds(reason) {
   if (reason && REASONS.includes(reason)) {
-    return concentration[reason];
+    return config.concentration[reason];
   }
-  return concentration.default;
+  return config.concentration.default;
 }
 function computeDelay(reason = null, sleepBehavior) {
   const t = getThresholds(reason);
@@ -1183,12 +1229,12 @@ function shouldReact(reason = null, sleepBehavior) {
   return react;
 }
 function pickReaction(customEmojis) {
-  if (customEmojis && customEmojis.length > 0 && Math.random() < serverEmojiChance) {
+  if (customEmojis && customEmojis.length > 0 && Math.random() < config.serverEmojiChance) {
     const emoji2 = customEmojis[Math.floor(Math.random() * customEmojis.length)];
     console.log(`[mannerisms] reaction=${emoji2} (custom)`);
     return emoji2;
   }
-  const emoji = reactions[Math.floor(Math.random() * reactions.length)];
+  const emoji = config.reactions[Math.floor(Math.random() * config.reactions.length)];
   console.log(`[mannerisms] reaction=${emoji} (unicode)`);
   return emoji;
 }
@@ -1477,14 +1523,16 @@ async function sendTextAsVoiceMessage(channelId, replyToMessageId, text) {
   }
 }
 function shouldSendVoice() {
-  if (voiceMessageChance <= 0) {
+  if (config.voiceMessageChance <= 0) {
     return false;
   }
   const roll = Math.random();
-  const send = roll < voiceMessageChance;
-  console.log(
-    `[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${voiceMessageChance})`
-  );
+  const send = roll < config.voiceMessageChance;
+  if (send) {
+    console.log(
+      `[tts] voiceMessage=${send} (roll=${roll.toFixed(3)} < chance=${config.voiceMessageChance})`
+    );
+  }
   return send;
 }
 var init_voice_message = __esm({
@@ -1509,27 +1557,19 @@ function isInWindow(now, start, end) {
   return now >= start || now < end;
 }
 function getSleepBehavior() {
-  if (!sleepSchedule.enabled) {
+  if (!config.sleepSchedule.enabled) {
     return null;
   }
+  const tz = config.sleepSchedule.timezone;
   const now = /* @__PURE__ */ new Date();
-  const tz = sleepSchedule.timezone;
-  const formatter = new Intl.DateTimeFormat("fr-FR", {
-    timeZone: tz,
-    hour: "numeric",
-    minute: "numeric",
-    hourCycle: "h23"
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  const nowMinutes = hour * 60 + minute;
-  const startMinutes = parseTime(sleepSchedule.start);
-  const endMinutes = parseTime(sleepSchedule.end);
-  if (!isInWindow(nowMinutes, startMinutes, endMinutes)) {
+  const localNow = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+  const currentMinutes = localNow.getHours() * 60 + localNow.getMinutes();
+  const startMinutes = parseTime(config.sleepSchedule.start);
+  const endMinutes = parseTime(config.sleepSchedule.end);
+  if (!isInWindow(currentMinutes, startMinutes, endMinutes)) {
     return null;
   }
-  return sleepSchedule.behavior;
+  return config.sleepSchedule.behavior;
 }
 var init_sleep = __esm({
   "src/behavior/sleep.ts"() {
@@ -1826,7 +1866,7 @@ var init_reactions = __esm({
 
 // src/bot/typo-correction.ts
 async function applyTypoCorrection(client2, channelId, messageId, correction) {
-  const delay = typoCorrectionDelay + Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+  const delay = config.typoCorrectionDelay + Math.random() * (config.typoCorrectionDelayMax - config.typoCorrectionDelay);
   const style = resolveStyle();
   await new Promise((r) => setTimeout(r, delay));
   try {
@@ -1847,10 +1887,10 @@ async function applyTypoCorrection(client2, channelId, messageId, correction) {
   }
 }
 function resolveStyle() {
-  if (typoCorrectionStyle === "mixed") {
+  if (config.typoCorrectionStyle === "mixed") {
     return Math.random() < 0.5 ? "edit" : "message";
   }
-  return typoCorrectionStyle;
+  return config.typoCorrectionStyle;
 }
 var init_typo_correction = __esm({
   "src/bot/typo-correction.ts"() {
@@ -1896,9 +1936,9 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
       await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
     } else {
       let typoState = null;
-      if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
+      if (config.typoChance > 0 && Math.random() < config.typoChance && chunks.length > 0) {
         const idx = Math.floor(Math.random() * chunks.length);
-        const result = applyTypo(chunks[idx], typoLayout);
+        const result = applyTypo(chunks[idx], config.typoLayout);
         if (result) {
           chunks[idx] = result.text;
           typoState = {
@@ -1913,7 +1953,7 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
       for (const chunk of chunks) {
         if (!isFirstChunk) {
           const ratio = chunk.length / 200;
-          const delay = chunkDelayMin + Math.random() * (chunkDelayMax - chunkDelayMin) * Math.min(ratio, 1);
+          const delay = config.chunkDelayMin + Math.random() * (config.chunkDelayMax - config.chunkDelayMin) * Math.min(ratio, 1);
           await new Promise((r) => setTimeout(r, delay));
         }
         const sent = await client.createMessage(message.channel.id, {
@@ -2032,6 +2072,7 @@ function logAndReact(message, author, channelName, reason, sleepBehavior) {
   }, delay);
 }
 async function startBot() {
+  watchConfig();
   void initTTS();
   const saved = await loadState();
   restoreState(saved);
@@ -2039,10 +2080,10 @@ async function startBot() {
   startPruning();
   client.connect();
   setInterval(() => {
-    if (Math.random() < spontaneousChance) {
+    if (Math.random() < config.spontaneousChance) {
       void trySpawn(client);
     }
-  }, spontaneousIntervalMs);
+  }, config.spontaneousIntervalMs);
 }
 var client;
 var init_bot = __esm({

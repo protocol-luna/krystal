@@ -1,9 +1,5 @@
 import type * as Eris from "eris";
-import {
-	typoCorrectionDelay,
-	typoCorrectionDelayMax,
-	typoCorrectionStyle,
-} from "../config.js";
+import { config } from "../config.js";
 
 export type CorrectionStyle = "edit" | "message" | "mixed";
 
@@ -20,8 +16,9 @@ export async function applyTypoCorrection(
 	correction: TypoCorrectionState
 ): Promise<void> {
 	const delay =
-		typoCorrectionDelay +
-		Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+		config.typoCorrectionDelay +
+		Math.random() *
+			(config.typoCorrectionDelayMax - config.typoCorrectionDelay);
 	const style = resolveStyle();
 
 	await new Promise((r) => setTimeout(r, delay));
@@ -46,8 +43,8 @@ export async function applyTypoCorrection(
 }
 
 function resolveStyle(): CorrectionStyle {
-	if (typoCorrectionStyle === "mixed") {
+	if (config.typoCorrectionStyle === "mixed") {
 		return Math.random() < 0.5 ? "edit" : "message";
 	}
-	return typoCorrectionStyle;
+	return config.typoCorrectionStyle;
 }

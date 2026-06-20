@@ -1,4 +1,4 @@
-import { sleepSchedule, type SleepSchedule } from "../config.js";
+import { config, type SleepSchedule } from "../config.js";
 
 function parseTime(t: string): number {
 	const [h, m] = t.split(":").map(Number);
@@ -13,29 +13,22 @@ function isInWindow(now: number, start: number, end: number): boolean {
 }
 
 export function getSleepBehavior(): SleepSchedule["behavior"] | null {
-	if (!sleepSchedule.enabled) {
+	if (!config.sleepSchedule.enabled) {
 		return null;
 	}
+
+	const tz = config.sleepSchedule.timezone;
 
 	const now = new Date();
-	const tz = sleepSchedule.timezone;
-	const formatter = new Intl.DateTimeFormat("fr-FR", {
-		timeZone: tz,
-		hour: "numeric",
-		minute: "numeric",
-		hourCycle: "h23",
-	});
-	const parts = formatter.formatToParts(now);
-	const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-	const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-	const nowMinutes = hour * 60 + minute;
+	const localNow = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+	const currentMinutes = localNow.getHours() * 60 + localNow.getMinutes();
 
-	const startMinutes = parseTime(sleepSchedule.start);
-	const endMinutes = parseTime(sleepSchedule.end);
+	const startMinutes = parseTime(config.sleepSchedule.start);
+	const endMinutes = parseTime(config.sleepSchedule.end);
 
-	if (!isInWindow(nowMinutes, startMinutes, endMinutes)) {
+	if (!isInWindow(currentMinutes, startMinutes, endMinutes)) {
 		return null;
 	}
 
-	return sleepSchedule.behavior;
+	return config.sleepSchedule.behavior;
 }

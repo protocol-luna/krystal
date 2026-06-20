@@ -2,12 +2,8 @@ import * as Eris from "eris";
 import {
 	DISCORD_TOKEN,
 	pickReplyStyle,
-	spontaneousIntervalMs,
-	spontaneousChance,
-	chunkDelayMin,
-	chunkDelayMax,
-	typoChance,
-	typoLayout,
+	config,
+	watchConfig,
 } from "./config.js";
 import { askLLM, resetLLM } from "./core/llm-core.js";
 import { llmBus } from "./core/llm-bus.js";
@@ -120,9 +116,13 @@ async function triggerLunaReply(
 		} else {
 			let typoState: TypoCorrectionState | null = null;
 
-			if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
+			if (
+				config.typoChance > 0 &&
+				Math.random() < config.typoChance &&
+				chunks.length > 0
+			) {
 				const idx = Math.floor(Math.random() * chunks.length);
-				const result = applyTypo(chunks[idx], typoLayout);
+				const result = applyTypo(chunks[idx], config.typoLayout);
 				if (result) {
 					chunks[idx] = result.text;
 					typoState = {
@@ -139,9 +139,9 @@ async function triggerLunaReply(
 				if (!isFirstChunk) {
 					const ratio = chunk.length / 200;
 					const delay =
-						chunkDelayMin +
+						config.chunkDelayMin +
 						Math.random() *
-							(chunkDelayMax - chunkDelayMin) *
+							(config.chunkDelayMax - config.chunkDelayMin) *
 							Math.min(ratio, 1);
 					await new Promise((r) => setTimeout(r, delay));
 				}
@@ -408,6 +408,7 @@ client.on(
 );
 
 export async function startBot(): Promise<void> {
+	watchConfig();
 	void initTTS();
 
 	const saved = await loadState();
@@ -418,8 +419,8 @@ export async function startBot(): Promise<void> {
 	client.connect();
 
 	setInterval(() => {
-		if (Math.random() < spontaneousChance) {
+		if (Math.random() < config.spontaneousChance) {
 			void trySpawn(client);
 		}
-	}, spontaneousIntervalMs);
+	}, config.spontaneousIntervalMs);
 }

@@ -2,7 +2,7 @@ import type * as Eris from "eris";
 import { findMostActiveChannel, isTextChannel } from "./guild.js";
 import { askLLM, resetLLM, isLLMBusy } from "./core/llm-client.js";
 import { markBotActivity } from "./state/state.js";
-import { spontaneousContextMessages, spontaneousWhitelist } from "./config.js";
+import { config } from "./config.js";
 
 const CACHE_TTL = 60_000;
 const activeChannelCache = new Map<
@@ -28,9 +28,9 @@ function pickWeightedGuild(
 	client: Eris.Client
 ): { guild: Eris.Guild; channel: Eris.TextChannel } | null {
 	const whitelist =
-		spontaneousWhitelist === "*"
+		config.spontaneousWhitelist === "*"
 			? null
-			: new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+			: new Set(config.spontaneousWhitelist.split(",").map((id) => id.trim()));
 
 	const guilds = [...client.guilds.values()].filter((g) => {
 		if (whitelist && !whitelist.has(g.id)) {
@@ -103,7 +103,7 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 
 	const context = await fetchContext(
 		picked.channel,
-		spontaneousContextMessages
+		config.spontaneousContextMessages
 	);
 
 	await resetLLM();

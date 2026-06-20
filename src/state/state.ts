@@ -1,4 +1,4 @@
-import { cooldownSeconds } from "../config.js";
+import { config } from "../config.js";
 import { stateBus } from "./state-bus.js";
 
 const channelCooldowns = new Map<string, number>();
@@ -27,7 +27,7 @@ export function isOnCooldown(channelId: string): boolean {
 	if (!last) {
 		return false;
 	}
-	return Date.now() - last < cooldownSeconds * 1000;
+	return Date.now() - last < config.cooldownSeconds * 1000;
 }
 
 export function markReplied(channelId: string): void {

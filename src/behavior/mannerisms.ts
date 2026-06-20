@@ -1,9 +1,4 @@
-import {
-	reactions,
-	serverEmojiChance,
-	concentration,
-	type ConcentrationThresholds,
-} from "../config.js";
+import { config, type ConcentrationThresholds } from "../config.js";
 
 const REASONS: (keyof ConcentrationThresholds)[] = [
 	"mention",
@@ -18,9 +13,9 @@ function getThresholds(
 	reason: string | null
 ): ConcentrationThresholds[keyof ConcentrationThresholds] {
 	if (reason && REASONS.includes(reason as keyof ConcentrationThresholds)) {
-		return concentration[reason as keyof ConcentrationThresholds];
+		return config.concentration[reason as keyof ConcentrationThresholds];
 	}
-	return concentration.default;
+	return config.concentration.default;
 }
 
 export function computeDelay(
@@ -83,13 +78,14 @@ export function pickReaction(customEmojis?: string[]): string {
 	if (
 		customEmojis &&
 		customEmojis.length > 0 &&
-		Math.random() < serverEmojiChance
+		Math.random() < config.serverEmojiChance
 	) {
 		const emoji = customEmojis[Math.floor(Math.random() * customEmojis.length)];
 		console.log(`[mannerisms] reaction=${emoji} (custom)`);
 		return emoji;
 	}
-	const emoji = reactions[Math.floor(Math.random() * reactions.length)];
+	const emoji =
+		config.reactions[Math.floor(Math.random() * config.reactions.length)];
 	console.log(`[mannerisms] reaction=${emoji} (unicode)`);
 	return emoji;
 }

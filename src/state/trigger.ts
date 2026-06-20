@@ -1,5 +1,5 @@
 import type * as Eris from "eris";
-import { randomChance, names, keywords, replyInDM } from "../config.js";
+import { config } from "../config.js";
 import { isOnCooldown, setPaused, markReplied, isPaused } from "./state.js";
 
 function log(channel: string, msg: string): void {
@@ -74,7 +74,7 @@ export function evaluateMessage(
 		setPaused(false);
 		return { shouldRespond: true, reason: "mention", botName };
 	}
-	if (isDM && replyInDM) {
+	if (isDM && config.replyInDM) {
 		log(channelId, `${author}: "${message.content.slice(0, 60)}" → dm`);
 		return { shouldRespond: true, reason: "dm", botName };
 	}
@@ -102,7 +102,7 @@ export function evaluateMessage(
 		return { shouldRespond: true, reason: "name", botName };
 	}
 
-	for (const name of names) {
+	for (const name of config.names) {
 		if (hasWord(contentLower, name.toLowerCase())) {
 			log(
 				channelId,
@@ -113,7 +113,7 @@ export function evaluateMessage(
 		}
 	}
 
-	for (const keyword of keywords) {
+	for (const keyword of config.keywords) {
 		if (hasWord(contentLower, keyword.toLowerCase())) {
 			log(
 				channelId,
@@ -129,7 +129,7 @@ export function evaluateMessage(
 		return { shouldRespond: true, reason: "follow-up", botName };
 	}
 
-	if (randomChance > 0 && Math.random() < randomChance) {
+	if (config.randomChance > 0 && Math.random() < config.randomChance) {
 		log(channelId, `${author}: "${message.content.slice(0, 60)}" → random`);
 		markReplied(channelId);
 		return { shouldRespond: true, reason: "random", botName };
