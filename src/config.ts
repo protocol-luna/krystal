@@ -102,6 +102,10 @@ export const spontaneousContextMessages = v<number>(
 	"spontaneous_context_messages",
 	5
 );
+export const spontaneousWhitelist = v<string>(
+	"spontaneous_whitelist",
+	"*"
+);
 
 // --- TTS / Voice messages ---
 export const voiceMessageChance = v<number>("voice_message_chance", 0.08);

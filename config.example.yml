@@ -1,11 +1,13 @@
-# Configuration pixieglow Discord Bot
+# Configuration du bot Discord
 # Surchargé par .env pour DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH
 # Surchargé par prompt.txt pour le system prompt
 
-# --- Triggers ---
+# --- Triggers (déclencheurs de réponse) ---
 names:
   - "Luna"
   - "Pixie"
+# Noms que le bot reconnaît comme étant le sien. Si un message contient un de ces noms,
+# le bot considère qu'on s'adresse à lui et répondra toujours (sauf si ignore_chance_mention > 0).
 
 keywords:
   - "hello"
@@ -17,19 +19,39 @@ keywords:
   - "ai"
   - "llm"
   - "bot"
+# Mots-clés qui déclenchent une réponse du bot (avec une probabilité random_chance).
+# Utile pour réagir à des salutations ou des sujets spécifiques.
 
 random_chance: 0.015
-cooldown_seconds: 8
-reply_in_dm: true
+# Probabilité qu'un message contenant un keyword déclenche une réponse (0.0 - 1.0).
+# 0.015 = 1.5% de chance par message correspondant.
 
-# --- Mannerisms ---
+cooldown_seconds: 8
+# Temps minimum (en secondes) entre deux réponses du bot dans un même channel,
+# pour éviter de spammer.
+
+reply_in_dm: true
+# Si true, le bot répond aux messages privés (DM). Sinon, il les ignore.
+
+# --- Mannerisms (comportement) ---
 response_delay_min: 800
 response_delay_max: 4000
+# Délai aléatoire (en ms) entre la réception d'un message et l'envoi de la réponse,
+# pour simuler un temps de réflexion humain.
 
 reaction_chance: 0.06
+# Probabilité d'ajouter une réaction (emoji) à un message avant de répondre (0.0 - 1.0).
+
 ignore_chance: 0.08
+# Probabilité d'ignorer un message même si les conditions de réponse sont réunies
+# (sauf mention directe). Utile pour rendre le comportement moins prévisible.
+
 ignore_chance_mention: 0
+# Probabilité d'ignorer un message qui mentionne le bot directement (@Luna).
+# 0 = répond toujours aux mentions.
+
 server_emoji_chance: 0.3
+# Probabilité que la réaction soit un emoji personnalisé du serveur (vs un emoji standard).
 
 reactions:
   - "👀"
@@ -46,16 +68,33 @@ reactions:
   - "💅"
   - "🗿"
   - "🌚"
+# Liste des emojis standards utilisés pour les réactions.
 
-# --- Spontaneous ---
-spontaneous_interval_ms: 300000     # 5 min
+# --- Spontaneous (messages spontanés) ---
+spontaneous_interval_ms: 300000
+# Intervalle (en ms) entre chaque tentative de message spontané.
+# 300000 = 5 minutes. Le bot peut envoyer un message de lui-même dans un serveur.
+
 spontaneous_chance: 0.12
+# Probabilité (0.0 - 1.0) qu'une tentative spontanée aboutisse réellement.
+# Combiné avec spontaneous_interval_ms, permet de contrôler la fréquence.
+
 spontaneous_context_messages: 5
+# Nombre de messages récents lus dans le channel pour alimenter le contexte
+# du message spontané. Plus le nombre est élevé, plus le bot a de contexte.
+
+spontaneous_whitelist: "*"
+# Liste des IDs de serveurs (guilds) autorisés pour les messages spontanés.
+# "*" = tous les serveurs.
+# Exemple avec plusieurs serveurs : "123456789,987654321"
+# Exemple avec un seul serveur : "123456789"
 
 # --- TTS / Voice messages ---
 voice_message_chance: 0.08
+# Probabilité qu'une réponse soit envoyée sous forme de message vocal (fichier audio)
+# plutôt que de texte. Nécessite Piper TTS et un modèle vocal configurés.
 
-# --- Reply styles (poids en pourcentage) ---
+# --- Reply styles (style de réponse) ---
 reply_styles:
   - message_reference: true
     mention_replied_user: false
@@ -69,4 +108,8 @@ reply_styles:
   - message_reference: false
     mention_replied_user: true
     weight: 5
-
+# Styles de réponse possibles avec leur poids (en pourcentage).
+# message_reference: true  → répond en citant le message (reply)
+# message_reference: false → répond sans citation
+# mention_replied_user: true → ping/notifie l'utilisateur cité
+# Les poids déterminent la probabilité de chaque style.

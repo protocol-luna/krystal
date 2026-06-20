@@ -80,6 +80,10 @@ var spontaneousContextMessages = v(
   "spontaneous_context_messages",
   5
 );
+var spontaneousWhitelist = v(
+  "spontaneous_whitelist",
+  "*"
+);
 var voiceMessageChance = v("voice_message_chance", 0.08);
 var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
@@ -410,9 +414,15 @@ function findMostActiveChannel(guild) {
 
 // src/spontaneous.ts
 function pickWeightedGuild(client2) {
-  const guilds = [...client2.guilds.values()].filter(
-    (g) => [...g.channels.values()].some((c) => isTextChannel(c))
-  );
+  const whitelist = spontaneousWhitelist === "*"
+    ? null
+    : new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+  const guilds = [...client2.guilds.values()].filter((g) => {
+    if (whitelist && !whitelist.has(g.id)) {
+      return false;
+    }
+    return [...g.channels.values()].some((c) => isTextChannel(c));
+  });
   if (guilds.length === 0) {
     return null;
   }

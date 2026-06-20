@@ -2,12 +2,19 @@ import type * as Eris from "eris";
 import { findMostActiveChannel, isTextChannel } from "./guild.js";
 import { askLLM, resetLLM, isLLMBusy } from "./llm-client.js";
 import { markBotActivity } from "./trigger.js";
-import { spontaneousContextMessages } from "./config.js";
+import { spontaneousContextMessages, spontaneousWhitelist } from "./config.js";
 
 function pickWeightedGuild(client: Eris.Client): Eris.Guild | null {
-	const guilds = [...client.guilds.values()].filter((g) =>
-		[...g.channels.values()].some((c) => isTextChannel(c))
-	);
+	const whitelist = spontaneousWhitelist === "*"
+		? null
+		: new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+
+	const guilds = [...client.guilds.values()].filter((g) => {
+		if (whitelist && !whitelist.has(g.id)) {
+			return false;
+		}
+		return [...g.channels.values()].some((c) => isTextChannel(c));
+	});
 	if (guilds.length === 0) {
 		return null;
 	}
