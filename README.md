@@ -4,22 +4,31 @@ Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de faço
 
 - Modèle fine-tuné sur [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M échanges, 17M turns)
 - Format GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Deux processus séparés : LLM (llama-cli) + client Discord (hot-reloadable)
-- Communication en NDJSON streamé HTTP (port 3124 par défaut)
-- Auto-restart du LLM avec backup exponentiel et file préservée
-- Pourquoi NDJSON ? Plus simple à parser ligne par ligne que SSE, chaque ligne est un JSON complet
+- Deux modes LLM : `cli` (spawn llama-cli) ou `server` (HTTP → llama-server)
+- Architecture événementielle : `llmBus` pour les tokens/erreurs LLM, `stateBus` pour l'auto-persist
+- Auto-restart du LLM (mode cli) avec backup exponentiel et file préservée
 
 ```
-┌─────────────────────┐   NDJSON/HTTP    ┌──────────────────────┐
-│  core/llm-server.ts │ ◄──────────────► │  bot.ts (Eris)       │
-│  (port 3124)        │   POST /ask      │  bot/pending.ts      │
-│                     │   POST /reset    │  bot/reactions.ts    │
-│  llama-cli process  │   GET /health    │  state/trigger.ts    │
-│  (auto-restart)     │                  │  state/state.ts      │
-└─────────────────────┘                  │  behavior/*          │
-                                         │  tts/*               │
-                                         │  spontaneous.ts      │
-                                         └──────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                   core/bus.ts                        │
+│  TypedBus<K, V> — on / off / once / emit            │
+├──────────────────┬──────────────────────────────────┤
+│   core/llm-bus   │       state/state-bus             │
+│  token / done /  │     state:changed                 │
+│  error / crash / │     → persistence auto            │
+│  ready / reset   │                                   │
+└────────┬─────────┴────────┬─────────────────────────┘
+         │                  │
+┌────────▼─────────┐  ┌────▼──────────────────────┐
+│ core/llm-core.ts │  │ bot.ts (Eris)             │
+│                  │  │ bot/pending.ts             │
+│ mode cli         │  │ bot/reactions.ts           │
+│   spawn llama-cli│  │ state/trigger.ts           │
+│ mode server      │  │ state/state.ts             │
+│   HTTP → llama-  │  │ behavior/*                 │
+│   server:port    │  │ tts/*                      │
+│                  │  │ spontaneous.ts             │
+└──────────────────┘  └────────────────────────────┘
 ```
 
 ## Structure
@@ -33,11 +42,13 @@ src/
 ├── spontaneous.ts     # Messages spontanés pondérés
 ├── guild.ts           # findMostActiveChannel
 ├── core/
-│   ├── llm-core.ts    # Spawn, queue, parsing, restart LLM
-│   ├── llm-client.ts  # Client HTTP vers le serveur LLM
-│   ├── llm-server.ts  # Serveur HTTP NDJSON
-│   └── llm-direct.ts  # Mode CLI direct
+│   ├── bus.ts         # TypedBus générique (on/off/once/emit)
+│   ├── llm-bus.ts     # Bus LLM (token, done, error, crash, ready, reset)
+│   ├── llm-core.ts    # Spawn CLI ou HTTP server, queue, parsing, restart
+│   ├── llm-client.ts  # Client HTTP vers llm-server (legacy)
+│   └── llm-server.ts  # Serveur HTTP NDJSON (legacy)
 ├── state/
+│   ├── state-bus.ts   # Bus state (state:changed → auto-persist)
 │   ├── state.ts       # Cooldowns, activité, suivi conversation
 │   ├── trigger.ts     # Évaluation des déclencheurs
 │   └── persistence.ts # Sauvegarde/restauration state.json
@@ -252,11 +263,11 @@ Le texte est nettoyé avant synthèse : mentions → `@utilisateur`, URLs suppri
 ### Typing indicator
 
 ```typescript
-onFirstToken: startTyping   → envoie typing + intervalle 8s
-finally: clearInterval      → arrête le typing
+llmBus.once("token", startTyping)  → envoie typing + intervalle 8s
+finally: clearInterval, llmBus.off  → arrête le typing + nettoie
 ```
 
-Pas de typing pendant le délai de concentration — le typing n'apparaît que quand le LLM commence à générer.
+Pas de typing pendant le délai de concentration — le typing n'apparaît que quand le LLM commence à générer (premier event `token` sur `llmBus`).
 
 ### Réponse multi-chunk
 
@@ -379,16 +390,20 @@ Clé `channelId:userId`. Un seul message en attente par utilisateur par salon. T
 
 ```mermaid
 flowchart LR
-    A[Mutation d'état] --> B[scheduleSave\ndebounce 500ms]
-    B --> C[async writeFile\nstate.json]
-    D[Démarrage] --> E[loadState async]
-    E --> F[restoreState]
-    E --> G[récupère messages\nen attente via API]
+    A[Mutation d'état\nsetPaused / markReplied\nmarkBotActivity / etc.] --> B[stateBus.emit\n"state:changed"]
+    B --> C[persistence.ts\nécoute le bus]
+    C --> D[scheduleSave\ndebounce 500ms]
+    D --> E[async writeFile\nstate.json]
+    F[Démarrage] --> G[loadState async]
+    G --> H[restoreState]
+    G --> I[récupère messages\nen attente via API]
 ```
 
 **Persisté :** pendingMessages, paused, cooldowns, timestamps, lastSpeaker, follow-up counters.
 
-### Auto-restart LLM
+**Auto-save :** toute mutation state émet sur `stateBus` → sauvegarde automatique (debounce 500ms). Plus besoin d'appels `saveAllState()` manuels.
+
+### Auto-restart LLM (mode `cli`)
 
 Si le processus llama-cli crash (OOM, segfault, etc.), il est automatiquement relancé :
 
@@ -430,8 +445,7 @@ sequenceDiagram
     participant mannerisms.ts
     participant sleep.ts
     participant typo.ts
-    participant llm-client.ts
-    participant llm-server.ts
+    participant llm-core.ts
     participant llama
 
     User->>Discord: envoie un message
@@ -447,6 +461,7 @@ sequenceDiagram
 
     alt shouldRespond = true
         bot.ts->>trigger.ts: markReplied() + trackSpeaker()
+        Note over state.ts: stateBus.emit("state:changed")<br/>→ auto-save debounce 500ms
         bot.ts->>mannerisms.ts: shouldIgnore(reason, sleepBehavior)
         alt ignoré
             mannerisms.ts-->>bot.ts: true → return
@@ -464,22 +479,25 @@ sequenceDiagram
                 bot.ts->>bot.ts: stocke dans pendingMessages["C:U"]
                 bot.ts-->>Discord: ignoré (file)
             else libre
-                bot.ts->>llm-client.ts: askLLM({ username, text })
-                llm-client.ts->>llm-server.ts: POST /ask (NDJSON)
-                llm-server.ts->>llama: stdin (prompt)
-                llama-->>llm-server.ts: stdout stream
-                llm-server.ts-->>llm-client.ts: NDJSON stream
-                llm-client.ts-->>bot.ts: onFirstToken()
-                bot.ts->>Discord: sendChannelTyping()
+                bot.ts->>bot.ts: llmBus.on("token", onChunk)<br/>llmBus.once("token", startTyping)
+                bot.ts->>llm-core.ts: askLLM({ username, text })
+
+                llm-core.ts-->>bot.ts: mode cli → stdin<br/>mode server → HTTP POST
+
+                llama-->>llm-core.ts: stdout stream (CLI)<br/>ou SSE stream (server)
+                llm-core.ts->>llmBus: emit("token", chunk)
+
+                bot.ts->>Discord: sendChannelTyping()<br/>(déclenché par once)
                 loop every 8s
                     bot.ts->>Discord: sendChannelTyping()
                 end
                 loop each chunk
-                    llm-client.ts-->>bot.ts: onChunk(chunk)
+                    llmBus-->>bot.ts: onToken(chunk)
                     bot.ts->>bot.ts: délai inter-chunk
                     bot.ts->>bot.ts: typo possible (applyTypo)
                     bot.ts->>Discord: createMessage(chunk)
                     bot.ts->>trigger.ts: markBotActivity()
+                    Note over state.ts: stateBus.emit("state:changed")
                 end
                 alt typo corrigé
                     alt style = "edit"
@@ -489,9 +507,12 @@ sequenceDiagram
                     end
                 end
                 alt erreur LLM
+                    llm-core.ts->>llmBus: emit("error")
                     bot.ts->>Discord: addReaction("❌")
                 end
                 bot.ts->>trigger.ts: trackSpeaker(bot)
+                Note over state.ts: stateBus.emit("state:changed")
+                bot.ts->>bot.ts: llmBus.off("token", onChunk) cleanup
                 bot.ts->>bot.ts: pendingMessages["C:U"] ?
                 alt message en attente
                     bot.ts->>bot.ts: triggerLunaReply(msg)
@@ -524,6 +545,9 @@ Clé `system_prompt` avec le prompt système. Supporte le format YAML multiligne
 discord_token: "ton_token"
 llama_cli_path: "bin/llama/llama-cli"
 llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
+llm_host: "localhost"
+llm_port: 3124
+llm_mode: "cli"          # cli → spawn llama-cli, server → HTTP llama-server
 system_prompt: |
   Tu es Luna...
 tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
@@ -588,7 +612,8 @@ xychart-beta
 | `[bot]` | Décision, follow-up, reply style |
 | `[tts]` | Synthèse, upload, voice message |
 | `[persist]` | Sauvegarde/restauration |
-| `[llm-core]` | Spawn, crash, restart |
+| `[llm-core]` | Spawn, crash, restart, mode CLI/server |
+| `[llmBus]` | Événements LLM (token, done, error, ready) |
 
 ---
 
@@ -603,12 +628,12 @@ npm run build && npm start  # production
 ```
 
 | Script | Description |
-|---|---|
-| `dev` | LLM server (hot) + esbuild watch + bot (watch) |
-| `start` | LLM server + bot (production) |
-| `build` | Bundle bot + serveur |
+|---|---|---|
+| `dev` | Bot (hot reload) |
+| `start` | Bot (production) |
+| `build` | Bundle bot |
 | `client-only` | Bot uniquement (watch) |
-| `server-only` | LLM server uniquement |
+| `direct` | Mode CLI direct : `node . direct` |
 | `lint` / `format` / `check` | Biome |
 | `download-model` | GGUF depuis HuggingFace |
 
