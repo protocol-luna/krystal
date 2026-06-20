@@ -45,6 +45,27 @@ Le bot est prévu pour tourner sur un GGUF quantifié (ex. `Discord-Hermes-3-8B.
 
 ---
 
+## 👀 Vue d'ensemble simplifiée
+
+```mermaid
+flowchart TD
+    A["💬 Quelqu'un envoie\nun message"] --> B{"📋 C'est une\ncommande ?"}
+    B -- "❌ ▶️ 🗑️" --> C["✅ Hop, exécuté\nen silence"]
+    B -- "non" --> D{"😴 Le bot\ndort ?"}
+    D -- "oui 🌙" --> E["🙈 Ignoré\n(sauf mention)"]
+    D -- "non" --> F{"🎯 Le bot est\nconcerné ?"}
+    F -- "non" --> G["👋 Pas répondu\n(pas pour lui)"]
+    F -- "oui" --> H["⏳ Attend un peu\n(et réagit peut-être)"]
+    H --> I["✍️ Tape la réponse\nen plusieurs messages"]
+    I --> J{"🗣️ Réponse\nvocale ?"}
+    J -- "oui" --> K["🎵 Envoie un\nmessage vocal"]
+    J -- "non" --> L["💬 Continue\n(avec fautes, délais...)"]
+    K --> M["✔️ Fini !"]
+    L --> M
+```
+
+---
+
 ## Système de déclenchement
 
 ### State machine — décision message entrant
