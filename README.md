@@ -444,14 +444,10 @@ Toute la configuration du bot : token, chemins LLM/TTS, triggers, mannerisms, co
 
 Surcharge `config.yml` si présent. Utile pour garder le token hors du gitignore local.
 
-### `prompt.txt`
+### `system_prompt` (dans config.yml)
 
-Fichier lu au démarrage, contient le system prompt. Exemple :
-
-```
-Your name is pixieglow. You are a 21-year-old girl studying art.
-Talk naturally and never prefix your replies with your name.
-```
+Clé `system_prompt` avec le prompt système. Supporte le format YAML multiligne (`|`).
+`prompt.txt` est encore lu comme fallback si la clé n'est pas présente.
 
 ### Paramètres LLM (llama-cli)
 
@@ -503,10 +499,7 @@ npm install
 
 # Configuration
 cp config.example.yml config.yml
-# éditer config.yml (token Discord, chemins LLM, comportement)
-
-# System prompt
-echo "Your name is pixieglow. You are a 21-year-old girl studying art." > prompt.txt
+# éditer config.yml (token Discord, chemins LLM, system prompt, comportement)
 
 # Lancer en dev
 npm run dev

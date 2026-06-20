@@ -39,7 +39,13 @@ export const LLM_PORT: number =
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
 // --- System prompt ---
+const DEFAULT_PROMPT = "Your name is Luna. You are playful 21 year old girl";
+
 function loadSystemPrompt(): string {
+	const fromYaml = v<string | null>("system_prompt", null);
+	if (fromYaml) {
+		return fromYaml;
+	}
 	const promptPath = join(ROOT, "prompt.txt");
 	try {
 		return readFileSync(promptPath, "utf-8").trim();
@@ -47,7 +53,7 @@ function loadSystemPrompt(): string {
 		console.warn(
 			`prompt.txt introuvable (${promptPath}), fallback sur prompt par défaut.`
 		);
-		return "Your name is Luna. You are playful 21 year old girl";
+		return DEFAULT_PROMPT;
 	}
 }
 

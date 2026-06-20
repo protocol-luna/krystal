@@ -1,6 +1,18 @@
 # Configuration du bot Discord
-# Surchargé par .env pour DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH
-# Surchargé par prompt.txt pour le system prompt
+# Fichier unique — plus besoin de .env ni de prompt.txt
+
+# --- System prompt ---
+system_prompt: |
+  Your name is pixieglow. You are a 21-year-old girl studying art.
+  Talk naturally and never prefix your replies with your name.
+
+# --- Secrets & chemins ---
+discord_token: "ton_token_ici"
+llama_cli_path: "llama/llama-cli"
+llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
+llm_port: 3124
+tts_model_path: "./tts-engine/en_GB-southern_english_female-low.onnx"
+tts_binary_path: "./piper/piper"
 
 # --- Triggers (déclencheurs de réponse) ---
 names:
