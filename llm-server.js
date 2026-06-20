@@ -87,6 +87,20 @@ var spontaneousWhitelist = v(
 );
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
+var rawSleep = v("sleep_schedule", {
+  enabled: false,
+  start: "23:00",
+  end: "08:00",
+  timezone: "Europe/Paris",
+  behavior: "sleep"
+});
+var sleepSchedule = {
+  enabled: Boolean(rawSleep.enabled),
+  start: String(rawSleep.start ?? "23:00"),
+  end: String(rawSleep.end ?? "08:00"),
+  timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+  behavior: rawSleep.behavior ?? "sleep"
+};
 var voiceMessageChance = v("voice_message_chance", 0.08);
 var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");

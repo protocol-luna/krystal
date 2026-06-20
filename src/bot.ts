@@ -26,6 +26,7 @@ import {
 } from "./mannerisms.js";
 import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
 import { chunkDelayMin, chunkDelayMax } from "./config.js";
+import { getSleepBehavior } from "./sleep.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
@@ -212,22 +213,30 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		return;
 	}
 
+	const sleepBehavior = getSleepBehavior();
+	if (sleepBehavior === "sleep" && result.reason !== "mention" && result.reason !== "dm") {
+		console.log(
+			`[bot] #${channel.name ?? message.channel.id} ${author}: ignoré (sommeil)`
+		);
+		return;
+	}
+
 	if (result.shouldRespond) {
 		trackSpeaker(message.channel.id, message.author.id);
-		if (shouldIgnore(result.reason)) {
+		if (shouldIgnore(result.reason, sleepBehavior)) {
 			console.log(
 				`[bot] #${channel.name ?? message.channel.id} ${author}: ignoré (${result.reason})`
 			);
 			return;
 		}
 
-		const delay = computeDelay(result.reason);
+		const delay = computeDelay(result.reason, sleepBehavior);
 		console.log(
 			`[bot] #${channel.name ?? message.channel.id} ${author}: répond (${result.reason}) delay=${delay.toFixed(0)}ms`
 		);
 		await new Promise((r) => setTimeout(r, delay));
 
-		if (shouldReact(result.reason)) {
+		if (shouldReact(result.reason, sleepBehavior)) {
 			const serverEmojis = isDM
 				? undefined
 				: (channel as Eris.GuildTextableChannel).guild?.emojis
@@ -241,15 +250,15 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		return;
 	}
 
-	if (canFollowUp(message.channel.id, client.user.id)) {
+	if (canFollowUp(message.channel.id, client.user.id) && sleepBehavior !== "sleep") {
 		trackSpeaker(message.channel.id, message.author.id);
 		markReplied(message.channel.id);
 		console.log(
 			`[bot] #${channel.name ?? message.channel.id} ${author}: follow-up immédiat`
 		);
-		await new Promise((r) => setTimeout(r, computeDelay("follow-up")));
+		await new Promise((r) => setTimeout(r, computeDelay("follow-up", sleepBehavior)));
 
-		if (shouldReact("follow-up")) {
+		if (shouldReact("follow-up", sleepBehavior)) {
 			const serverEmojis = isDM
 				? undefined
 				: (channel as Eris.GuildTextableChannel).guild?.emojis

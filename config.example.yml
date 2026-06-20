@@ -95,6 +95,22 @@ chunk_delay_max: 1500
 # Délai variable entre l'envoi de chaque chunk, proportionnel à la longueur du texte.
 # 300-1500ms simulé le temps d'écrire chaque message individuellement.
 
+# --- Sleep schedule (plages de sommeil / présence variable) ---
+sleep_schedule:
+  enabled: false
+  start: "23:00"
+  end: "08:00"
+  timezone: "Europe/Paris"
+  behavior: "sleep"
+# Permet de simuler une présence non-24/7.
+# enabled: false → toujours actif, true → applique la plage.
+# start/end: heures de début et fin (format 24h). Gère les plages chevauchant minuit.
+# timezone: fuseau horaire (ex: "Europe/Paris", "America/New_York").
+# behavior:
+#   sleep → le bot ne répond qu'aux mentions et DMs
+#   slow  → délais x3-5, réactions quasi nulles
+#   short → ignore chance augmenté, réactions quasi nulles
+
 # --- TTS / Voice messages ---
 voice_message_chance: 0.08
 # Probabilité qu'une réponse soit envoyée sous forme de message vocal (fichier audio)

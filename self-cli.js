@@ -86,6 +86,20 @@ var spontaneousWhitelist = v(
 );
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
+var rawSleep = v("sleep_schedule", {
+  enabled: false,
+  start: "23:00",
+  end: "08:00",
+  timezone: "Europe/Paris",
+  behavior: "sleep"
+});
+var sleepSchedule = {
+  enabled: Boolean(rawSleep.enabled),
+  start: String(rawSleep.start ?? "23:00"),
+  end: String(rawSleep.end ?? "08:00"),
+  timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+  behavior: rawSleep.behavior ?? "sleep"
+};
 var voiceMessageChance = v("voice_message_chance", 0.08);
 var ttsModelPath = process.env.TTS_MODEL_PATH ?? join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 var ttsBinaryPath = process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
@@ -529,7 +543,7 @@ function pickReactionChance(reason) {
       return reactionChance;
   }
 }
-function computeDelay(reason = null) {
+function computeDelay(reason = null, sleepBehavior) {
   let min = responseDelayMin;
   let max = responseDelayMax;
   switch (reason) {
@@ -554,12 +568,20 @@ function computeDelay(reason = null) {
       max = 5e3;
       break;
   }
-  const delay = min + Math.random() * (max - min);
-  console.log(`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason})`);
+  let delay = min + Math.random() * (max - min);
+  if (sleepBehavior === "slow") {
+    delay *= 3 + Math.random() * 2;
+  }
+  console.log(
+    `[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"})`
+  );
   return delay;
 }
-function shouldIgnore(reason) {
-  const chance = pickIgnoreChance(reason);
+function shouldIgnore(reason, sleepBehavior) {
+  let chance = pickIgnoreChance(reason);
+  if (sleepBehavior === "short") {
+    chance = Math.min(chance + 0.3, 0.9);
+  }
   if (chance <= 0) {
     return false;
   }
@@ -570,8 +592,11 @@ function shouldIgnore(reason) {
   );
   return ignored;
 }
-function shouldReact(reason = null) {
-  const chance = pickReactionChance(reason);
+function shouldReact(reason = null, sleepBehavior) {
+  let chance = pickReactionChance(reason);
+  if (sleepBehavior === "slow" || sleepBehavior === "short") {
+    chance = Math.min(chance, 0.02);
+  }
   if (chance <= 0) {
     console.log("[mannerisms] react=false (chance=0)");
     return false;
@@ -838,6 +863,41 @@ function shouldSendVoice() {
   return send;
 }
 
+// src/sleep.ts
+function parseTime(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function isInWindow(now, start, end) {
+  if (start <= end) {
+    return now >= start && now < end;
+  }
+  return now >= start || now < end;
+}
+function getSleepBehavior() {
+  if (!sleepSchedule.enabled) {
+    return null;
+  }
+  const now = /* @__PURE__ */ new Date();
+  const tz = sleepSchedule.timezone;
+  const formatter = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: tz,
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23"
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const nowMinutes = hour * 60 + minute;
+  const startMinutes = parseTime(sleepSchedule.start);
+  const endMinutes = parseTime(sleepSchedule.end);
+  if (!isInWindow(nowMinutes, startMinutes, endMinutes)) {
+    return null;
+  }
+  return sleepSchedule.behavior;
+}
+
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
@@ -986,20 +1046,27 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
+  const sleepBehavior = getSleepBehavior();
+  if (sleepBehavior === "sleep" && result.reason !== "mention" && result.reason !== "dm") {
+    console.log(
+      `[bot] #${channel.name ?? message.channel.id} ${author}: ignor\xE9 (sommeil)`
+    );
+    return;
+  }
   if (result.shouldRespond) {
     trackSpeaker(message.channel.id, message.author.id);
-    if (shouldIgnore(result.reason)) {
+    if (shouldIgnore(result.reason, sleepBehavior)) {
       console.log(
         `[bot] #${channel.name ?? message.channel.id} ${author}: ignor\xE9 (${result.reason})`
       );
       return;
     }
-    const delay = computeDelay(result.reason);
+    const delay = computeDelay(result.reason, sleepBehavior);
     console.log(
       `[bot] #${channel.name ?? message.channel.id} ${author}: r\xE9pond (${result.reason}) delay=${delay.toFixed(0)}ms`
     );
     await new Promise((r) => setTimeout(r, delay));
-    if (shouldReact(result.reason)) {
+    if (shouldReact(result.reason, sleepBehavior)) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {
@@ -1008,14 +1075,14 @@ client.on("messageCreate", async (message) => {
     await triggerLunaReply(message, isDM, result.reason);
     return;
   }
-  if (canFollowUp(message.channel.id, client.user.id)) {
+  if (canFollowUp(message.channel.id, client.user.id) && sleepBehavior !== "sleep") {
     trackSpeaker(message.channel.id, message.author.id);
     markReplied(message.channel.id);
     console.log(
       `[bot] #${channel.name ?? message.channel.id} ${author}: follow-up imm\xE9diat`
     );
-    await new Promise((r) => setTimeout(r, computeDelay("follow-up")));
-    if (shouldReact("follow-up")) {
+    await new Promise((r) => setTimeout(r, computeDelay("follow-up", sleepBehavior)));
+    if (shouldReact("follow-up", sleepBehavior)) {
       const serverEmojis = isDM ? void 0 : channel.guild?.emojis?.filter((e) => e.id)?.map((e) => `${e.animated ? "a:" : ""}${e.name}:${e.id}`);
       const reaction = pickReaction(serverEmojis);
       await message.addReaction(reaction).catch(() => {

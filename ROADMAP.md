@@ -17,33 +17,32 @@ chunk_delay_max: 1500      # ms
 
 ---
 
-## 2. Plages de sommeil / présence variable
+## 2. Plages de sommeil / présence variable ✅
 
 **Problème** : le bot répond 24h/24. Un humain ne serait pas actif à toute heure.
 
 **Solution** : configurer des plages horaires où le bot adapte son comportement.
 
 ```yaml
-# config.yml
 sleep_schedule:
-  enabled: true
-  start: "23:00"              # 11 PM
-  end: "08:00"                # 8 AM
-  timezone: "Europe/Paris"    # fuseau horaire
-  behavior: "sleep"           # sleep | slow | short
+  enabled: false
+  start: "23:00"
+  end: "08:00"
+  timezone: "Europe/Paris"
+  behavior: "sleep"  # sleep | slow | short
 ```
 
 Comportements possibles :
 
 | Mode | Effet |
 |------|-------|
-| `sleep` | Aucune réponse (le bot "dort") |
-| `slow` | Délais beaucoup plus longs (x3–x5), ignore chance augmenté, réactions désactivées |
-| `short` | Réponses très courtes, pas de follow-up, le bot "répond à moitié endormi" |
+| `sleep` | Seules les mentions et DMs sont traitées |
+| `slow` | Délais x3–5, réactions quasi nulles |
+| `short` | Ignore chance +30%, réactions quasi nulles |
 
-Hors plages de sommeil, comportement normal.
+**Fichiers** : `config.ts`, `sleep.ts`, `mannerisms.ts`, `bot.ts`.
 
-**Fichiers** : `config.ts`, `mannerisms.ts`, `bot.ts` (dans le handler `messageCreate`, vérifier avant de répondre).
+**Statut : ✅ Implémenté**.
 
 ---
 
@@ -132,5 +131,5 @@ q → w/a, w → q/e/s, e → w/r, r → e/t, t → r/y, y → t/u, u → y/i, i
 1. **✅ Gestion des interruptions** (#5) — implémenté
 2. **✅ Concentration variable** (#4) — implémenté
 3. **✅ Délai inter-chunks** (#1) — implémenté
-4. **Plages de sommeil** (#2) — indépendant, ajoute une couche de configuration
+4. **✅ Plages de sommeil** (#2) — implémenté
 5. **Typos + correction** (#3) — le plus complexe (mapping clavier, logique d'edit, gestion des races)

@@ -111,6 +111,30 @@ export const spontaneousWhitelist = v<string>(
 export const chunkDelayMin = v<number>("chunk_delay_min", 300);
 export const chunkDelayMax = v<number>("chunk_delay_max", 1500);
 
+// --- Sleep schedule ---
+export interface SleepSchedule {
+	enabled: boolean;
+	start: string;
+	end: string;
+	timezone: string;
+	behavior: "sleep" | "slow" | "short";
+}
+
+const rawSleep = v<Record<string, unknown>>("sleep_schedule", {
+	enabled: false,
+	start: "23:00",
+	end: "08:00",
+	timezone: "Europe/Paris",
+	behavior: "sleep",
+});
+export const sleepSchedule: SleepSchedule = {
+	enabled: Boolean(rawSleep.enabled),
+	start: String(rawSleep.start ?? "23:00"),
+	end: String(rawSleep.end ?? "08:00"),
+	timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+	behavior: (rawSleep.behavior as SleepSchedule["behavior"]) ?? "sleep",
+};
+
 // --- TTS / Voice messages ---
 export const voiceMessageChance = v<number>("voice_message_chance", 0.08);
 

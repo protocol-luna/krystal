@@ -55,6 +55,7 @@ stateDiagram-v2
     state "Skip bot" as skipbot
     state "Commande ?" as cmd
     state "Évaluation" as eval
+    state "Sommeil ?" as sleep
     state "Ignore ?" as ignore
     state "Délai + Réaction" as prereply
     state "Réponse LLM" as reply
@@ -84,11 +85,14 @@ stateDiagram-v2
     eval --> random : 1.5% chance
     eval --> track : aucun trigger
 
-    mention --> prereply
-    dm --> prereply
-    name --> prereply
-    keyword --> prereply
+    mention --> sleep
+    dm --> sleep
+    name --> sleep
+    keyword --> sleep
     random --> prereply
+
+    sleep --> prereply : sleep=off\nou sleep=slow\nou mention/dm
+    sleep --> [*] : sleep mode + pas mention/dm
 
     prereply --> ignore : roll < chance
     ignore --> [*] : ignoré
@@ -98,7 +102,7 @@ stateDiagram-v2
     reply --> [*]
 
     track --> canFollowup : bot dernier speaker + actif < 15s ?
-    canFollowup --> prereply : oui → follow-up immédiat
+    canFollowup --> prereply : oui → follow-up immédiat\n(ignoré si sleep mode)
     canFollowup --> track : non
     track --> [*]
 ```
@@ -195,6 +199,34 @@ flowchart LR
 | `keyword` | 1000ms | 3500ms | 8% | 4% |
 | `follow-up` | 500ms | 2000ms | 0% | 3% |
 | `random` | 1500ms | 5000ms | 15% | 2% |
+
+### Plages de sommeil
+
+Le bot peut simuler une présence non-24/7. Pendant les heures configurées, son comportement change :
+
+```mermaid
+flowchart LR
+    A[Message reçu] --> B{Sleep schedule\nenabled ?}
+    B -- non --> C[Comportement normal]
+    B -- oui --> D{Heure de sommeil ?}
+    D -- non --> C
+    D -- oui --> E{Sleep behavior ?}
+    E -- sleep --> F{Mention ou DM ?}
+    F -- oui --> C
+    F -- non --> G[Ignoré]
+    E -- slow --> H[Délai x3-5\nreact↓]
+    E -- short --> I[Ignore chance +30%\nreact↓]
+    H --> C
+    I --> C
+```
+
+| Mode | Effet |
+|------|-------|
+| `sleep` | Seules les mentions (@bot) et les DMs sont traitées. Tout le reste est ignoré. |
+| `slow` | Délais multipliés par 3–5, réactions quasi nulles. Le bot est "endormi mais répond". |
+| `short` | Ignore chance augmenté de 30%, réactions quasi nulles. Le bot est "distrait". |
+
+Configurable via `sleep_schedule` dans `config.yml`.
 
 ### Messages spontanés
 

@@ -41,7 +41,10 @@ function pickReactionChance(reason: string | null): number {
 	}
 }
 
-export function computeDelay(reason: string | null = null): number {
+export function computeDelay(
+	reason: string | null = null,
+	sleepBehavior?: string | null
+): number {
 	let min = responseDelayMin;
 	let max = responseDelayMax;
 	switch (reason) {
@@ -66,13 +69,24 @@ export function computeDelay(reason: string | null = null): number {
 			max = 5000;
 			break;
 	}
-	const delay = min + Math.random() * (max - min);
-	console.log(`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason})`);
+	let delay = min + Math.random() * (max - min);
+	if (sleepBehavior === "slow") {
+		delay *= 3 + Math.random() * 2;
+	}
+	console.log(
+		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"})`
+	);
 	return delay;
 }
 
-export function shouldIgnore(reason: string | null): boolean {
-	const chance = pickIgnoreChance(reason);
+export function shouldIgnore(
+	reason: string | null,
+	sleepBehavior?: string | null
+): boolean {
+	let chance = pickIgnoreChance(reason);
+	if (sleepBehavior === "short") {
+		chance = Math.min(chance + 0.3, 0.9);
+	}
 	if (chance <= 0) {
 		return false;
 	}
@@ -84,8 +98,14 @@ export function shouldIgnore(reason: string | null): boolean {
 	return ignored;
 }
 
-export function shouldReact(reason: string | null = null): boolean {
-	const chance = pickReactionChance(reason);
+export function shouldReact(
+	reason: string | null = null,
+	sleepBehavior?: string | null
+): boolean {
+	let chance = pickReactionChance(reason);
+	if (sleepBehavior === "slow" || sleepBehavior === "short") {
+		chance = Math.min(chance, 0.02);
+	}
 	if (chance <= 0) {
 		console.log("[mannerisms] react=false (chance=0)");
 		return false;
