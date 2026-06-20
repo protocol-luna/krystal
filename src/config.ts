@@ -62,10 +62,15 @@ export const LLM_PORT: number =
 	v<number | null>("llm_port", null) ??
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
-export const LLM_MODE: "cli" | "server" =
-	(v<string | null>("llm_mode", null) as "cli" | "server" | null) ??
-	(process.env.LLM_MODE as "cli" | "server" | undefined) ??
-	"cli";
+export let LLM_MODE: "cli" | "server" | "proxy" =
+	(v<string | null>("llm_mode", null) as "cli" | "server" | "proxy" | null) ??
+	(process.env.LLM_MODE as "cli" | "server" | "proxy" | undefined) ??
+	"proxy";
+
+/** Override LLM_MODE at runtime (used by llm-server to force cli/server) */
+export function setLLMMode(mode: "cli" | "server"): void {
+	LLM_MODE = mode;
+}
 
 export const SYSTEM_PROMPT = (() => {
 	const fromYaml = v<string | null>("system_prompt", null);

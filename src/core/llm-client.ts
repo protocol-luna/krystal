@@ -1,6 +1,6 @@
-import { LLM_PORT } from "../config.js";
+import { LLM_HOST, LLM_PORT } from "../config.js";
 
-const BASE = `http://localhost:${LLM_PORT}`;
+const BASE = `http://${LLM_HOST}:${LLM_PORT}`;
 
 export async function askLLM(
 	userMessage: { username: string; text: string },

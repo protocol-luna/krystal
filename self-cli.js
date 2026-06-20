@@ -37,6 +37,9 @@ function watchConfig() {
     }
   });
 }
+function setLLMMode(mode) {
+  LLM_MODE = mode;
+}
 function mergeConcentration(raw, defaults) {
   const merged = { ...defaults };
   for (const key of Object.keys(
@@ -91,7 +94,7 @@ var init_config = __esm({
     LLAMA_MODEL_PATH = v("llama_model_path", null) ?? process.env.LLAMA_MODEL_PATH ?? join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
     LLM_HOST = v("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";
     LLM_PORT = v("llm_port", null) ?? Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
-    LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "cli";
+    LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "proxy";
     SYSTEM_PROMPT = (() => {
       const fromYaml = v("system_prompt", null);
       if (fromYaml) {
@@ -363,15 +366,107 @@ var init_llm_bus = __esm({
   }
 });
 
+// src/core/llm-client.ts
+var llm_client_exports = {};
+__export(llm_client_exports, {
+  askLLM: () => askLLM,
+  isLLMBusy: () => isLLMBusy,
+  resetLLM: () => resetLLM
+});
+async function askLLM(userMessage, callbacks) {
+  const response = await fetch(`${BASE}/ask`, {
+    method: "POST",
+    body: JSON.stringify(userMessage),
+    headers: { "Content-Type": "application/json" }
+  });
+  if (!(response.ok && response.body)) {
+    throw new Error(`LLM server error: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        const event = JSON.parse(line);
+        switch (event.type) {
+          case "firstToken":
+            callbacks.onFirstToken?.();
+            break;
+          case "chunk":
+            callbacks.onChunk(event.data);
+            break;
+          case "done":
+            fullText = event.data;
+            break;
+          case "error":
+            throw new Error(event.data);
+          default:
+            break;
+        }
+      } catch {
+      }
+    }
+  }
+  return fullText;
+}
+async function resetLLM() {
+  const response = await fetch(`${BASE}/reset`, { method: "POST" });
+  if (!response.ok) {
+    console.error("LLM reset failed:", response.status);
+  }
+}
+async function isLLMBusy() {
+  try {
+    const response = await fetch(`${BASE}/health`);
+    if (!response.ok) {
+      return true;
+    }
+    const data = await response.json();
+    return data.busy;
+  } catch {
+    return true;
+  }
+}
+var BASE;
+var init_llm_client = __esm({
+  "src/core/llm-client.ts"() {
+    "use strict";
+    init_config();
+    BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+  }
+});
+
 // src/core/llm-core.ts
 var llm_core_exports = {};
 __export(llm_core_exports, {
-  askLLM: () => askLLM,
-  isLLMBusy: () => isLLMBusy,
-  resetLLM: () => resetLLM,
+  askLLM: () => askLLM2,
+  isLLMBusy: () => isLLMBusy2,
+  resetLLM: () => resetLLM2,
   shutdown: () => shutdown
 });
 import { spawn } from "node:child_process";
+function ensureLLM() {
+  if (initialized) {
+    return;
+  }
+  initialized = true;
+  isModelReady = LLM_MODE !== "cli";
+  if (LLM_MODE === "cli") {
+    spawnLlama();
+  }
+}
 function spawnLlama() {
   if (LLM_MODE !== "cli") {
     return;
@@ -555,7 +650,29 @@ async function serverRequest(item) {
     throw err;
   }
 }
+async function proxyRequest(item) {
+  try {
+    const { askLLM: askLLMClient } = await Promise.resolve().then(() => (init_llm_client(), llm_client_exports));
+    const text = await askLLMClient(item.userMessage, {
+      onFirstToken: () => {
+        if (!hasSentFirstToken) {
+          hasSentFirstToken = true;
+          currentItem?.onFirstToken?.();
+        }
+      },
+      onChunk: (chunk) => {
+        llmBus.emit("token", chunk);
+        currentItem?.onChunk?.(chunk);
+      }
+    });
+    llmBus.emit("done", text);
+  } catch (err) {
+    llmBus.emit("error", err);
+    throw err;
+  }
+}
 function processQueue() {
+  ensureLLM();
   if (isProcessing || queueHead >= requestQueue.length) {
     return;
   }
@@ -593,11 +710,16 @@ function processQueue() {
       llmBus.off("done", doneHandler);
       fail(err);
     });
+  } else if (LLM_MODE === "proxy") {
+    void proxyRequest(item).catch((err) => {
+      llmBus.off("done", doneHandler);
+      fail(err);
+    });
   } else {
     cliRequest(item);
   }
 }
-function askLLM(userMessage, callbacks) {
+function askLLM2(userMessage, callbacks) {
   return new Promise((resolve2, reject) => {
     requestQueue.push({
       userMessage,
@@ -609,16 +731,20 @@ function askLLM(userMessage, callbacks) {
     void processQueue();
   });
 }
-function isLLMBusy() {
+function isLLMBusy2() {
   return isProcessing || queueHead < requestQueue.length;
 }
-async function resetLLM() {
+async function resetLLM2() {
   requestQueue.length = 0;
   queueHead = 0;
   isProcessing = false;
   currentItem = null;
   llmBus.emit("reset");
-  if (LLM_MODE === "server") {
+  if (LLM_MODE === "server" || LLM_MODE === "proxy") {
+    if (LLM_MODE === "proxy") {
+      const { resetLLM: resetLLMClient } = await Promise.resolve().then(() => (init_llm_client(), llm_client_exports));
+      await resetLLMClient();
+    }
     return;
   }
   stdoutBuffer = "";
@@ -643,7 +769,7 @@ function shutdown() {
   shutdownRequested = true;
   llama?.kill();
 }
-var requestQueue, queueHead, isProcessing, currentItem, hasSentFirstToken, isModelReady, stdoutBuffer, currentUsername, llama, shutdownRequested, restartCount, MAX_RESTARTS, restartDelay, LLM_BASE, serverParams;
+var requestQueue, queueHead, isProcessing, currentItem, hasSentFirstToken, initialized, isModelReady, stdoutBuffer, currentUsername, llama, shutdownRequested, restartCount, MAX_RESTARTS, restartDelay, LLM_BASE, serverParams;
 var init_llm_core = __esm({
   "src/core/llm-core.ts"() {
     "use strict";
@@ -654,7 +780,8 @@ var init_llm_core = __esm({
     isProcessing = false;
     currentItem = null;
     hasSentFirstToken = false;
-    isModelReady = LLM_MODE === "server";
+    initialized = false;
+    isModelReady = false;
     stdoutBuffer = "";
     currentUsername = "";
     shutdownRequested = false;
@@ -689,9 +816,6 @@ var init_llm_core = __esm({
       }
       return map;
     })();
-    if (LLM_MODE === "cli") {
-      spawnLlama();
-    }
   }
 });
 
@@ -988,82 +1112,6 @@ var init_guild = __esm({
   }
 });
 
-// src/core/llm-client.ts
-async function askLLM2(userMessage, callbacks) {
-  const response = await fetch(`${BASE}/ask`, {
-    method: "POST",
-    body: JSON.stringify(userMessage),
-    headers: { "Content-Type": "application/json" }
-  });
-  if (!(response.ok && response.body)) {
-    throw new Error(`LLM server error: ${response.status}`);
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullText = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
-      }
-      try {
-        const event = JSON.parse(line);
-        switch (event.type) {
-          case "firstToken":
-            callbacks.onFirstToken?.();
-            break;
-          case "chunk":
-            callbacks.onChunk(event.data);
-            break;
-          case "done":
-            fullText = event.data;
-            break;
-          case "error":
-            throw new Error(event.data);
-          default:
-            break;
-        }
-      } catch {
-      }
-    }
-  }
-  return fullText;
-}
-async function resetLLM2() {
-  const response = await fetch(`${BASE}/reset`, { method: "POST" });
-  if (!response.ok) {
-    console.error("LLM reset failed:", response.status);
-  }
-}
-async function isLLMBusy2() {
-  try {
-    const response = await fetch(`${BASE}/health`);
-    if (!response.ok) {
-      return true;
-    }
-    const data = await response.json();
-    return data.busy;
-  } catch {
-    return true;
-  }
-}
-var BASE;
-var init_llm_client = __esm({
-  "src/core/llm-client.ts"() {
-    "use strict";
-    init_config();
-    BASE = `http://localhost:${LLM_PORT}`;
-  }
-});
-
 // src/spontaneous.ts
 function getCachedActiveChannel(guild) {
   const cached = activeChannelCache.get(guild.id);
@@ -1124,7 +1172,7 @@ async function fetchContext(channel, count) {
   }
 }
 async function trySpawn(client2) {
-  if (await isLLMBusy2()) {
+  if (await isLLMBusy()) {
     return;
   }
   const picked = pickWeightedGuild(client2);
@@ -1135,9 +1183,9 @@ async function trySpawn(client2) {
     picked.channel,
     config.spontaneousContextMessages
   );
-  await resetLLM2();
+  await resetLLM();
   let reply = "";
-  await askLLM2(
+  await askLLM(
     {
       username: "system",
       text: context ? `Recent conversation in #${picked.channel.name}:
@@ -1162,7 +1210,7 @@ Join the conversation naturally. Keep it short and relevant to what was just sai
   } else {
     console.log(`[spontaneous] #${picked.channel.name} : r\xE9ponse vide`);
   }
-  await resetLLM2();
+  await resetLLM();
 }
 var CACHE_TTL, activeChannelCache;
 var init_spontaneous = __esm({
@@ -1834,14 +1882,14 @@ async function handleReactionCommand(message, emojiName, userId) {
   const channelName = message.channel instanceof Eris.TextChannel ? message.channel.name : message.channel.id;
   console.log(`[bot] #${channelName} r\xE9action ${emojiName} \u2192 ${cmd}`);
   if (cmd === "stop") {
-    await resetLLM();
+    await resetLLM2();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, userId);
     setPaused(true);
   } else if (cmd === "start") {
     setPaused(false);
   } else if (cmd === "clear") {
-    await resetLLM();
+    await resetLLM2();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, userId);
   }
@@ -1900,6 +1948,10 @@ var init_typo_correction = __esm({
 });
 
 // src/bot.ts
+var bot_exports = {};
+__export(bot_exports, {
+  startBot: () => startBot
+});
 import * as Eris2 from "eris";
 async function triggerLunaReply(message, isDM = false, reason = null) {
   const key = pendingKey(message.channel.id, message.author.id);
@@ -1931,7 +1983,7 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
     if (!isVoice) {
       llmBus.once("token", startTyping);
     }
-    const fullText = await askLLM({ username: displayName, text: content });
+    const fullText = await askLLM2({ username: displayName, text: content });
     if (isVoice && !hasUnsafeTTSText(fullText)) {
       await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
     } else {
@@ -2010,7 +2062,7 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
 }
 async function handleCommand(message, author, channelName, channelId, result) {
   if (result.reason === "stop") {
-    await resetLLM();
+    await resetLLM2();
     clearCooldown(channelId);
     trackSpeaker(channelId, message.author.id);
     setPaused(true);
@@ -2031,7 +2083,7 @@ async function handleCommand(message, author, channelName, channelId, result) {
     return true;
   }
   if (result.reason === "clear") {
-    await resetLLM();
+    await resetLLM2();
     clearCooldown(channelId);
     trackSpeaker(channelId, message.author.id);
     try {
@@ -2204,6 +2256,7 @@ var init_llm_server = __esm({
     "use strict";
     init_config();
     init_llm_core();
+    setLLMMode("cli");
     PORT = LLM_PORT;
     createServer(async (req, res) => {
       const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -2220,7 +2273,7 @@ var init_llm_server = __esm({
             Connection: "keep-alive",
             "Access-Control-Allow-Origin": "*"
           });
-          askLLM(
+          askLLM2(
             { username, text },
             {
               onFirstToken: () => {
@@ -2247,7 +2300,7 @@ var init_llm_server = __esm({
         return;
       }
       if (req.method === "POST" && url.pathname === "/reset") {
-        await resetLLM();
+        await resetLLM2();
         res.writeHead(200, { "Access-Control-Allow-Origin": "*" });
         res.end("ok");
         return;
@@ -2282,15 +2335,16 @@ var command;
 var init_cli = __esm({
   async "src/cli.ts"() {
     "use strict";
-    init_bot();
     command = process.argv[2];
     switch (command) {
       case "bot":
       case void 0: {
-        await startBot();
+        const { startBot: startBot2 } = await Promise.resolve().then(() => (init_bot(), bot_exports));
+        await startBot2();
         break;
       }
       case "server": {
+        process.env.LLM_MODE = "cli";
         await Promise.resolve().then(() => (init_llm_server(), llm_server_exports));
         break;
       }

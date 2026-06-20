@@ -1,16 +1,17 @@
 import { createInterface } from "node:readline";
-import { startBot } from "./bot.js";
 
 const command = process.argv[2];
 
 switch (command) {
 	case "bot":
 	case undefined: {
+		const { startBot } = await import("./bot.js");
 		await startBot();
 		break;
 	}
 
 	case "server": {
+		process.env.LLM_MODE = "cli";
 		await import("./core/llm-server.js");
 		break;
 	}

@@ -21,6 +21,9 @@ import { cpus } from "node:os";
 function v(key, fallback) {
   return rawCfg[key] ?? fallback;
 }
+function setLLMMode(mode) {
+  LLM_MODE = mode;
+}
 var ROOT, configPath, rawCfg, DISCORD_TOKEN, LLAMA_CLI_PATH, LLAMA_MODEL_PATH, LLM_HOST, LLM_PORT, LLM_MODE, SYSTEM_PROMPT, jinjaTemplate, ttsModelPath, ttsBinaryPath, ffmpegPath, ffprobePath, cpuCount, llamaArgs;
 var init_config = __esm({
   "src/config.ts"() {
@@ -36,7 +39,7 @@ var init_config = __esm({
     LLAMA_MODEL_PATH = v("llama_model_path", null) ?? process.env.LLAMA_MODEL_PATH ?? join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
     LLM_HOST = v("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";
     LLM_PORT = v("llm_port", null) ?? Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
-    LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "cli";
+    LLM_MODE = v("llm_mode", null) ?? process.env.LLM_MODE ?? "proxy";
     SYSTEM_PROMPT = (() => {
       const fromYaml = v("system_prompt", null);
       if (fromYaml) {
@@ -143,15 +146,107 @@ var init_llm_bus = __esm({
   }
 });
 
+// src/core/llm-client.ts
+var llm_client_exports = {};
+__export(llm_client_exports, {
+  askLLM: () => askLLM,
+  isLLMBusy: () => isLLMBusy,
+  resetLLM: () => resetLLM
+});
+async function askLLM(userMessage, callbacks) {
+  const response = await fetch(`${BASE}/ask`, {
+    method: "POST",
+    body: JSON.stringify(userMessage),
+    headers: { "Content-Type": "application/json" }
+  });
+  if (!(response.ok && response.body)) {
+    throw new Error(`LLM server error: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        const event = JSON.parse(line);
+        switch (event.type) {
+          case "firstToken":
+            callbacks.onFirstToken?.();
+            break;
+          case "chunk":
+            callbacks.onChunk(event.data);
+            break;
+          case "done":
+            fullText = event.data;
+            break;
+          case "error":
+            throw new Error(event.data);
+          default:
+            break;
+        }
+      } catch {
+      }
+    }
+  }
+  return fullText;
+}
+async function resetLLM() {
+  const response = await fetch(`${BASE}/reset`, { method: "POST" });
+  if (!response.ok) {
+    console.error("LLM reset failed:", response.status);
+  }
+}
+async function isLLMBusy() {
+  try {
+    const response = await fetch(`${BASE}/health`);
+    if (!response.ok) {
+      return true;
+    }
+    const data = await response.json();
+    return data.busy;
+  } catch {
+    return true;
+  }
+}
+var BASE;
+var init_llm_client = __esm({
+  "src/core/llm-client.ts"() {
+    "use strict";
+    init_config();
+    BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+  }
+});
+
 // src/core/llm-core.ts
 var llm_core_exports = {};
 __export(llm_core_exports, {
-  askLLM: () => askLLM,
-  isLLMBusy: () => isLLMBusy,
-  resetLLM: () => resetLLM,
+  askLLM: () => askLLM2,
+  isLLMBusy: () => isLLMBusy2,
+  resetLLM: () => resetLLM2,
   shutdown: () => shutdown
 });
 import { spawn } from "node:child_process";
+function ensureLLM() {
+  if (initialized) {
+    return;
+  }
+  initialized = true;
+  isModelReady = LLM_MODE !== "cli";
+  if (LLM_MODE === "cli") {
+    spawnLlama();
+  }
+}
 function spawnLlama() {
   if (LLM_MODE !== "cli") {
     return;
@@ -335,7 +430,29 @@ async function serverRequest(item) {
     throw err;
   }
 }
+async function proxyRequest(item) {
+  try {
+    const { askLLM: askLLMClient } = await Promise.resolve().then(() => (init_llm_client(), llm_client_exports));
+    const text = await askLLMClient(item.userMessage, {
+      onFirstToken: () => {
+        if (!hasSentFirstToken) {
+          hasSentFirstToken = true;
+          currentItem?.onFirstToken?.();
+        }
+      },
+      onChunk: (chunk) => {
+        llmBus.emit("token", chunk);
+        currentItem?.onChunk?.(chunk);
+      }
+    });
+    llmBus.emit("done", text);
+  } catch (err) {
+    llmBus.emit("error", err);
+    throw err;
+  }
+}
 function processQueue() {
+  ensureLLM();
   if (isProcessing || queueHead >= requestQueue.length) {
     return;
   }
@@ -373,11 +490,16 @@ function processQueue() {
       llmBus.off("done", doneHandler);
       fail(err);
     });
+  } else if (LLM_MODE === "proxy") {
+    void proxyRequest(item).catch((err) => {
+      llmBus.off("done", doneHandler);
+      fail(err);
+    });
   } else {
     cliRequest(item);
   }
 }
-function askLLM(userMessage, callbacks) {
+function askLLM2(userMessage, callbacks) {
   return new Promise((resolve, reject) => {
     requestQueue.push({
       userMessage,
@@ -389,16 +511,20 @@ function askLLM(userMessage, callbacks) {
     void processQueue();
   });
 }
-function isLLMBusy() {
+function isLLMBusy2() {
   return isProcessing || queueHead < requestQueue.length;
 }
-async function resetLLM() {
+async function resetLLM2() {
   requestQueue.length = 0;
   queueHead = 0;
   isProcessing = false;
   currentItem = null;
   llmBus.emit("reset");
-  if (LLM_MODE === "server") {
+  if (LLM_MODE === "server" || LLM_MODE === "proxy") {
+    if (LLM_MODE === "proxy") {
+      const { resetLLM: resetLLMClient } = await Promise.resolve().then(() => (init_llm_client(), llm_client_exports));
+      await resetLLMClient();
+    }
     return;
   }
   stdoutBuffer = "";
@@ -423,7 +549,7 @@ function shutdown() {
   shutdownRequested = true;
   llama?.kill();
 }
-var requestQueue, queueHead, isProcessing, currentItem, hasSentFirstToken, isModelReady, stdoutBuffer, currentUsername, llama, shutdownRequested, restartCount, MAX_RESTARTS, restartDelay, LLM_BASE, serverParams;
+var requestQueue, queueHead, isProcessing, currentItem, hasSentFirstToken, initialized, isModelReady, stdoutBuffer, currentUsername, llama, shutdownRequested, restartCount, MAX_RESTARTS, restartDelay, LLM_BASE, serverParams;
 var init_llm_core = __esm({
   "src/core/llm-core.ts"() {
     "use strict";
@@ -434,7 +560,8 @@ var init_llm_core = __esm({
     isProcessing = false;
     currentItem = null;
     hasSentFirstToken = false;
-    isModelReady = LLM_MODE === "server";
+    initialized = false;
+    isModelReady = false;
     stdoutBuffer = "";
     currentUsername = "";
     shutdownRequested = false;
@@ -469,9 +596,6 @@ var init_llm_core = __esm({
       }
       return map;
     })();
-    if (LLM_MODE === "cli") {
-      spawnLlama();
-    }
   }
 });
 
@@ -479,6 +603,7 @@ var init_llm_core = __esm({
 init_config();
 init_llm_core();
 import { createServer } from "node:http";
+setLLMMode("cli");
 var PORT = LLM_PORT;
 createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -495,7 +620,7 @@ createServer(async (req, res) => {
         Connection: "keep-alive",
         "Access-Control-Allow-Origin": "*"
       });
-      askLLM(
+      askLLM2(
         { username, text },
         {
           onFirstToken: () => {
@@ -522,13 +647,13 @@ createServer(async (req, res) => {
     return;
   }
   if (req.method === "POST" && url.pathname === "/reset") {
-    await resetLLM();
+    await resetLLM2();
     res.writeHead(200, { "Access-Control-Allow-Origin": "*" });
     res.end("ok");
     return;
   }
   if (req.method === "GET" && url.pathname === "/health") {
-    const { isLLMBusy: isLLMBusy2 } = await Promise.resolve().then(() => (init_llm_core(), llm_core_exports));
+    const { isLLMBusy: isLLMBusy3 } = await Promise.resolve().then(() => (init_llm_core(), llm_core_exports));
     res.writeHead(200, {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*"
@@ -536,7 +661,7 @@ createServer(async (req, res) => {
     res.end(
       JSON.stringify({
         ready: true,
-        busy: isLLMBusy2(),
+        busy: isLLMBusy3(),
         queued: 0
       })
     );

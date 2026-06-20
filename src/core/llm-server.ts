@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
-import { LLM_PORT } from "../config.js";
+import { LLM_PORT, setLLMMode } from "../config.js";
 import { askLLM, resetLLM } from "./llm-core.js";
+
+// llm-server gère toujours le LLM en direct, jamais via proxy
+setLLMMode("cli");
 
 const PORT = LLM_PORT;
 

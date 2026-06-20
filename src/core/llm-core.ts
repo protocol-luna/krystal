@@ -28,7 +28,8 @@ let currentItem: QueueItem | null = null;
 let hasSentFirstToken = false;
 
 // --- CLI mode state ---
-let isModelReady = LLM_MODE === "server";
+let initialized = false;
+let isModelReady = false;
 let stdoutBuffer = "";
 let currentUsername = "";
 let llama: ChildProcess | undefined;
@@ -38,6 +39,17 @@ const MAX_RESTARTS = 5;
 let restartDelay = 1_000;
 
 const LLM_BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+
+function ensureLLM(): void {
+	if (initialized) {
+		return;
+	}
+	initialized = true;
+	isModelReady = LLM_MODE !== "cli";
+	if (LLM_MODE === "cli") {
+		spawnLlama();
+	}
+}
 
 // --- CLI backend ---
 
@@ -292,9 +304,34 @@ async function serverRequest(item: QueueItem): Promise<void> {
 	}
 }
 
+// --- Proxy backend (HTTP → llm-server.ts) ---
+
+async function proxyRequest(item: QueueItem): Promise<void> {
+	try {
+		const { askLLM: askLLMClient } = await import("./llm-client.js");
+		const text = await askLLMClient(item.userMessage, {
+			onFirstToken: () => {
+				if (!hasSentFirstToken) {
+					hasSentFirstToken = true;
+					currentItem?.onFirstToken?.();
+				}
+			},
+			onChunk: (chunk: string) => {
+				llmBus.emit("token", chunk);
+				currentItem?.onChunk?.(chunk);
+			},
+		});
+		llmBus.emit("done", text);
+	} catch (err) {
+		llmBus.emit("error", err as Error);
+		throw err;
+	}
+}
+
 // --- Queue processing ---
 
 function processQueue(): void {
+	ensureLLM();
 	if (isProcessing || queueHead >= requestQueue.length) {
 		return;
 	}
@@ -338,6 +375,11 @@ function processQueue(): void {
 			llmBus.off("done", doneHandler);
 			fail(err);
 		});
+	} else if (LLM_MODE === "proxy") {
+		void proxyRequest(item).catch((err) => {
+			llmBus.off("done", doneHandler);
+			fail(err);
+		});
 	} else {
 		cliRequest(item);
 	}
@@ -372,7 +414,11 @@ export async function resetLLM(): Promise<void> {
 	currentItem = null;
 	llmBus.emit("reset");
 
-	if (LLM_MODE === "server") {
+	if (LLM_MODE === "server" || LLM_MODE === "proxy") {
+		if (LLM_MODE === "proxy") {
+			const { resetLLM: resetLLMClient } = await import("./llm-client.js");
+			await resetLLMClient();
+		}
 		return;
 	}
 
@@ -398,8 +444,4 @@ export function shutdown(): void {
 	}
 	shutdownRequested = true;
 	llama?.kill();
-}
-
-if (LLM_MODE === "cli") {
-	spawnLlama();
 }
