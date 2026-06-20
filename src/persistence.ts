@@ -61,3 +61,15 @@ export function buildPending(
 	}
 	return out;
 }
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingState: PersistedState | null = null;
+
+export function scheduleSave(state: PersistedState): void {
+	pendingState = state;
+	if (saveTimer) { clearTimeout(saveTimer); }
+	saveTimer = setTimeout(() => {
+		if (pendingState) { persistState(pendingState); }
+		saveTimer = null;
+	}, 500);
+}

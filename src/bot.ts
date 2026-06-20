@@ -30,7 +30,7 @@ import { initTTS, sendTextAsVoiceMessage, shouldSendVoice, hasUnsafeTTSText } fr
 import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle } from "./config.js";
 import { getSleepBehavior } from "./sleep.js";
 import { applyTypo } from "./typo.js";
-import { buildPending, persistState, loadState } from "./persistence.js";
+import { buildPending, scheduleSave, loadState } from "./persistence.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "guildMessageReactions", "messageContent", "directMessages"],
@@ -43,6 +43,18 @@ function pendingKey(channelId: string, userId: string): string {
 	return `${channelId}:${userId}`;
 }
 
+function saveAllState(): void {
+	const t = dumpState();
+	scheduleSave({
+		pendingMessages: buildPending(pendingMessages),
+		paused: t.paused,
+		channelCooldowns: t.channelCooldowns,
+		botActivity: t.botActivity,
+		lastSpeaker: t.lastSpeaker,
+		responseCount: t.responseCount,
+	});
+}
+
 async function triggerLunaReply(
 	message: Eris.Message,
 	isDM = false,
@@ -52,6 +64,7 @@ async function triggerLunaReply(
 
 	if (processing.has(key)) {
 		pendingMessages.set(key, { message, reason: reason ?? "mention" });
+		saveAllState();
 		console.log(
 			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: mis en attente (déjà en cours)`
 		);
@@ -176,6 +189,7 @@ async function triggerLunaReply(
 		const queued = pendingMessages.get(key);
 		if (queued) {
 			pendingMessages.delete(key);
+			saveAllState();
 			console.log(
 				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente (${queued.reason})`
 			);
@@ -217,6 +231,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, message.author.id);
 		setPaused(true);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
@@ -226,6 +241,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			`[bot] #${channel.name ?? message.channel.id} ${author}: -start → reprise`
 		);
 		setPaused(false);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
@@ -237,6 +253,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		await resetLLM();
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, message.author.id);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
@@ -323,14 +340,17 @@ client.on("messageReactionAdd", async (message: Eris.Message, emoji: { name: str
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
 		setPaused(true);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 	} else if (cmd === "start") {
 		setPaused(false);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 	} else if (cmd === "clear") {
 		await resetLLM();
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
+		saveAllState();
 		try { await message.addReaction("✅"); } catch { /* ignore */ }
 	}
 });
@@ -354,18 +374,6 @@ export async function startBot(): Promise<void> {
 	}
 
 	client.connect();
-
-	setInterval(() => {
-		const t = dumpState();
-		persistState({
-			pendingMessages: buildPending(pendingMessages),
-			paused: t.paused,
-			channelCooldowns: t.channelCooldowns,
-			botActivity: t.botActivity,
-			lastSpeaker: t.lastSpeaker,
-			responseCount: t.responseCount,
-		});
-	}, 3000);
 
 	setInterval(() => {
 		if (Math.random() < spontaneousChance) {
