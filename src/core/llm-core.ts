@@ -1,5 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { LLAMA_CLI_PATH, llamaArgs } from "../config.js";
+import {
+	LLAMA_CLI_PATH,
+	LLM_HOST,
+	LLM_PORT,
+	LLM_MODE,
+	llamaArgs,
+} from "../config.js";
 import { llmBus } from "./llm-bus.js";
 
 export interface UserMessage {
@@ -18,19 +24,27 @@ interface QueueItem {
 const requestQueue: QueueItem[] = [];
 let queueHead = 0;
 let isProcessing = false;
-let isModelReady = false;
-let stdoutBuffer = "";
-let currentUsername = "";
 let currentItem: QueueItem | null = null;
 let hasSentFirstToken = false;
 
-let llama: ChildProcess;
+// --- CLI mode state ---
+let isModelReady = LLM_MODE === "server";
+let stdoutBuffer = "";
+let currentUsername = "";
+let llama: ChildProcess | undefined;
 let shutdownRequested = false;
 let restartCount = 0;
 const MAX_RESTARTS = 5;
 let restartDelay = 1_000;
 
+const LLM_BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+
+// --- CLI backend ---
+
 function spawnLlama(): void {
+	if (LLM_MODE !== "cli") {
+		return;
+	}
 	console.log(`[llm-core] spawn: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 	llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 
@@ -170,8 +184,121 @@ function handleStdout(data: Buffer): void {
 	}
 }
 
+function cliRequest(item: QueueItem): void {
+	currentUsername = item.userMessage.username;
+	stdoutBuffer = "";
+	llama!.stdin!.write(
+		`${item.userMessage.username}: ${item.userMessage.text}\n`
+	);
+}
+
+// --- Server backend ---
+
+const serverParams = (() => {
+	const args = llamaArgs;
+	// build param map from llamaArgs-like CLI flags
+	const map: Record<string, unknown> = {};
+	for (let i = 0; i < args.length; i++) {
+		const a = args[i];
+		if (a === "-m") {
+			map.model = args[++i];
+		} else if (a === "--temp") {
+			map.temperature = Number(args[++i]);
+		} else if (a === "--top-k") {
+			map.top_k = Number(args[++i]);
+		} else if (a === "--top-p") {
+			map.top_p = Number(args[++i]);
+		} else if (a === "--min-p") {
+			map.min_p = Number(args[++i]);
+		} else if (a === "--repeat-penalty") {
+			map.repeat_penalty = Number(args[++i]);
+		} else if (a === "--repeat-last-n") {
+			map.repeat_last_n = Number(args[++i]);
+		} else if (a === "--presence-penalty") {
+			map.presence_penalty = Number(args[++i]);
+		} else if (a === "-c") {
+			map.n_ctx = Number(args[++i]);
+		}
+	}
+	return map;
+})();
+
+async function serverRequest(item: QueueItem): Promise<void> {
+	try {
+		const response = await fetch(`${LLM_BASE}/completion`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				prompt: `${item.userMessage.username}: ${item.userMessage.text}`,
+				stream: true,
+				n_predict: 512,
+				...serverParams,
+			}),
+		});
+
+		if (!(response.ok && response.body)) {
+			throw new Error(`llama-server error: ${response.status}`);
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+		let fullText = "";
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) {
+				break;
+			}
+
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			buffer = lines.pop() ?? "";
+
+			for (const line of lines) {
+				if (!line.startsWith("data: ")) {
+					continue;
+				}
+				try {
+					const data = JSON.parse(line.slice(6)) as {
+						content?: string;
+						stop?: boolean;
+					};
+					const content = data.content ?? "";
+					if (content) {
+						if (!hasSentFirstToken) {
+							hasSentFirstToken = true;
+							currentItem?.onFirstToken?.();
+						}
+						fullText += content;
+						llmBus.emit("token", content);
+						currentItem?.onChunk?.(content);
+					}
+					if (data.stop) {
+						llmBus.emit("done", fullText);
+						return;
+					}
+				} catch {
+					// skip malformed SSE
+				}
+			}
+		}
+
+		// stream ended without stop signal
+		llmBus.emit("done", fullText);
+	} catch (err) {
+		llmBus.emit("error", err as Error);
+		throw err;
+	}
+}
+
+// --- Queue processing ---
+
 function processQueue(): void {
-	if (isProcessing || queueHead >= requestQueue.length || !isModelReady) {
+	if (isProcessing || queueHead >= requestQueue.length) {
+		return;
+	}
+	if (LLM_MODE === "cli" && !isModelReady) {
 		return;
 	}
 	isProcessing = true;
@@ -183,23 +310,40 @@ function processQueue(): void {
 		queueHead = 0;
 	}
 
-	const { userMessage, resolve } = item;
-	stdoutBuffer = "";
-	currentUsername = userMessage.username;
 	currentItem = item;
 	hasSentFirstToken = false;
 
-	const doneHandler = (text: string) => {
-		llmBus.off("done", doneHandler);
+	const finish = (text: string) => {
 		currentItem = null;
 		isProcessing = false;
-		resolve(text);
+		item.resolve(text);
 		setTimeout(() => processQueue(), 100);
+	};
+
+	const fail = (err: unknown) => {
+		currentItem = null;
+		isProcessing = false;
+		item.reject(err);
+		setTimeout(() => processQueue(), 100);
+	};
+
+	const doneHandler = (text: string) => {
+		llmBus.off("done", doneHandler);
+		finish(text);
 	};
 	llmBus.on("done", doneHandler);
 
-	llama.stdin!.write(`${userMessage.username}: ${userMessage.text}\n`);
+	if (LLM_MODE === "server") {
+		void serverRequest(item).catch((err) => {
+			llmBus.off("done", doneHandler);
+			fail(err);
+		});
+	} else {
+		cliRequest(item);
+	}
 }
+
+// --- Public API ---
 
 export function askLLM(
 	userMessage: UserMessage,
@@ -225,26 +369,37 @@ export async function resetLLM(): Promise<void> {
 	requestQueue.length = 0;
 	queueHead = 0;
 	isProcessing = false;
-	stdoutBuffer = "";
+	currentItem = null;
 	llmBus.emit("reset");
-	llama.stdin!.write("/clear\n");
+
+	if (LLM_MODE === "server") {
+		return;
+	}
+
+	stdoutBuffer = "";
+	llama!.stdin!.write("/clear\n");
 	await new Promise<void>((resolve) => {
 		const timeout = setTimeout(resolve, 5_000);
 		const listener = (data: Buffer) => {
 			const str = data.toString();
 			if (str.includes("\n> ") || str.endsWith("> ")) {
 				clearTimeout(timeout);
-				llama.stdout!.off("data", listener);
+				llama!.stdout!.off("data", listener);
 				resolve();
 			}
 		};
-		llama.stdout!.on("data", listener);
+		llama!.stdout!.on("data", listener);
 	});
 }
 
 export function shutdown(): void {
+	if (LLM_MODE !== "cli") {
+		return;
+	}
 	shutdownRequested = true;
 	llama?.kill();
 }
 
-spawnLlama();
+if (LLM_MODE === "cli") {
+	spawnLlama();
+}

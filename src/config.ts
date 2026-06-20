@@ -33,9 +33,17 @@ export const LLAMA_MODEL_PATH: string =
 	process.env.LLAMA_MODEL_PATH ??
 	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
 
+export const LLM_HOST: string =
+	v<string | null>("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";
+
 export const LLM_PORT: number =
 	v<number | null>("llm_port", null) ??
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
+
+export const LLM_MODE: "cli" | "server" =
+	(v<string | null>("llm_mode", null) as "cli" | "server" | null) ??
+	(process.env.LLM_MODE as "cli" | "server" | undefined) ??
+	"cli";
 
 // --- System prompt ---
 const DEFAULT_PROMPT = "Your name is Luna. You are playful 21 year old girl";
