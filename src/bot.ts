@@ -396,7 +396,7 @@ client.on(
 		if (userId === client.user.id) {
 			return;
 		}
-		if (message.author.id !== client.user.id) {
+		if (message.author?.id !== client.user.id) {
 			return;
 		}
 		if (!(message.channel instanceof Eris.TextChannel)) {

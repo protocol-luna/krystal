@@ -2183,7 +2183,7 @@ var init_bot = __esm({
         if (userId === client.user.id) {
           return;
         }
-        if (message.author.id !== client.user.id) {
+        if (message.author?.id !== client.user.id) {
           return;
         }
         if (!(message.channel instanceof Eris2.TextChannel)) {
