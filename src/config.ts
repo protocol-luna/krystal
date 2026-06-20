@@ -134,10 +134,10 @@ const rawSleep = v<Record<string, unknown>>("sleep_schedule", {
 	behavior: "sleep",
 });
 export const sleepSchedule: SleepSchedule = {
-	enabled: Boolean(rawSleep.enabled),
-	start: String(rawSleep.start ?? "23:00"),
-	end: String(rawSleep.end ?? "08:00"),
-	timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+	enabled: rawSleep.enabled === true,
+	start: (rawSleep.start as string) ?? "23:00",
+	end: (rawSleep.end as string) ?? "08:00",
+	timezone: (rawSleep.timezone as string) ?? "Europe/Paris",
 	behavior: (rawSleep.behavior as SleepSchedule["behavior"]) ?? "sleep",
 };
 

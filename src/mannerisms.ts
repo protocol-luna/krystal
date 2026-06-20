@@ -68,6 +68,8 @@ export function computeDelay(
 			min = 1500;
 			max = 5000;
 			break;
+		default:
+			break;
 	}
 	let delay = min + Math.random() * (max - min);
 	if (sleepBehavior === "slow") {
