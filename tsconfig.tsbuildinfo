@@ -1,1 +1,0 @@
-{"root":["./src/bot.ts","./src/config.ts","./src/guild.ts","./src/index.ts","./src/llm-client.ts","./src/llm-server.ts","./src/llm.ts","./src/mannerisms.ts","./src/spontaneous.ts","./src/trigger.ts","./src/tts.ts"],"version":"6.0.3"}
