@@ -225,6 +225,35 @@ flowchart LR
 | `follow-up` | 500ms | 2000ms | 0% | 3% |
 | `random` | 1500ms | 5000ms | 15% | 2% |
 
+### File d'attente anti-spam
+
+Quand le bot est déjà en train de répondre, les nouveaux messages ne sont pas perdus mais **mis en file d'attente** :
+
+```mermaid
+stateDiagram-v2
+    state "Message reçu\n(trigger match)" as msg
+    state "Clé processing[C:U] ?" as check
+    state "En cours" as busy
+    state "Disponible" as free
+    state "Stocké dans\npendingMessages[C:U]" as queue
+    state "Réponse LLM" as reply
+    state "Après réponse" as done
+    state "pendingMessages[C:U] ?" as drain
+
+    msg --> check
+    check --> busy : oui (déjà en cours)
+    check --> free : non
+    busy --> queue : mis en attente
+    queue --> [*]
+    free --> reply
+    reply --> done
+    done --> drain
+    drain --> reply : message en attente
+    drain --> [*] : rien en attente
+```
+
+Chaque clé est `"channelId:userId"` — un utilisateur ne peut avoir qu'un message en attente par salon. Quand la réponse en cours termine, le message en file est traité immédiatement.
+
 ### Plages de sommeil
 
 Le bot peut simuler une présence non-24/7. Pendant les heures configurées, son comportement change :
@@ -252,6 +281,24 @@ flowchart LR
 | `short` | Ignore chance augmenté de 30%, réactions quasi nulles. Le bot est "distrait". |
 
 Configurable via `sleep_schedule` dans `config.yml`.
+
+Exemple de timeline sur 24h :
+
+```mermaid
+gantt
+    title Plages de sommeil (exemple)
+    dateFormat HH:mm
+    axisFormat %H:%M
+    tickInterval 2hour
+
+    section Comportement
+    Éveillé        : active, 07:00, 3h
+    Court          : short, 10:00, 1h
+    Éveillé        : active2, 11:00, 5h
+    Lent           : slow, 16:00, 2h
+    Éveillé        : active3, 18:00, 4h
+    Sommeil        : sleep, 22:00, 9h
+```
 
 ### Messages spontanés
 
@@ -438,7 +485,7 @@ npm start
 
 - Activer **Message Content Intent** (onglet Bot)
 - Inviter avec scope `bot` + permissions `Send Messages`, `Read Message History`, `Add Reactions`
-- Gateway intents : `guilds`, `guildMessages`, `messageContent`, `directMessages`
+- Gateway intents : `guilds`, `guildMessages`, `guildMessageReactions`, `messageContent`, `directMessages`
 
 ---
 
@@ -529,6 +576,10 @@ sequenceDiagram
                         bot.ts->>Discord: createMessage("mot_corrigé*")
                     end
                 end
+                alt erreur LLM
+                    bot.ts-->>bot.ts: console.error(err)
+                    bot.ts->>Discord: addReaction("❌")
+                end
                 bot.ts->>trigger.ts: trackSpeaker(bot)
                 bot.ts->>bot.ts: pendingMessages["C:U"] ?
                 alt message en attente
@@ -545,6 +596,33 @@ sequenceDiagram
             bot.ts->>Discord: (delay, réaction, réponse...)
         else
             bot.ts->>trigger.ts: trackSpeaker(user)
+    end
+end
+```
+
+### Flux commandes par réactions
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Discord
+    participant bot.ts
+
+    User->>Discord: réagit avec ❌ / ▶️ / 🗑️
+    Discord->>bot.ts: messageReactionAdd
+    alt message du bot
+        bot.ts->>bot.ts: mapper emoji → commande
+        alt ❌ → stop
+            bot.ts->>bot.ts: resetLLM() + clearCooldown() + setPaused(true)
+            bot.ts->>Discord: addReaction("✅")
+        else ▶️ → start
+            bot.ts->>bot.ts: setPaused(false)
+            bot.ts->>Discord: addReaction("✅")
+        else 🗑️ → clear
+            bot.ts->>bot.ts: resetLLM() + clearCooldown()
+            bot.ts->>Discord: addReaction("✅")
         end
+    else message d'un autre
+        bot.ts-->>bot.ts: ignoré
     end
 ```
