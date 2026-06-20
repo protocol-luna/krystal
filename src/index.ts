@@ -1,3 +1,3 @@
-import { startBot } from "./bot.js";
+export {};
 
-void startBot();
+await import("./cli.js");

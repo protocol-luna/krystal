@@ -11,9 +11,20 @@ export {
 	clearCooldown,
 	dumpState,
 	restoreState,
-} from "./state/state.js";
+	MAX_FOLLOWUPS,
+	FOLLOWUP_WINDOW,
+} from "./state.js";
 
 export {
 	evaluateMessage,
 	type TriggerResult,
-} from "./state/trigger.js";
+} from "./trigger.js";
+
+export {
+	type PendingEntry,
+	type PersistedState,
+	loadState,
+	persistState,
+	buildPending,
+	scheduleSave,
+} from "./persistence.js";
