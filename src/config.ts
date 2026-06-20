@@ -178,6 +178,14 @@ export interface SleepSchedule {
 	behavior: "sleep" | "slow" | "short";
 }
 
+export type SelfStatus = "online" | "idle" | "dnd" | "invisible";
+
+export interface DynamicStatusPreset {
+	status: SelfStatus;
+	text: string;
+	type: number;
+}
+
 export interface ReplyStyle {
 	messageReference: boolean;
 	mentionRepliedUser: boolean;
@@ -382,6 +390,22 @@ export const config = {
 			timezone: (raw.timezone as string) ?? "Europe/Paris",
 			behavior: (raw.behavior as SleepSchedule["behavior"]) ?? "sleep",
 		};
+	},
+	get dynamicStatus(): DynamicStatusPreset[] {
+		const raw = v<{ status: string; text: string; type: number }[]>(
+			"dynamic_status_presets",
+			[]
+		);
+		return raw.map((p) => ({
+			status: (["online", "idle", "dnd", "invisible"].includes(p.status)
+				? p.status
+				: "online") as SelfStatus,
+			text: p.text,
+			type: p.type ?? 0,
+		}));
+	},
+	get dynamicStatusIntervalMinutes(): number {
+		return v<number>("dynamic_status_interval_minutes", 15);
 	},
 	get replyStyles(): { style: ReplyStyle; weight: number }[] {
 		const raw = v<ReplyStyleEntry[]>("reply_styles", [

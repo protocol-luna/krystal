@@ -314,10 +314,45 @@ function logAndReact(
 	}, delay);
 }
 
+let statusIndex = 0;
+let statusInterval: ReturnType<typeof setInterval> | null = null;
+
+function startDynamicStatus(): void {
+	if (statusInterval) {
+		clearInterval(statusInterval);
+	}
+
+	const update = () => {
+		const presets = config.dynamicStatus;
+		if (presets.length === 0) {
+			return;
+		}
+		const sleep = getSleepBehavior();
+		if (sleep === "sleep") {
+			client.editStatus("invisible");
+			return;
+		}
+		const preset = presets[statusIndex % presets.length];
+		client.editStatus(preset.status, [
+			{ name: preset.text, type: preset.type as 0 | 1 | 2 | 3 | 4 | 5 },
+		]);
+		statusIndex++;
+	};
+
+	update();
+	statusInterval = setInterval(
+		update,
+		config.dynamicStatusIntervalMinutes * 60000
+	);
+}
+
 client.on("ready", () => {
 	console.log(
 		`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`
 	);
+	if (config.dynamicStatus.length > 0) {
+		startDynamicStatus();
+	}
 });
 
 client.on("error", (err: Error) => {

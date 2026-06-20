@@ -166,6 +166,26 @@ hesitation_words:
 forget_chance: 0.03
 # Probabilité faible que le bot ignore un message même après trigger.
 
+# --- Dynamic status (statut Discord rotatif) ---
+dynamic_status_interval_minutes: 15
+# Intervalle de rotation entre les status (en minutes).
+dynamic_status_presets:
+  - status: "online"
+    text: "with cats"
+    type: 0
+  - status: "online"
+    text: "drawing"
+    type: 0
+  - status: "idle"
+    text: "anime"
+    type: 3
+  - status: "online"
+    text: "lofi hip hop"
+    type: 2
+# Le bot alterne entre ces presets, et passe en "invisible" pendant le sommeil.
+# type: 0=Playing, 1=Streaming, 2=Listening, 3=Watching, 4=Custom, 5=Competing
+# Laissez le tableau vide [] pour désactiver.
+
 # --- Sleep schedule (plages de sommeil / présence variable) ---
 sleep_schedule:
   enabled: false

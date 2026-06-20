@@ -19,8 +19,8 @@
 [[Les paramètres de contextes pourrait être sympas si on utilisait la version server de llama.cpp, hors ici on hi-jack la version client. C'est une constraint qui pousse à garder le contexte sans tout analyser à chaque fois, et llama-cli répond plus rapidement que llama-server, surout sans GPU. A creuser]]
 
 ## Présence et disponibilité
-- [!] Statut Discord dynamique (en ligne, occupé, "regarde un film...") [j'aime l'idée, les status devront etre en anglais mais j'aime l'idée]
-- [!] Périodes "hors ligne" ou "occupée" en dehors du sommeil (ne répond pas pendant X minutes) [L'idée est bonne mais elle ne devrait pas rentrer en conflit avec la précédente]
+- [x] Statut Discord dynamique (en ligne, occupé, "regarde un film...") [Implémenté : dynamic_status_presets rotatif]
+- ~~[!] Périodes "hors ligne" ou "occupée" en dehors du sommeil (ne répond pas pendant X minutes) [Barré — déjà couvert par sleep + shouldIgnore + forgetChance]~~
 - [x] Temps de réponse plus long si inactif depuis longtemps (simule le "réveil") [Implémenté : inactivityMs dans computeDelay]
 - ~~[?] Interruptible : si on lui parle pendant qu'elle répond, elle peut s'arrêter ou changer de sujet [Déprécié — l'anti-spam gère déjà ce cas]~~
 
