@@ -414,9 +414,7 @@ function findMostActiveChannel(guild) {
 
 // src/spontaneous.ts
 function pickWeightedGuild(client2) {
-  const whitelist = spontaneousWhitelist === "*"
-    ? null
-    : new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
+  const whitelist = spontaneousWhitelist === "*" ? null : new Set(spontaneousWhitelist.split(",").map((id) => id.trim()));
   const guilds = [...client2.guilds.values()].filter((g) => {
     if (whitelist && !whitelist.has(g.id)) {
       return false;
