@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { LLAMA_CLI_PATH, llamaArgs } from "./config.js";
+import { LLAMA_CLI_PATH, LLM_PORT, llamaArgs } from "./config.js";
 
 interface UserMessage {
 	username: string;
@@ -19,7 +19,7 @@ interface QueueItem {
 	reject: (reason: unknown) => void;
 }
 
-const PORT = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
+const PORT = LLM_PORT;
 
 console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 const llama = spawn(LLAMA_CLI_PATH, llamaArgs);

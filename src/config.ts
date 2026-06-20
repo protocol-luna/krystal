@@ -46,7 +46,7 @@ export const LLAMA_MODEL_PATH: string =
 	process.env.LLAMA_MODEL_PATH ??
 	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
 
-export const PORT: string = process.env.PORT ?? "3124";
+export const LLM_PORT: number = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
 export const jinjaTemplate =
 	"{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";

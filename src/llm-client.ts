@@ -8,7 +8,8 @@ interface LLMCallbacks {
 	onChunk: (chunk: string) => void;
 }
 
-const LLM_PORT = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
+import { LLM_PORT } from "./config.js";
+
 const BASE = `http://localhost:${LLM_PORT}`;
 
 export async function askLLM(
