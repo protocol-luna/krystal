@@ -1,4 +1,4 @@
-import { describe, it, expect, } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
 describe("shouldSendVoice", () => {
@@ -26,7 +26,9 @@ describe("shouldSendVoice", () => {
 		let sends = 0;
 		const trials = 200;
 		for (let i = 0; i < trials; i++) {
-			if (shouldSendVoice()) { sends++; }
+			if (shouldSendVoice()) {
+				sends++;
+			}
 		}
 		expect(sends).toBeGreaterThan(0);
 	});

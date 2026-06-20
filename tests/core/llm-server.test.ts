@@ -10,16 +10,25 @@ function mockRes() {
 	let body = "";
 	const writes: string[] = [];
 	let resolveEnd: () => void;
-	const onEnd = new Promise<void>((r) => { resolveEnd = r; });
+	const onEnd = new Promise<void>((r) => {
+		resolveEnd = r;
+	});
 	return {
 		promises: { onEnd },
 		status: () => status,
 		body: () => body,
 		writes: () => writes,
 		res: {
-			writeHead: (s: number, _h?: any) => { status = s; },
-			write: (d: string) => { writes.push(d); },
-			end: (d?: string) => { if (d !== undefined) body = d; resolveEnd!(); },
+			writeHead: (s: number, _h?: any) => {
+				status = s;
+			},
+			write: (d: string) => {
+				writes.push(d);
+			},
+			end: (d?: string) => {
+				if (d !== undefined) body = d;
+				resolveEnd!();
+			},
 		},
 	};
 }
@@ -30,7 +39,11 @@ describe("llm-server", () => {
 		mock.module("node:http", () => ({
 			createServer: (handler: any) => {
 				capturedHandler = handler;
-				return { listen: (_port: number, cb?: () => void) => { cb?.(); } };
+				return {
+					listen: (_port: number, cb?: () => void) => {
+						cb?.();
+					},
+				};
 			},
 		}));
 	});
@@ -91,12 +104,16 @@ describe("llm-server", () => {
 		const encoder = new TextEncoder();
 		globalThis.fetch = async (url: string) => {
 			if (url.includes("/ask")) {
-				const body = [
-					JSON.stringify({ type: "chunk", data: "Hi" }),
-					JSON.stringify({ type: "done", data: "Hi" }),
-				].join("\n") + "\n";
+				const body =
+					[
+						JSON.stringify({ type: "chunk", data: "Hi" }),
+						JSON.stringify({ type: "done", data: "Hi" }),
+					].join("\n") + "\n";
 				const stream = new ReadableStream({
-					start(ctrl) { ctrl.enqueue(encoder.encode(body)); ctrl.close(); },
+					start(ctrl) {
+						ctrl.enqueue(encoder.encode(body));
+						ctrl.close();
+					},
 				});
 				return new Response(stream, { status: 200 });
 			}
@@ -109,7 +126,10 @@ describe("llm-server", () => {
 		req.method = "POST";
 		req.headers = { host: "localhost:3124" };
 		capturedHandler!(req, m.res);
-		req.emit("data", Buffer.from(JSON.stringify({ username: "test", text: "hi" })));
+		req.emit(
+			"data",
+			Buffer.from(JSON.stringify({ username: "test", text: "hi" }))
+		);
 		req.emit("end");
 		await m.promises.onEnd;
 		expect(m.status()).toBe(200);

@@ -11,7 +11,9 @@ describe("initTTS", () => {
 	it("handles PiperTTS.create failure gracefully", async () => {
 		mock.module("pipertts", () => ({
 			PiperTTS: {
-				create: async () => { throw new Error("init failed"); },
+				create: async () => {
+					throw new Error("init failed");
+				},
 			},
 		}));
 		const { initTTS, isTTSReady } = await import("../../src/tts/piper.js");

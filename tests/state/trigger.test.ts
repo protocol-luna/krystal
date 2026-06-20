@@ -116,7 +116,11 @@ describe("evaluateMessage", () => {
 		const { evaluateMessage } = await import("../../src/state/trigger.js");
 		const msg = makeMsg({
 			content: "hey Luna",
-			channel: { id: "c1", type: 0, guild: { members: new Map([["b1", { nick: "Luna" }]]) } },
+			channel: {
+				id: "c1",
+				type: 0,
+				guild: { members: new Map([["b1", { nick: "Luna" }]]) },
+			},
 		});
 		const r = evaluateMessage(msg as any, "b1", "Luna", false);
 		expect(r.shouldRespond).toBeTrue();

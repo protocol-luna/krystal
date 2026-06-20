@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, } from "bun:test";
+import {
+	describe,
+	it,
+	expect,
+	beforeAll,
+	afterAll,
+	beforeEach,
+} from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
 const originalDateNow = Date.now;
@@ -31,7 +38,7 @@ describe("isPaused / setPaused", () => {
 
 describe("markReplied / isOnCooldown", () => {
 	beforeAll(() => {
-		mockConfig();
+		mockConfig({ cooldownSeconds: 8 });
 		Date.now = () => fakeNow;
 	});
 	afterAll(() => {
@@ -201,7 +208,7 @@ describe("canFollowUp / isInConversation", () => {
 });
 
 describe("clearCooldown", () => {
-	beforeAll(() => mockConfig());
+	beforeAll(() => mockConfig({ cooldownSeconds: 8 }));
 
 	it("clears all channel state", async () => {
 		const mod = await import("../../src/state/state.js");
@@ -270,7 +277,7 @@ describe("startPruning", () => {
 		mod.markReplied("c1");
 		fakeNow += 3_600_000 + 1;
 		mod.startPruning();
-		await new Promise(r => setTimeout(r, 50));
+		await new Promise((r) => setTimeout(r, 50));
 		expect(mod.isOnCooldown("c1")).toBeFalse();
 	});
 });

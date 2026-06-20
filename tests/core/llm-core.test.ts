@@ -7,10 +7,11 @@ function mockFetchOK() {
 	globalThis.fetch = async (url: string) => {
 		if (url.includes("/reset")) return new Response(null, { status: 200 });
 		if (url.includes("/ask")) {
-			const body = [
-				JSON.stringify({ type: "chunk", data: "Hello" }),
-				JSON.stringify({ type: "done", data: "Hello" }),
-			].join("\n") + "\n";
+			const body =
+				[
+					JSON.stringify({ type: "chunk", data: "Hello" }),
+					JSON.stringify({ type: "done", data: "Hello" }),
+				].join("\n") + "\n";
 			const stream = new ReadableStream({
 				start(controller) {
 					controller.enqueue(encoder.encode(body));
@@ -52,10 +53,17 @@ describe("askLLM", () => {
 		const mod = await import("../../src/core/llm-core.js");
 		let firstToken = false;
 		const chunks: string[] = [];
-		const text = await mod.askLLM({ username: "test", text: "hi" }, {
-			onFirstToken: () => { firstToken = true; },
-			onChunk: (c: string) => { chunks.push(c); },
-		});
+		const text = await mod.askLLM(
+			{ username: "test", text: "hi" },
+			{
+				onFirstToken: () => {
+					firstToken = true;
+				},
+				onChunk: (c: string) => {
+					chunks.push(c);
+				},
+			}
+		);
 		expect(firstToken).toBeFalse(); // proxy mode uses llm-client which calls onChunk then onDone
 		expect(chunks).toEqual(["Hello"]);
 		expect(text).toBe("Hello");

@@ -1,9 +1,21 @@
-import { describe, it, expect, beforeAll, } from "bun:test";
+import { describe, it, expect, beforeAll } from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
 describe("computeDelay", () => {
 	beforeAll(() => {
-		mockConfig();
+		mockConfig({
+			concentration: {
+				mention: { delay_min: 300, delay_max: 1500, ignore_chance: 0, reaction_chance: 0.08 },
+				dm: { delay_min: 400, delay_max: 1800, ignore_chance: 0, reaction_chance: 0.05 },
+				name: { delay_min: 800, delay_max: 4000, ignore_chance: 0.05, reaction_chance: 0.06 },
+				keyword: { delay_min: 1000, delay_max: 3500, ignore_chance: 0.08, reaction_chance: 0.04 },
+				"follow-up": { delay_min: 500, delay_max: 2000, ignore_chance: 0, reaction_chance: 0.03 },
+				random: { delay_min: 1500, delay_max: 5000, ignore_chance: 0.15, reaction_chance: 0.02 },
+				default: { delay_min: 800, delay_max: 4000, ignore_chance: 0.08, reaction_chance: 0.06 },
+			},
+			inactivityWarmupMinutes: 10,
+			inactivityWarmupMultiplier: 2,
+		});
 	});
 
 	it("returns delay within reason range", async () => {
@@ -30,7 +42,9 @@ describe("computeDelay", () => {
 	it("multiplies delay with slow sleep", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
 		const normals = Array.from({ length: 50 }, () => computeDelay("mention"));
-		const slows = Array.from({ length: 50 }, () => computeDelay("mention", "slow"));
+		const slows = Array.from({ length: 50 }, () =>
+			computeDelay("mention", "slow")
+		);
 		const avgNormal = normals.reduce((a, b) => a + b, 0) / normals.length;
 		const avgSlow = slows.reduce((a, b) => a + b, 0) / slows.length;
 		expect(avgSlow).toBeGreaterThan(avgNormal * 2);
@@ -46,8 +60,12 @@ describe("computeDelay", () => {
 	it("caps reading factor at 3x for very long messages", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
 		// long and short both use random base delay; use averages for stability
-		const shorts = Array.from({ length: 30 }, () => computeDelay("mention", null, 10));
-		const longs = Array.from({ length: 30 }, () => computeDelay("mention", null, 5000));
+		const shorts = Array.from({ length: 30 }, () =>
+			computeDelay("mention", null, 10)
+		);
+		const longs = Array.from({ length: 30 }, () =>
+			computeDelay("mention", null, 5000)
+		);
 		const avgShort = shorts.reduce((a, b) => a + b, 0) / shorts.length;
 		const avgLong = longs.reduce((a, b) => a + b, 0) / longs.length;
 		// reading factor for 5000 is capped at 3x, for 10 it's ~0.02x (reduces delay)
@@ -57,8 +75,12 @@ describe("computeDelay", () => {
 	it("caps inactivity ratio at 5x", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
 		// 30min vs 500min — both exceed warmup threshold; ratio capped at 5x
-		const milds = Array.from({ length: 30 }, () => computeDelay("mention", null, undefined, 600_000 * 3));
-		const extremes = Array.from({ length: 30 }, () => computeDelay("mention", null, undefined, 600_000 * 50));
+		const milds = Array.from({ length: 30 }, () =>
+			computeDelay("mention", null, undefined, 600_000 * 3)
+		);
+		const extremes = Array.from({ length: 30 }, () =>
+			computeDelay("mention", null, undefined, 600_000 * 50)
+		);
 		const avgMild = milds.reduce((a, b) => a + b, 0) / milds.length;
 		const avgExtreme = extremes.reduce((a, b) => a + b, 0) / extremes.length;
 		expect(avgExtreme).toBeGreaterThan(avgMild);
@@ -85,7 +107,9 @@ describe("shouldIgnore", () => {
 		const { shouldIgnore } = await import("../../src/behavior/mannerisms.js");
 		let ignored = 0;
 		for (let i = 0; i < 1000; i++) {
-			if (shouldIgnore("keyword")) { ignored++; }
+			if (shouldIgnore("keyword")) {
+				ignored++;
+			}
 		}
 		expect(ignored).toBeGreaterThan(0);
 		expect(ignored).toBeLessThan(200);
@@ -112,7 +136,9 @@ describe("shouldReact", () => {
 		const { shouldReact } = await import("../../src/behavior/mannerisms.js");
 		let reacted = 0;
 		for (let i = 0; i < 1000; i++) {
-			if (shouldReact("mention")) { reacted++; }
+			if (shouldReact("mention")) {
+				reacted++;
+			}
 		}
 		expect(reacted).toBeGreaterThan(0);
 		expect(reacted).toBeLessThan(200);
@@ -122,7 +148,9 @@ describe("shouldReact", () => {
 		const { shouldReact } = await import("../../src/behavior/mannerisms.js");
 		let reacted = 0;
 		for (let i = 0; i < 1000; i++) {
-			if (shouldReact("mention", "slow")) { reacted++; }
+			if (shouldReact("mention", "slow")) {
+				reacted++;
+			}
 		}
 		expect(reacted).toBeLessThan(60);
 	});
@@ -130,8 +158,18 @@ describe("shouldReact", () => {
 	it("returns false for 0% chance reason", async () => {
 		mockConfig({
 			concentration: {
-				mention: { delay_min: 300, delay_max: 1500, ignore_chance: 0, reaction_chance: 0 },
-				default: { delay_min: 800, delay_max: 4000, ignore_chance: 0, reaction_chance: 0 },
+				mention: {
+					delay_min: 300,
+					delay_max: 1500,
+					ignore_chance: 0,
+					reaction_chance: 0,
+				},
+				default: {
+					delay_min: 800,
+					delay_max: 4000,
+					ignore_chance: 0,
+					reaction_chance: 0,
+				},
 			},
 			reactions: [],
 			serverEmojiChance: 0,

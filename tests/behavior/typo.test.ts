@@ -49,7 +49,8 @@ describe("applyTypo", () => {
 		expect(result).not.toBeNull();
 		const diffIdx = result!.charIndex;
 		const origIsUpper = "Bonjour"[diffIdx] === "Bonjour"[diffIdx].toUpperCase();
-		const newIsUpper = result!.text[diffIdx] === result!.text[diffIdx].toUpperCase();
+		const newIsUpper =
+			result!.text[diffIdx] === result!.text[diffIdx].toUpperCase();
 		expect(origIsUpper).toBe(newIsUpper);
 	});
 
@@ -76,7 +77,9 @@ describe("applyTypo", () => {
 		expect(result).not.toBeNull();
 		let diffs = 0;
 		for (let i = 0; i < result!.text.length; i++) {
-			if (result!.text[i] !== result!.original[i]) { diffs++; }
+			if (result!.text[i] !== result!.original[i]) {
+				diffs++;
+			}
 		}
 		expect(diffs).toBe(1);
 	});

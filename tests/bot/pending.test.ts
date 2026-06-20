@@ -3,7 +3,15 @@ import { describe, it, expect, beforeAll, beforeEach, mock } from "bun:test";
 function mockDeps() {
 	mock.module("../../src/state/persistence.js", () => ({
 		buildPending: (_m: Map<string, unknown>) => {
-			return [{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention", timestamp: Date.now() }];
+			return [
+				{
+					channelId: "c1",
+					messageId: "m1",
+					userId: "u1",
+					reason: "mention",
+					timestamp: Date.now(),
+				},
+			];
 		},
 		scheduleSave: () => {},
 	}));
@@ -63,14 +71,24 @@ describe("pendingMessages", () => {
 
 	it("queuePending adds pending message", async () => {
 		const mod = await import("../../src/bot/pending.js");
-		const msg = { id: "m1", content: "hello", channel: { id: "c1" }, author: { id: "u1" } };
+		const msg = {
+			id: "m1",
+			content: "hello",
+			channel: { id: "c1" },
+			author: { id: "u1" },
+		};
 		mod.queuePending("c1:u1", msg as any, "mention");
 		expect(mod.hasPending("c1:u1")).toBeTrue();
 	});
 
 	it("drainPending returns queued message", async () => {
 		const mod = await import("../../src/bot/pending.js");
-		const msg = { id: "m1", content: "hello", channel: { id: "c1" }, author: { id: "u1" } };
+		const msg = {
+			id: "m1",
+			content: "hello",
+			channel: { id: "c1" },
+			author: { id: "u1" },
+		};
 		mod.queuePending("c1:u1", msg as any, "mention");
 		const drained = mod.drainPending("c1:u1");
 		expect(drained).not.toBeNull();
@@ -80,7 +98,12 @@ describe("pendingMessages", () => {
 
 	it("drainPending removes from map", async () => {
 		const mod = await import("../../src/bot/pending.js");
-		const msg = { id: "m1", content: "hello", channel: { id: "c1" }, author: { id: "u1" } };
+		const msg = {
+			id: "m1",
+			content: "hello",
+			channel: { id: "c1" },
+			author: { id: "u1" },
+		};
 		mod.queuePending("c1:u1", msg as any, "mention");
 		mod.drainPending("c1:u1");
 		expect(mod.hasPending("c1:u1")).toBeFalse();
@@ -99,9 +122,13 @@ describe("saveAllState", () => {
 		let saved: unknown = null;
 		mock.module("../../src/state/persistence.js", () => ({
 			buildPending: () => [],
-			scheduleSave: (s: unknown) => { saved = s; },
+			scheduleSave: (s: unknown) => {
+				saved = s;
+			},
 		}));
-		const { saveAllState, pendingMessages } = await import("../../src/bot/pending.js");
+		const { saveAllState, pendingMessages } = await import(
+			"../../src/bot/pending.js"
+		);
 		pendingMessages.clear();
 		saveAllState();
 		expect(saved).not.toBeNull();
@@ -121,7 +148,10 @@ describe("restorePending", () => {
 			getChannel: () => null,
 			getMessage: async () => ({ id: "m1" }),
 		};
-		await mod.restorePending([{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention" }], client as any);
+		await mod.restorePending(
+			[{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention" }],
+			client as any
+		);
 		expect(mod.hasPending("c1:u1")).toBeFalse();
 	});
 
@@ -134,7 +164,10 @@ describe("restorePending", () => {
 			getChannel: () => null,
 			getMessage: async () => ({ id: "m1" }),
 		};
-		await mod.restorePending([{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention" }], client as any);
+		await mod.restorePending(
+			[{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention" }],
+			client as any
+		);
 		expect(mod.hasPending("c1:u1")).toBeFalse();
 	});
 });

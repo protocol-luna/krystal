@@ -9,7 +9,9 @@ describe("loadState", () => {
 
 	it("returns default state when file does not exist", async () => {
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => { throw new Error("ENOENT"); },
+			readFile: async () => {
+				throw new Error("ENOENT");
+			},
 			writeFile: async () => {},
 		}));
 		const { loadState } = await import("../../src/state/persistence.js");
@@ -20,7 +22,15 @@ describe("loadState", () => {
 
 	it("loads paused state from file", async () => {
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => JSON.stringify({ paused: true, pendingMessages: [], channelCooldowns: [], botActivity: [], lastSpeaker: [], responseCount: [] }),
+			readFile: async () =>
+				JSON.stringify({
+					paused: true,
+					pendingMessages: [],
+					channelCooldowns: [],
+					botActivity: [],
+					lastSpeaker: [],
+					responseCount: [],
+				}),
 			writeFile: async () => {},
 		}));
 		const { loadState } = await import("../../src/state/persistence.js");
@@ -59,11 +69,22 @@ describe("persistState", () => {
 	it("writes state to file", async () => {
 		let written = "";
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => { throw new Error("ENOENT"); },
-			writeFile: async (_path: string, data: string) => { written = data; },
+			readFile: async () => {
+				throw new Error("ENOENT");
+			},
+			writeFile: async (_path: string, data: string) => {
+				written = data;
+			},
 		}));
 		const { persistState } = await import("../../src/state/persistence.js");
-		await persistState({ paused: true, pendingMessages: [], channelCooldowns: [], botActivity: [], lastSpeaker: [], responseCount: [] });
+		await persistState({
+			paused: true,
+			pendingMessages: [],
+			channelCooldowns: [],
+			botActivity: [],
+			lastSpeaker: [],
+			responseCount: [],
+		});
 		const parsed = JSON.parse(written);
 		expect(parsed.paused).toBeTrue();
 	});
@@ -71,11 +92,30 @@ describe("persistState", () => {
 	it("serializes pending messages", async () => {
 		let written = "";
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => { throw new Error("ENOENT"); },
-			writeFile: async (_path: string, data: string) => { written = data; },
+			readFile: async () => {
+				throw new Error("ENOENT");
+			},
+			writeFile: async (_path: string, data: string) => {
+				written = data;
+			},
 		}));
 		const { persistState } = await import("../../src/state/persistence.js");
-		await persistState({ paused: false, pendingMessages: [{ channelId: "c1", messageId: "m1", userId: "u1", reason: "mention", timestamp: 1000 }], channelCooldowns: [], botActivity: [], lastSpeaker: [], responseCount: [] });
+		await persistState({
+			paused: false,
+			pendingMessages: [
+				{
+					channelId: "c1",
+					messageId: "m1",
+					userId: "u1",
+					reason: "mention",
+					timestamp: 1000,
+				},
+			],
+			channelCooldowns: [],
+			botActivity: [],
+			lastSpeaker: [],
+			responseCount: [],
+		});
 		const parsed = JSON.parse(written);
 		expect(parsed.pendingMessages).toHaveLength(1);
 		expect(parsed.pendingMessages[0].channelId).toBe("c1");
@@ -92,7 +132,13 @@ describe("buildPending", () => {
 	it("converts Map to array", async () => {
 		const { buildPending } = await import("../../src/state/persistence.js");
 		const map = new Map([
-			["k1", { message: { id: "m1", channel: { id: "c1" }, author: { id: "u1" } }, reason: "mention" }],
+			[
+				"k1",
+				{
+					message: { id: "m1", channel: { id: "c1" }, author: { id: "u1" } },
+					reason: "mention",
+				},
+			],
 		]);
 		const result = buildPending(map as any);
 		expect(result).toHaveLength(1);
@@ -119,16 +165,27 @@ describe("scheduleSave", () => {
 	it("debounces writes within 500ms", async () => {
 		let writeCount = 0;
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => { throw new Error("ENOENT"); },
-			writeFile: async () => { writeCount++; },
+			readFile: async () => {
+				throw new Error("ENOENT");
+			},
+			writeFile: async () => {
+				writeCount++;
+			},
 		}));
 		const { scheduleSave } = await import("../../src/state/persistence.js");
-		const state = { paused: false, pendingMessages: [], channelCooldowns: [], botActivity: [], lastSpeaker: [], responseCount: [] };
+		const state = {
+			paused: false,
+			pendingMessages: [],
+			channelCooldowns: [],
+			botActivity: [],
+			lastSpeaker: [],
+			responseCount: [],
+		};
 		scheduleSave(state);
 		scheduleSave(state);
 		scheduleSave(state);
 		expect(writeCount).toBe(0); // not yet flushed
-		await new Promise(r => setTimeout(r, 600));
+		await new Promise((r) => setTimeout(r, 600));
 		expect(writeCount).toBe(1); // only one write after debounce
 	});
 });

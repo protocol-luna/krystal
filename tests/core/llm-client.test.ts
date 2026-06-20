@@ -8,7 +8,9 @@ describe("askLLM", () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async () => new Response(null, { status: 500 });
 		const { askLLM } = await import("../../src/core/llm-client.js");
-		await expect(askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })).rejects.toThrow("LLM server error");
+		await expect(
+			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
+		).rejects.toThrow("LLM server error");
 		globalThis.fetch = originalFetch;
 	});
 
@@ -17,10 +19,24 @@ describe("askLLM", () => {
 		const encoder = new TextEncoder();
 		const stream = new ReadableStream({
 			start(controller) {
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "firstToken" }) + "\n"));
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "chunk", data: "Hello" }) + "\n"));
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "chunk", data: " world" }) + "\n"));
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "done", data: "Hello world" }) + "\n"));
+				controller.enqueue(
+					encoder.encode(JSON.stringify({ type: "firstToken" }) + "\n")
+				);
+				controller.enqueue(
+					encoder.encode(
+						JSON.stringify({ type: "chunk", data: "Hello" }) + "\n"
+					)
+				);
+				controller.enqueue(
+					encoder.encode(
+						JSON.stringify({ type: "chunk", data: " world" }) + "\n"
+					)
+				);
+				controller.enqueue(
+					encoder.encode(
+						JSON.stringify({ type: "done", data: "Hello world" }) + "\n"
+					)
+				);
 				controller.close();
 			},
 		});
@@ -28,10 +44,17 @@ describe("askLLM", () => {
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		let firstToken = false;
 		const chunks: string[] = [];
-		const result = await askLLM({ username: "test", text: "hi" }, {
-			onFirstToken: () => { firstToken = true; },
-			onChunk: (c) => { chunks.push(c); },
-		});
+		const result = await askLLM(
+			{ username: "test", text: "hi" },
+			{
+				onFirstToken: () => {
+					firstToken = true;
+				},
+				onChunk: (c) => {
+					chunks.push(c);
+				},
+			}
+		);
 		expect(firstToken).toBeTrue();
 		expect(chunks).toEqual(["Hello", " world"]);
 		expect(result).toBe("Hello world");
@@ -43,13 +66,19 @@ describe("askLLM", () => {
 		const encoder = new TextEncoder();
 		const stream = new ReadableStream({
 			start(controller) {
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "error", data: "model overloaded" }) + "\n"));
+				controller.enqueue(
+					encoder.encode(
+						JSON.stringify({ type: "error", data: "model overloaded" }) + "\n"
+					)
+				);
 				controller.close();
 			},
 		});
 		globalThis.fetch = async () => new Response(stream, { status: 200 });
 		const { askLLM } = await import("../../src/core/llm-client.js");
-		await expect(askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })).rejects.toThrow("model overloaded");
+		await expect(
+			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
+		).rejects.toThrow("model overloaded");
 		globalThis.fetch = originalFetch;
 	});
 
@@ -59,13 +88,18 @@ describe("askLLM", () => {
 		const stream = new ReadableStream({
 			start(controller) {
 				controller.enqueue(encoder.encode("not json\n"));
-				controller.enqueue(encoder.encode(JSON.stringify({ type: "done", data: "" }) + "\n"));
+				controller.enqueue(
+					encoder.encode(JSON.stringify({ type: "done", data: "" }) + "\n")
+				);
 				controller.close();
 			},
 		});
 		globalThis.fetch = async () => new Response(stream, { status: 200 });
 		const { askLLM } = await import("../../src/core/llm-client.js");
-		const result = await askLLM({ username: "test", text: "hi" }, { onChunk: () => {} });
+		const result = await askLLM(
+			{ username: "test", text: "hi" },
+			{ onChunk: () => {} }
+		);
 		expect(result).toBe("");
 		globalThis.fetch = originalFetch;
 	});
@@ -102,7 +136,9 @@ describe("isLLMBusy", () => {
 
 	it("returns true on fetch failure", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => { throw new Error("network error"); };
+		globalThis.fetch = async () => {
+			throw new Error("network error");
+		};
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeTrue();
@@ -120,7 +156,8 @@ describe("isLLMBusy", () => {
 
 	it("returns the busy field from response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(JSON.stringify({ busy: false }), { status: 200 });
+		globalThis.fetch = async () =>
+			new Response(JSON.stringify({ busy: false }), { status: 200 });
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeFalse();

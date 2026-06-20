@@ -32,10 +32,17 @@ describe("handleReactionCommand", () => {
 		mock.module("../../src/state/state.js", () => ({
 			clearCooldown: () => {},
 			trackSpeaker: () => {},
-			setPaused: (v: boolean) => { paused = v; },
+			setPaused: (v: boolean) => {
+				paused = v;
+			},
 		}));
-		const { handleReactionCommand } = await import("../../src/bot/reactions.js");
-		const msg = { channel: { id: "c1", name: "general" }, addReaction: async () => {} };
+		const { handleReactionCommand } = await import(
+			"../../src/bot/reactions.js"
+		);
+		const msg = {
+			channel: { id: "c1", name: "general" },
+			addReaction: async () => {},
+		};
 		await handleReactionCommand(msg as any, "❌", "u1");
 		expect(paused).toBeTrue();
 	});
@@ -43,10 +50,17 @@ describe("handleReactionCommand", () => {
 	it("handles start command", async () => {
 		let paused: boolean | null = null;
 		mock.module("../../src/state/state.js", () => ({
-			setPaused: (v: boolean) => { paused = v; },
+			setPaused: (v: boolean) => {
+				paused = v;
+			},
 		}));
-		const { handleReactionCommand } = await import("../../src/bot/reactions.js");
-		const msg = { channel: { id: "c1", name: "general" }, addReaction: async () => {} };
+		const { handleReactionCommand } = await import(
+			"../../src/bot/reactions.js"
+		);
+		const msg = {
+			channel: { id: "c1", name: "general" },
+			addReaction: async () => {},
+		};
 		await handleReactionCommand(msg as any, "▶️", "u1");
 		expect(paused).toBeFalse();
 	});
@@ -57,25 +71,44 @@ describe("handleReactionCommand", () => {
 			resetLLM: async () => {},
 		}));
 		mock.module("../../src/state/state.js", () => ({
-			clearCooldown: () => { cleared = true; },
+			clearCooldown: () => {
+				cleared = true;
+			},
 			trackSpeaker: () => {},
 		}));
-		const { handleReactionCommand } = await import("../../src/bot/reactions.js");
-		const msg = { channel: { id: "c1", name: "general" }, addReaction: async () => {} };
+		const { handleReactionCommand } = await import(
+			"../../src/bot/reactions.js"
+		);
+		const msg = {
+			channel: { id: "c1", name: "general" },
+			addReaction: async () => {},
+		};
 		await handleReactionCommand(msg as any, "🗑️", "u1");
 		expect(cleared).toBeTrue();
 	});
 
 	it("does nothing for unknown emoji", async () => {
-		const { handleReactionCommand } = await import("../../src/bot/reactions.js");
-		const msg = { channel: { id: "c1", name: "general" }, addReaction: async () => {} };
+		const { handleReactionCommand } = await import(
+			"../../src/bot/reactions.js"
+		);
+		const msg = {
+			channel: { id: "c1", name: "general" },
+			addReaction: async () => {},
+		};
 		await handleReactionCommand(msg as any, "😀", "u1");
 	});
 
 	it("adds ✅ reaction after command", async () => {
 		let added = "";
-		const { handleReactionCommand } = await import("../../src/bot/reactions.js");
-		const msg = { channel: { id: "c1", name: "general" }, addReaction: async (e: string) => { added = e; } };
+		const { handleReactionCommand } = await import(
+			"../../src/bot/reactions.js"
+		);
+		const msg = {
+			channel: { id: "c1", name: "general" },
+			addReaction: async (e: string) => {
+				added = e;
+			},
+		};
 		mock.module("../../src/state/state.js", () => ({ setPaused: () => {} }));
 		await handleReactionCommand(msg as any, "▶️", "u1");
 		expect(added).toBe("✅");

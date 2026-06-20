@@ -29,7 +29,9 @@ describe("sanitizeForTTS", () => {
 
 	it("removes URLs", async () => {
 		const { sanitizeForTTS } = await import("../../src/tts/audio.js");
-		const result = sanitizeForTTS("check https://example.com/foo?bar=1 for info");
+		const result = sanitizeForTTS(
+			"check https://example.com/foo?bar=1 for info"
+		);
 		expect(result).not.toContain("https://");
 	});
 

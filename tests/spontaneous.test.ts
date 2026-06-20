@@ -68,7 +68,9 @@ describe("trySpawn", () => {
 		const { trySpawn } = await import("../src/spontaneous.js");
 		const client: any = {
 			guilds: new Map([["g1", guild]]),
-			createMessage: async (_id: string, opts: any) => { sentMessage = opts.content; },
+			createMessage: async (_id: string, opts: any) => {
+				sentMessage = opts.content;
+			},
 		};
 		await trySpawn(client);
 		expect(sentMessage).toBe("Hello everyone!");

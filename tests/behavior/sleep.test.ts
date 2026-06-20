@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mockConfig } from "../../tests/_mock-config.js";
 
 describe("getSleepBehavior enabled", () => {
@@ -6,9 +6,7 @@ describe("getSleepBehavior enabled", () => {
 		process.env.TZ = "UTC";
 		mockConfig({
 			timezone: "UTC",
-			timeSchedules: [
-				{ start: "00:00", end: "23:59", behavior: "sleep" },
-			],
+			timeSchedules: [{ start: "00:00", end: "23:59", behavior: "sleep" }],
 		});
 	});
 	afterAll(() => {
@@ -26,9 +24,7 @@ describe("getSleepBehavior slow", () => {
 		process.env.TZ = "UTC";
 		mockConfig({
 			timezone: "UTC",
-			timeSchedules: [
-				{ start: "00:00", end: "23:59", behavior: "slow" },
-			],
+			timeSchedules: [{ start: "00:00", end: "23:59", behavior: "slow" }],
 		});
 	});
 	afterAll(() => {
@@ -46,9 +42,7 @@ describe("getSleepBehavior short", () => {
 		process.env.TZ = "UTC";
 		mockConfig({
 			timezone: "UTC",
-			timeSchedules: [
-				{ start: "00:00", end: "23:59", behavior: "short" },
-			],
+			timeSchedules: [{ start: "00:00", end: "23:59", behavior: "short" }],
 		});
 	});
 	afterAll(() => {
@@ -78,9 +72,7 @@ describe("getSleepBehavior outside window", () => {
 	beforeAll(() => {
 		mockConfig({
 			timezone: "UTC",
-			timeSchedules: [
-				{ start: "23:00", end: "00:00", behavior: "sleep" },
-			],
+			timeSchedules: [{ start: "23:00", end: "00:00", behavior: "sleep" }],
 		});
 	});
 
