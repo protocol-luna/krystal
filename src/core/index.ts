@@ -1,1 +1,1 @@
-export { type UserMessage, type LLMCallbacks, askLLM, isLLMBusy, resetLLM } from "./llm-core.js";
+export { type UserMessage, type LLMCallbacks, askLLM, isLLMBusy, resetLLM, shutdown } from "./llm-core.js";

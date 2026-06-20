@@ -27,8 +27,72 @@ let isModelReady = false;
 let stdoutBuffer = "";
 let currentUsername = "";
 
-console.log(`Lancement du CLI: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
-const llama: ChildProcess = spawn(LLAMA_CLI_PATH, llamaArgs);
+let llama: ChildProcess;
+let shutdownRequested = false;
+let restartCount = 0;
+const MAX_RESTARTS = 5;
+let restartDelay = 1_000; // doubles each attempt
+
+function spawnLlama(): void {
+	console.log(`[llm-core] spawn: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
+	llama = spawn(LLAMA_CLI_PATH, llamaArgs);
+
+	isModelReady = false;
+	stdoutBuffer = "";
+
+	currentOnFirstToken = null;
+	currentOnChunk = null;
+	currentOnDone = null;
+	isProcessing = false;
+
+	llama.stdout!.on("data", handleStdout);
+
+	llama.stderr!.on("data", (data: Buffer) => {
+		const msg = data.toString();
+		if (
+			msg.toLowerCase().includes("error") ||
+			msg.toLowerCase().includes("failed")
+		) {
+			process.stderr.write(msg);
+		}
+	});
+
+	llama.on("close", (code: number | null) => {
+		if (shutdownRequested) {
+			console.log("[llm-core] llama-cli arrêté proprement");
+			return;
+		}
+		console.error(
+			`[llm-core] llama-cli crashé (code=${code}), redémarrage...`,
+		);
+		scheduleRestart();
+	});
+
+	llama.on("error", (err: Error) => {
+		console.error(`[llm-core] erreur spawn: ${err.message}`);
+		scheduleRestart();
+	});
+}
+
+function scheduleRestart(): void {
+	restartCount++;
+	if (restartCount > MAX_RESTARTS) {
+		console.error(
+			`[llm-core] ${MAX_RESTARTS} tentatives de redémarrage échouées, abandon`,
+		);
+		process.exit(1);
+	}
+
+	const delay = restartDelay;
+	restartDelay = Math.min(restartDelay * 2, 30_000);
+	console.log(
+		`[llm-core] nouvelle tentative dans ${delay}ms (tentative ${restartCount}/${MAX_RESTARTS})`,
+	);
+
+	setTimeout(() => {
+		spawnLlama();
+	}, delay);
+}
 
 function cleanLine(line: string): string {
 	let cleaned = line;
@@ -36,7 +100,7 @@ function cleanLine(line: string): string {
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
 	cleaned = cleaned.replace(
 		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"),
-		""
+		"",
 	);
 	return cleaned.trim();
 }
@@ -47,18 +111,20 @@ function cleanFullResponse(text: string): string {
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
 	cleaned = cleaned.replace(
 		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"),
-		""
+		"",
 	);
 	return cleaned.trim();
 }
 
-llama.stdout!.on("data", (data: Buffer) => {
+function handleStdout(data: Buffer): void {
 	const str = data.toString();
 
 	if (!isModelReady) {
 		if (str.includes("> ") || str.includes("Enter no prompt")) {
 			isModelReady = true;
-			console.log("-> Le modèle llama.cpp est prêt à recevoir des messages !");
+			restartCount = 0;
+			restartDelay = 1_000;
+			console.log("[llm-core] modèle prêt");
 			void processQueue();
 		}
 		return;
@@ -108,22 +174,7 @@ llama.stdout!.on("data", (data: Buffer) => {
 	if (cleaned) {
 		currentOnChunk?.(cleaned);
 	}
-});
-
-llama.stderr!.on("data", (data: Buffer) => {
-	const msg = data.toString();
-	if (
-		msg.toLowerCase().includes("error") ||
-		msg.toLowerCase().includes("failed")
-	) {
-		process.stderr.write(msg);
-	}
-});
-
-llama.on("close", (code: number | null) => {
-	console.error(`Le processus llama-cli s'est arrêté avec le code : ${code}`);
-	process.exit(code ?? 1);
-});
+}
 
 function processQueue(): void {
 	if (isProcessing || requestQueue.length === 0 || !isModelReady) {
@@ -150,7 +201,7 @@ function processQueue(): void {
 
 export function askLLM(
 	userMessage: UserMessage,
-	callbacks: LLMCallbacks
+	callbacks: LLMCallbacks,
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
 		requestQueue.push({ userMessage, callbacks, resolve, reject });
@@ -182,3 +233,11 @@ export async function resetLLM(): Promise<void> {
 		llama.stdout!.on("data", listener);
 	});
 }
+
+export function shutdown(): void {
+	shutdownRequested = true;
+	llama?.kill();
+}
+
+// Initial spawn
+spawnLlama();

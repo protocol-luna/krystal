@@ -5,17 +5,23 @@ Bot Discord autonome qui fait tourner un LLM local (llama.cpp) et converse de fa
 ## Architecture
 
 ```
-┌─────────────────┐   NDJSON/HTTP    ┌──────────────────────┐
-│  llm-server.ts  │ ◄──────────────► │      bot client      │
-│  (port 3124)    │   POST /ask       │    (Eris / Discord)  │
-│                 │   POST /reset     │                      │
-│  llama-cli      │   GET /health     │  trigger.ts          │
-│  process        │                   │  mannerisms.ts       │
-└─────────────────┘                   │  spontaneous.ts     │
-                                      └──────────────────────┘
+┌─────────────────┐   NDJSON/HTTP    ┌──────────────────────────┐
+│  core/          │ ◄──────────────► │         bot client       │
+│  llm-server.ts  │   POST /ask       │    (Eris / Discord)      │
+│  (port 3124)    │   POST /reset     │                          │
+│                 │   GET /health     │  bot/bot.ts              │
+│  llama-cli      │                   │  bot/pending.ts          │
+│  process        │                   │  bot/reactions.ts        │
+│  (auto-restart) │                   │  state/trigger.ts        │
+└─────────────────┘                   │  state/state.ts          │
+                                      │  behavior/mannerisms.ts  │
+                                      │  spontaneous.ts          │
+                                      └──────────────────────────┘
 ```
 
 Deux processus séparés — le LLM (llama-cli avec chargement du modèle) et le client Discord (hot-reloadable sans recharger le modèle). Communication en NDJSON streamé sur HTTP.
+
+**Auto-restart** : si le processus llama-cli crash, il est automatiquement relancé avec la file d'attente préservée.
 
 **Pourquoi NDJSON plutôt que SSE ?** Plus simple à parser ligne par ligne, chaque ligne est un JSON complet.
 
@@ -298,9 +304,9 @@ Le bot sauvegarde son état dans `state.json` pour survivre aux redémarrages :
 ```mermaid
 flowchart LR
     A[Mutation d'état] --> B[scheduleSave\ndebounce 500ms]
-    B --> C[writeFileSync\nstate.json]
-    D[Démarrage] --> E[loadState]
-    E --> F[restoreState\ntrigger.ts]
+    B --> C[async writeFile\nstate.json]
+    D[Démarrage] --> E[loadState async]
+    E --> F[restoreState\nstate/state.ts]
     E --> G[récupère messages\nen attente via API]
 ```
 
@@ -310,6 +316,21 @@ flowchart LR
 - Cooldowns, timestamps d'activité, dernier interlocuteur, compteurs de follow-up.
 
 Sauvegardé à chaque mutation (ajout/retrait de la file, pause/dépause, clear) avec un debounce de 500ms pour grouper les changements rapides.
+
+### Auto-restart LLM
+
+Si le processus llama-cli crash (OOM, segfault, etc.), il est automatiquement relancé :
+
+1. Réinitialisation des flags internes (`isModelReady`, `isProcessing`, etc.)
+2. La file d'attente (`requestQueue`) est préservée — les requêtes en cours seront retraitées
+3. Backup exponentiel : 1s → 2s → 4s → 8s → 16s (max 5 tentatives)
+4. Après un redémarrage réussi, le compteur de tentatives est réinitialisé
+
+Utile pour les quantifications agressives (Q2_K) qui peuvent crash sur des prompts complexes.
+
+```yaml
+# Pas de configuration nécessaire — activé par défaut
+```
 
 ### Plages de sommeil
 
@@ -501,6 +522,7 @@ Le bot trace toutes ses décisions avec des préfixes filtrables :
 | `[eris]` | Erreurs de la librairie Discord (attrapées sans crash, log uniquement) |
 | `[tts]` | Synthèse vocale, upload CDN, ou envoi de voice message |
 | `[persist]` | Sauvegarde/restauration de l'état du bot (`state.json`) |
+| `[llm-core]` | Spawn, crash, redémarrage du processus llama-cli |
 
 ---
 
@@ -557,20 +579,35 @@ npm start
 
 ```
 src/
-├── index.ts          # Point d'entrée (import startBot)
-├── bot.ts            # Client Eris, message handler, triggerLunaReply
+├── index.ts          # Point d'entrée → cli.ts
+├── cli.ts            # CLI unifié (bot|server|direct)
+├── bot.ts            # Handler principal Eris (allégé)
 ├── config.ts         # Toute la configuration (env, triggers, LLM, styles)
-├── trigger.ts        # Évaluation des messages, cooldowns, follow-up
 ├── mannerisms.ts     # Délai, ignore, réactions, concentration
 ├── sleep.ts          # Plages de sommeil (présence variable)
 ├── typo.ts           # Simulation de fautes de frappe + correction
 ├── spontaneous.ts    # Messages spontanés pondérés
 ├── guild.ts          # findMostActiveChannel helper
-├── persistence.ts    # Sauvegarde/restauration d'état (state.json)
 ├── tts.ts            # Synthèse vocale PiperTTS, upload CDN, voice messages
-├── llm-server.ts     # Serveur HTTP NDJSON, spawn llama-cli, queue
 ├── llm-client.ts     # Client HTTP vers le serveur LLM
-└── llm.ts            # Ancienne version monolithique (archivée)
+├── llm-server.ts     # Ré-export rétrocompatible vers core/llm-server.ts
+├── llm.ts            # Ré-export rétrocompatible vers core/llm-core.ts
+├── persistence.ts    # Ré-export rétrocompatible vers state/persistence.ts
+├── trigger.ts        # Ré-export rétrocompatible vers state/*
+├── core/
+│   ├── index.ts      # Barrel export
+│   ├── llm-core.ts   # Logique LLM partagée (spawn, queue, parsing, restart)
+│   ├── llm-server.ts # Serveur HTTP NDJSON
+│   └── llm-direct.ts # Mode CLI direct (standalone)
+├── state/
+│   ├── index.ts      # Barrel export
+│   ├── state.ts      # Cooldowns, activité, suivi conversation
+│   ├── trigger.ts    # Évaluation des déclencheurs uniquement
+│   └── persistence.ts # Sauvegarde/restauration d'état (async)
+└── bot/
+    ├── pending.ts     # File d'attente anti-spam (processing + pendingMessages)
+    ├── reactions.ts   # Commandes par réactions (❌▶️🗑️)
+    └── typo-correction.ts # Correction différée des fautes de frappe
 ```
 
 ### Flux détaillé d'une réponse
@@ -580,12 +617,14 @@ sequenceDiagram
     participant User
     participant Discord
     participant bot.ts
-    participant trigger.ts
+    participant state/trigger.ts
+    participant state/state.ts
     participant mannerisms.ts
+    participant sleep.ts
     participant sleep.ts
     participant typo.ts
     participant llm-client.ts
-    participant llm-server.ts
+    participant core/llm-server.ts
     participant llama
 
     User->>Discord: envoie un message

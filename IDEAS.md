@@ -29,5 +29,6 @@
 - [ ] Lancer des sujets de conversation spontanés basés sur le contexte récent
 
 ## Technique
+- [x] Auto-restart du processus llama-cli en cas de crash (exponential backoff, max 5 tentatives)
 - [ ] Configurer la concentration (ignoreChance, réaction, délai) depuis config.yml au lieu de hardcodé dans mannerisms.ts
 - [ ] Tests unitaires pour chaque module
