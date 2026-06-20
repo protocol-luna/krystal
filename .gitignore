@@ -2,3 +2,4 @@ models
 node_modules/
 .env
 config.yml
+*.tsbuildinfo
