@@ -18,7 +18,7 @@ llm_port: 3124
 #   "cli"    → spawn llama-cli en subprocess (défaut)
 #   "server" → HTTP POST à llama-server (endpoint /completion, SSE)
 llm_mode: "cli"
-tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
+tts_model_path: "./tts-engine/en_GB-southern_english_female-low.onnx"
 tts_binary_path: "bin/piper/piper"
 ffmpeg_path: "bin/ffmpeg/ffmpeg"
 ffprobe_path: "bin/ffmpeg/ffprobe"
