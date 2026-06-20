@@ -30,7 +30,8 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
 });
 
-const pendingRequests = new Set<string>();
+const processing = new Set<string>();
+const pendingMessages = new Map<string, Eris.Message>();
 
 function pendingKey(channelId: string, userId: string): string {
 	return `${channelId}:${userId}`;
@@ -41,13 +42,16 @@ async function triggerLunaReply(
 	isDM = false
 ): Promise<void> {
 	const key = pendingKey(message.channel.id, message.author.id);
-	if (pendingRequests.has(key)) {
+
+	if (processing.has(key)) {
+		pendingMessages.set(key, message);
 		console.log(
-			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: ignoré (déjà une requête en cours)`
+			`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: mis en attente (déjà en cours)`
 		);
 		return;
 	}
-	pendingRequests.add(key);
+
+	processing.add(key);
 
 	let typingInterval: ReturnType<typeof setInterval> | null = null;
 	const startTyping = () => {
@@ -122,9 +126,18 @@ async function triggerLunaReply(
 			})
 			.then(() => markBotActivity(message.channel.id));
 	} finally {
-		pendingRequests.delete(key);
+		processing.delete(key);
 		if (typingInterval) {
 			clearInterval(typingInterval);
+		}
+
+		const queued = pendingMessages.get(key);
+		if (queued) {
+			pendingMessages.delete(key);
+			console.log(
+				`[bot] #${(message.channel as Eris.GuildTextableChannel).name ?? message.channel.id} ${message.author.username}: répond au message en attente`
+			);
+			await triggerLunaReply(queued, queued.channel.type === 1);
 		}
 	}
 }
