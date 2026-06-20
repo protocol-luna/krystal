@@ -20,6 +20,7 @@
     "download-model": "mkdir models && cd models && wget https://huggingface.co/mradermacher/Discord-Hermes-3-8B-GGUF/resolve/main/Discord-Hermes-3-8B.Q2_K.gguf && cd .."
   },
   "dependencies": {
+    "bun-types": "^1.3.14",
     "eris": "^0.18.0",
     "js-yaml": "^4.2.0",
     "pipertts": "^1.0.3"

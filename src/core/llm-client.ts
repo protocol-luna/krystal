@@ -20,6 +20,7 @@ export async function askLLM(
 	const decoder = new TextDecoder();
 	let buffer = "";
 	let fullText = "";
+	let llmError: Error | null = null;
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -48,16 +49,18 @@ export async function askLLM(
 						fullText = event.data;
 						break;
 					case "error":
-						throw new Error(event.data);
+						llmError = new Error(event.data);
+						break;
 					default:
 						break;
 				}
 			} catch {
-				// skip malformed lines
+				// skip malformed JSON lines
 			}
 		}
 	}
 
+	if (llmError) { throw llmError; }
 	return fullText;
 }
 
