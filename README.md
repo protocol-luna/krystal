@@ -420,7 +420,7 @@ Clé `channelId:userId`. Un seul message en attente par utilisateur par salon. T
 
 ```mermaid
 flowchart LR
-    A[Mutation d'état\nsetPaused / markReplied\nmarkBotActivity / etc.] --> B[stateBus.emit\n"state:changed"]
+    A[Mutation d'état\nsetPaused / markReplied\nmarkBotActivity / etc.] --> B[stateBus.emit\nstate:changed]
     B --> C[persistence.ts\nécoute le bus]
     C --> D[scheduleSave\ndebounce 500ms]
     D --> E[async writeFile\nstate.json]
