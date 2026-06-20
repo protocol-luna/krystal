@@ -434,15 +434,11 @@ En cas d'erreur interne, le bot réagit avec ❌ sur ton message au lieu d'affic
 
 ## Configuration
 
-Fichier unique `config.yml` pour toute la configuration. Plus besoin de `.env` (gardé pour rétrocompatibilité seulement).
+Fichier unique `config.yml` pour toute la configuration. Les variables d'env shell (`DISCORD_TOKEN`, etc.) surchargent les valeurs YAML si présentes.
 
 ### `config.yml`
 
-Toute la configuration du bot : token, chemins LLM/TTS, triggers, mannerisms, concentration, reply styles. Exemple complet à la racine.
-
-### `.env` (optionnel)
-
-Surcharge `config.yml` si présent. Utile pour garder le token hors du gitignore local.
+Toute la configuration du bot : token, chemins LLM/TTS, triggers, concentration, reply styles. Exemple complet à la racine.
 
 ### `system_prompt` (dans config.yml)
 
