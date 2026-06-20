@@ -1,3 +1,3 @@
 import { startBot } from "./bot.js";
 
-startBot();
+void startBot();

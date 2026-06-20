@@ -235,3 +235,23 @@ export function clearCooldown(channelId: string): void {
 	responseCount.delete(channelId);
 	lastSpeaker.delete(channelId);
 }
+
+// --- Persistence helpers ---
+
+export function dumpState() {
+	return {
+		channelCooldowns: [...channelCooldowns.entries()],
+		botActivity: [...botActivity.entries()],
+		lastSpeaker: [...lastSpeaker.entries()],
+		responseCount: [...responseCount.entries()],
+		paused,
+	};
+}
+
+export function restoreState(data: ReturnType<typeof dumpState>): void {
+	for (const [k, v] of data.channelCooldowns) { channelCooldowns.set(k, v); }
+	for (const [k, v] of data.botActivity) { botActivity.set(k, v); }
+	for (const [k, v] of data.lastSpeaker) { lastSpeaker.set(k, v); }
+	for (const [k, v] of data.responseCount) { responseCount.set(k, v); }
+	paused = data.paused;
+}

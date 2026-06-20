@@ -15,6 +15,8 @@ import {
 	trackSpeaker,
 	canFollowUp,
 	setPaused,
+	dumpState,
+	restoreState,
 	type TriggerResult,
 } from "./trigger.js";
 import { trySpawn } from "./spontaneous.js";
@@ -28,6 +30,7 @@ import { initTTS, sendTextAsVoiceMessage, shouldSendVoice, hasUnsafeTTSText } fr
 import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle } from "./config.js";
 import { getSleepBehavior } from "./sleep.js";
 import { applyTypo } from "./typo.js";
+import { buildPending, persistState, loadState } from "./persistence.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "guildMessageReactions", "messageContent", "directMessages"],
@@ -332,9 +335,37 @@ client.on("messageReactionAdd", async (message: Eris.Message, emoji: { name: str
 	}
 });
 
-export function startBot(): void {
+export async function startBot(): Promise<void> {
 	void initTTS();
+
+	const saved = loadState();
+	restoreState(saved);
+
+	for (const entry of saved.pendingMessages) {
+		try {
+			const msg = await client.getMessage(entry.channelId, entry.messageId);
+			const key = pendingKey(entry.channelId, entry.userId);
+			if (!processing.has(key)) {
+				pendingMessages.set(key, { message: msg, reason: entry.reason });
+			}
+		} catch {
+			// message supprimé ou channel inaccessible
+		}
+	}
+
 	client.connect();
+
+	setInterval(() => {
+		const t = dumpState();
+		persistState({
+			pendingMessages: buildPending(pendingMessages),
+			paused: t.paused,
+			channelCooldowns: t.channelCooldowns,
+			botActivity: t.botActivity,
+			lastSpeaker: t.lastSpeaker,
+			responseCount: t.responseCount,
+		});
+	}, 3000);
 
 	setInterval(() => {
 		if (Math.random() < spontaneousChance) {
