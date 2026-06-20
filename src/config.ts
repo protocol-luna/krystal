@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
@@ -51,7 +50,7 @@ function loadSystemPrompt(): string {
 		return readFileSync(promptPath, "utf-8").trim();
 	} catch {
 		console.warn(
-			`prompt.txt introuvable (${promptPath}), fallback sur prompt par défaut.`
+			"[config] ni system_prompt dans config.yml ni prompt.txt trouvé, fallback sur prompt par défaut."
 		);
 		return DEFAULT_PROMPT;
 	}

@@ -447,7 +447,7 @@ Surcharge `config.yml` si présent. Utile pour garder le token hors du gitignore
 ### `system_prompt` (dans config.yml)
 
 Clé `system_prompt` avec le prompt système. Supporte le format YAML multiligne (`|`).
-`prompt.txt` est encore lu comme fallback si la clé n'est pas présente.
+`prompt.txt` est aussi lu comme fallback si présent (déprécié).
 
 ### Paramètres LLM (llama-cli)
 
