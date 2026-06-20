@@ -1,4 +1,4 @@
-# pixieglow
+# Projet protocole Luna
 
 Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de façon naturelle — sommeil, inattention, fautes de frappe, hésitations, oublis, messages vocaux, tempo WPM, file anti-spam, persistance, auto-restart, statut rotatif.
 
