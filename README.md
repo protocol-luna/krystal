@@ -434,48 +434,15 @@ En cas d'erreur interne, le bot réagit avec ❌ sur ton message au lieu d'affic
 
 ## Configuration
 
-Deux couches, la YAML écrase les valeurs par défaut, puis `.env` écrase pour les secrets et chemins.
+Fichier unique `config.yml` pour toute la configuration. Plus besoin de `.env` (gardé pour rétrocompatibilité seulement).
 
-### `config.yml` (recommandé)
+### `config.yml`
 
-Toute la configuration du bot : triggers, mannerisms, styles de reply. Exemple :
+Toute la configuration du bot : token, chemins LLM/TTS, triggers, mannerisms, concentration, reply styles. Exemple complet à la racine.
 
-```yaml
-names:
-  - "Luna"
-  - "Pixie"
+### `.env` (optionnel)
 
-keywords:
-  - "hello"
-  - "hi"
-  - "hey"
-  - "ai"
-  - "bot"
-
-random_chance: 0.015
-cooldown_seconds: 8
-reply_in_dm: true
-
-response_delay_min: 800
-response_delay_max: 4000
-
-reaction_chance: 0.06
-ignore_chance: 0.08
-
-spontaneous_interval_ms: 300000
-spontaneous_chance: 0.12
-```
-
-Voir le fichier complet à la racine.
-
-### `.env`
-
-| Variable | Défaut | Description |
-|---|---|---|
-| `DISCORD_TOKEN` | — | Token du bot Discord (obligatoire) |
-| `LLAMA_CLI_PATH` | `llama/llama-cli` | Chemin vers l'exécutable `llama-cli` |
-| `LLAMA_MODEL_PATH` | `models/Discord-Hermes-3-8B.Q2_K.gguf` | Chemin du modèle GGUF |
-| `LLM_PORT` | `3124` | Port du serveur LLM HTTP |
+Surcharge `config.yml` si présent. Utile pour garder le token hors du gitignore local.
 
 ### `prompt.txt`
 
@@ -535,9 +502,8 @@ Le bot trace toutes ses décisions avec des préfixes filtrables :
 npm install
 
 # Configuration
-cp .env.example .env
-# éditer DISCORD_TOKEN dans .env
-# éditer config.yml (triggers, mannerisms, LLM, etc.)
+cp config.example.yml config.yml
+# éditer config.yml (token Discord, chemins LLM, comportement)
 
 # System prompt
 echo "Your name is pixieglow. You are a 21-year-old girl studying art." > prompt.txt

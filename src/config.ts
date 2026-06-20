@@ -15,6 +15,29 @@ function v<T>(key: string, fallback: T): T {
 	return (cfg[key] as T) ?? fallback;
 }
 
+// --- Secrets & paths (YAML → .env → default) ---
+export const DISCORD_TOKEN: string =
+	v<string | null>("discord_token", null) ??
+	process.env.DISCORD_TOKEN ??
+	(() => {
+		console.error("DISCORD_TOKEN manquant — mets-le dans config.yml ou .env");
+		process.exit(1);
+	})();
+
+export const LLAMA_CLI_PATH: string =
+	v<string | null>("llama_cli_path", null) ??
+	process.env.LLAMA_CLI_PATH ??
+	"llama/llama-cli";
+
+export const LLAMA_MODEL_PATH: string =
+	v<string | null>("llama_model_path", null) ??
+	process.env.LLAMA_MODEL_PATH ??
+	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
+
+export const LLM_PORT: number =
+	v<number | null>("llm_port", null) ??
+	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
+
 // --- System prompt ---
 function loadSystemPrompt(): string {
 	const promptPath = join(ROOT, "prompt.txt");
@@ -29,24 +52,6 @@ function loadSystemPrompt(): string {
 }
 
 export const SYSTEM_PROMPT = loadSystemPrompt();
-
-// --- Env (surcharge YAML) ---
-const rawDiscordToken = process.env.DISCORD_TOKEN;
-export const DISCORD_TOKEN: string =
-	rawDiscordToken ??
-	(() => {
-		console.error("DISCORD_TOKEN manquant dans .env");
-		process.exit(1);
-	})();
-
-export const LLAMA_CLI_PATH: string =
-	process.env.LLAMA_CLI_PATH ?? "llama/llama-cli";
-
-export const LLAMA_MODEL_PATH: string =
-	process.env.LLAMA_MODEL_PATH ??
-	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
-
-export const LLM_PORT: number = Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
 export const jinjaTemplate =
 	"{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
@@ -189,10 +194,12 @@ export const sleepSchedule: SleepSchedule = {
 export const voiceMessageChance = v<number>("voice_message_chance", 0.08);
 
 export const ttsModelPath: string =
+	v<string | null>("tts_model_path", null) ??
 	process.env.TTS_MODEL_PATH ??
 	join(ROOT, "tts-engine/en_GB-southern_english_female-low.onnx");
 
 export const ttsBinaryPath: string =
+	v<string | null>("tts_binary_path", null) ??
 	process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
 
 // --- Reply style ---
