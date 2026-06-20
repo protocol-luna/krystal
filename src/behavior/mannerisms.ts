@@ -21,7 +21,8 @@ function getThresholds(
 export function computeDelay(
 	reason: string | null = null,
 	sleepBehavior?: string | null,
-	msgLength?: number
+	msgLength?: number,
+	inactivityMs?: number
 ): number {
 	const t = getThresholds(reason);
 	let delay = t.delay_min + Math.random() * (t.delay_max - t.delay_min);
@@ -29,11 +30,21 @@ export function computeDelay(
 		const readingFactor = Math.min(msgLength / 500, 3);
 		delay *= 1 + readingFactor * (0.3 + Math.random() * 0.7);
 	}
+	if (inactivityMs !== undefined) {
+		const warmupMs = config.inactivityWarmupMinutes * 60000;
+		if (inactivityMs > warmupMs) {
+			const inactivityRatio = Math.min(inactivityMs / warmupMs, 5);
+			delay *=
+				1 +
+				(inactivityRatio * config.inactivityWarmupMultiplier - 1) *
+					(0.5 + Math.random() * 0.5);
+		}
+	}
 	if (sleepBehavior === "slow") {
 		delay *= 3 + Math.random() * 2;
 	}
 	console.log(
-		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"} len=${msgLength ?? 0})`
+		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"} len=${msgLength ?? 0} idle=${inactivityMs ?? 0})`
 	);
 	return delay;
 }

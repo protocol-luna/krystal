@@ -342,6 +342,12 @@ export const config = {
 	get typingWpm(): number {
 		return v<number>("typing_wpm", 300);
 	},
+	get inactivityWarmupMinutes(): number {
+		return v<number>("inactivity_warmup_minutes", 10);
+	},
+	get inactivityWarmupMultiplier(): number {
+		return v<number>("inactivity_warmup_multiplier", 2);
+	},
 	get voiceMessageChance(): number {
 		return v<number>("voice_message_chance", 0.08);
 	},

@@ -11,6 +11,7 @@ import { evaluateMessage, type TriggerResult } from "./state/trigger.js";
 import {
 	isRecentBotActivity,
 	markBotActivity,
+	getGlobalInactivityMs,
 	trackSpeaker,
 	canFollowUp,
 	clearCooldown,
@@ -287,7 +288,12 @@ function logAndReact(
 	reason: string | null,
 	sleepBehavior: string | null
 ): void {
-	const delay = computeDelay(reason, sleepBehavior, message.content.length);
+	const delay = computeDelay(
+		reason,
+		sleepBehavior,
+		message.content.length,
+		getGlobalInactivityMs()
+	);
 	console.log(
 		`[bot] #${channelName} ${author}: répond (${reason}) delay=${delay.toFixed(0)}ms`
 	);
@@ -356,7 +362,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		const delay = computeDelay(
 			result.reason,
 			sleepBehavior,
-			message.content.length
+			message.content.length,
+			getGlobalInactivityMs()
 		);
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
@@ -375,7 +382,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		const delay = computeDelay(
 			"follow-up",
 			sleepBehavior,
-			message.content.length
+			message.content.length,
+			getGlobalInactivityMs()
 		);
 		await new Promise((r) => setTimeout(r, delay));
 

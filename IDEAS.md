@@ -21,7 +21,7 @@
 ## Présence et disponibilité
 - [!] Statut Discord dynamique (en ligne, occupé, "regarde un film...") [j'aime l'idée, les status devront etre en anglais mais j'aime l'idée]
 - [!] Périodes "hors ligne" ou "occupée" en dehors du sommeil (ne répond pas pendant X minutes) [L'idée est bonne mais elle ne devrait pas rentrer en conflit avec la précédente]
-- [!] Temps de réponse plus long si inactif depuis longtemps (simule le "réveil") [L'idée est excellente]
+- [x] Temps de réponse plus long si inactif depuis longtemps (simule le "réveil") [Implémenté : inactivityMs dans computeDelay]
 - ~~[?] Interruptible : si on lui parle pendant qu'elle répond, elle peut s'arrêter ou changer de sujet [Déprécié — l'anti-spam gère déjà ce cas]~~
 
 ## Interaction

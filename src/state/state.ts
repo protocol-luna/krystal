@@ -6,6 +6,8 @@ const botActivity = new Map<string, number>();
 const lastSpeaker = new Map<string, { userId: string; timestamp: number }>();
 const responseCount = new Map<string, number>();
 
+let globalLastActivity = Date.now();
+
 export const MAX_FOLLOWUPS = 3;
 export const FOLLOWUP_WINDOW = 60_000;
 const PRUNE_INTERVAL = 5 * 60_000;
@@ -34,6 +36,7 @@ export function markReplied(channelId: string): void {
 	const now = Date.now();
 	channelCooldowns.set(channelId, now);
 	botActivity.set(channelId, now);
+	globalLastActivity = now;
 	const count = responseCount.get(channelId) ?? 0;
 	responseCount.set(channelId, count + 1);
 	setTimeout(() => {
@@ -45,6 +48,7 @@ export function markReplied(channelId: string): void {
 
 export function markBotActivity(channelId: string): void {
 	botActivity.set(channelId, Date.now());
+	globalLastActivity = Date.now();
 	stateBus.emit("state:changed");
 }
 
@@ -57,6 +61,10 @@ export function isRecentBotActivity(
 		return false;
 	}
 	return Date.now() - last < windowMs;
+}
+
+export function getGlobalInactivityMs(): number {
+	return Date.now() - globalLastActivity;
 }
 
 export function trackSpeaker(

@@ -147,6 +147,11 @@ typing_wpm: 300
 # Délai entre chunks calculé à partir de la longueur du chunk et de la vitesse WPM.
 # 300 WPM = ~60ms par mot, ajustable selon la réactivité souhaitée.
 
+# --- Inactivity warmup — délai plus long si le bot n'a pas parlé depuis longtemps ---
+inactivity_warmup_minutes: 10
+inactivity_warmup_multiplier: 2
+# Simule le "réveil" : réponse plus lente après une période d'inactivité.
+
 # --- Sleep schedule (plages de sommeil / présence variable) ---
 sleep_schedule:
   enabled: false
