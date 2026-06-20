@@ -1,28 +1,28 @@
 # IDEAS — Améliorations du réalisme humain
 
 ## Comportement de "frappe"
-- [?] Streamer le message lettre par lettre (au lieu de chunks) avec délai type "wpm" humain
-- [/] Commencer par une hésitation aléatoire ("Euh...", "Hmm...", "Bah...", "Bon...") [Cause de la dépréciation: le message peut être généré en anglais, donc pas optimal]
-- [~] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond
+- [!] Délai entre chunks basé sur un WPM "humain" (au lieu des délais fixes actuels) [15min de dev, rendu plus naturel]
+- [!] Commencer par une hésitation aléatoire ("Uh...", "Um...", "Well...", "I mean...") [Reformulé en anglais — retiré dépréciation]
+- [x] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond [Implémenté : msgLength dans computeDelay]
 
 ## Corrections et erreurs
-- [/] Fautes de grammaire intentionnelles (rare, type "j'ai vu" → "j'ai vue") [Cause dépréciation: la meme qu'en haut]
-- [@] Auto-correction "humaine" (corriger un doigt qui a dérapé entre deux mots différents, pas seulement adjacent)
-- [~] Changer d'avis : éditer le message après envoi pour ajouter/supprimer un mot [Utilité a faire ça ?]
+- ~~[/] Fautes de grammaire intentionnelles (rare, type "j'ai vu" → "j'ai vue") [Trop d'effort, LLM en fait déjà naturellement]~~
+- [~] Auto-correction "humaine" (corriger un doigt qui a dérapé entre deux mots différents, pas seulement adjacent) [Passé en ~, trop d'effort pour le rendu]
+- ~~[~] Changer d'avis : éditer le message après envoi pour ajouter/supprimer un mot [Barré — trop d'effort pour un détail quasi imperceptible]~~
 - [!] Oubli de répondre malgré trigger (probabilité faible)
 
 ## Contexte temporel et humeur
-- [~] Ton adapté à l'heure : plus fatiguée / irritable le soir, plus énergique le matin [L'idée est bonne mais le prompt systeme devrait changer pour ca, ca necessiterait un redémarrage de llama-cli juste pour ajouter ça au prompt, je suis pas sur que ca soit optimisable autrement]
-- [~] Humeur simulée persistante (joie, fatigue, irritation) qui évolue dans le temps [Pareil qu'en haut]
-- [?] Réponses plus courtes en fin de journée [Cause: on devrait piloter le system prompt pour ça non ?]
-- [?] Sujets basés sur le jour de la semaine / saison / météo [Prompt a modifier?]
+~~- [~] Ton adapté à l'heure : plus fatiguée / irritable le soir, plus énergique le matin [Barré — injection ignorée par le modèle, restart trop lourd]~~
+~~- [~] Humeur simulée persistante (joie, fatigue, irritation) qui évolue dans le temps [Barré — idem]~~
+~~- [~] Réponses plus courtes en fin de journée [Barré — idem]~~
+~~- [~] Sujets basés sur le jour de la semaine / saison / météo [Barré — nécessite API + restart, trop lourd]~~
 [[Les paramètres de contextes pourrait être sympas si on utilisait la version server de llama.cpp, hors ici on hi-jack la version client. C'est une constraint qui pousse à garder le contexte sans tout analyser à chaque fois, et llama-cli répond plus rapidement que llama-server, surout sans GPU. A creuser]]
 
 ## Présence et disponibilité
 - [!] Statut Discord dynamique (en ligne, occupé, "regarde un film...") [j'aime l'idée, les status devront etre en anglais mais j'aime l'idée]
 - [!] Périodes "hors ligne" ou "occupée" en dehors du sommeil (ne répond pas pendant X minutes) [L'idée est bonne mais elle ne devrait pas rentrer en conflit avec la précédente]
 - [!] Temps de réponse plus long si inactif depuis longtemps (simule le "réveil") [L'idée est excellente]
-- [?] Interruptible : si on lui parle pendant qu'elle répond, elle peut s'arrêter ou changer de sujet [A creuser, ca serait une génération inutile de faite, et le systeme anti-spam propose déjà une solution pour ce genre de problemes non ?]
+- ~~[?] Interruptible : si on lui parle pendant qu'elle répond, elle peut s'arrêter ou changer de sujet [Déprécié — l'anti-spam gère déjà ce cas]~~
 
 ## Interaction
 - [x] Répondre avec des messages vocaux via TTS aléatoirement 
