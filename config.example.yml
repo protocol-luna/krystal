@@ -97,6 +97,9 @@ typo_correction_delay_max: 4000
 # Intervalle (ms) avant que le bot corrige la faute en edittant le message.
 typo_layout: "azerty"
 # Disposition du clavier pour les fautes de touche adjacente : "azerty" | "qwerty".
+typo_correction_style: "mixed"
+# Style de correction des fautes : "edit" (édite tout le message), "message" (envoie "mot*"),
+# ou "mixed" (50/50 aléatoire).
 
 # --- Chunk delays (temps entre chaque message d'une réponse multi-chunk) ---
 chunk_delay_min: 300

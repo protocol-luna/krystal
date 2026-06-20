@@ -36,6 +36,7 @@ export function loadState(): PersistedState {
 		const raw = fs.readFileSync(STATE_FILE, "utf-8");
 		const parsed = JSON.parse(raw) as PersistedState;
 		if (typeof parsed.paused !== "boolean") { throw new Error("invalid paused"); }
+		console.log(`[persist] loaded state: ${parsed.pendingMessages.length} pending, paused=${parsed.paused}`);
 		return parsed;
 	} catch {
 		return defaultState();
@@ -44,6 +45,7 @@ export function loadState(): PersistedState {
 
 export function persistState(state: PersistedState): void {
 	fs.writeFileSync(STATE_FILE, JSON.stringify(state), "utf-8");
+	console.log(`[persist] saved state: ${state.pendingMessages.length} pending, paused=${state.paused}`);
 }
 
 export function buildPending(

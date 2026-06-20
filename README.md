@@ -184,7 +184,7 @@ finally: clearInterval      → arrête le typing
 
 ### Réponse multi-chunk
 
-Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai variable configurable entre chaque (simule le temps d'écrire). Seul le premier message a un `messageReference` (reply visuel).
+Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai proportionnel à la longueur du chunk (`min(délai × length/200, 1)`) entre chaque message — simule le temps d'écrire. Seul le premier message a un `messageReference` (reply visuel). En mode vocal, le typing indicator est désactivé et les chunks sont ignorés.
 
 ### Simulation de fautes de frappe
 
@@ -204,6 +204,22 @@ typo_correction_style: "mixed"
 ```
 
 Exemple de fautes AZERTY : `bonjour → bonjpur`, `salut → slaut`, `comment → cpmment`.
+
+### Messages vocaux (TTS)
+
+Avec une probabilité configurable (`voice_message_chance`), la réponse est envoyée comme **message vocal Discord** au lieu de texte. Le pipeline :
+
+1. Le texte est nettoyé (mentions → `@utilisateur`, URLs supprimées, tronqué à 500 caractères)
+2. Synthèse vocale via **Piper TTS** (fichier WAV)
+3. Conversion WAV → OGG via `ffmpeg`
+4. Mesure de la durée via `ffprobe`
+5. Upload sur le CDN Discord (3 étapes : création d'attachment, PUT du fichier, POST du message vocal)
+
+Si le texte contient des emoji ou caractères spéciaux, le bot ignore le TTS et envoie le message en texte normal.
+
+```yaml
+voice_message_chance: 0.08
+```
 
 ### Reply style
 
@@ -230,7 +246,7 @@ flowchart LR
     A[Trigger reason] --> B{type ?}
     B -- mention --> C["delai 300-1500ms\nignore=0%\nreact=8%"]
     B -- dm --> D["delai 400-1800ms\nignore=0%\nreact=5%"]
-    B -- name --> E["delai 800-3000ms\nignore=5%\nreact=6%"]
+    B -- name --> E["delai 800-4000ms\nignore=5%\nreact=6%"]
     B -- keyword --> F["delai 1000-3500ms\nignore=8%\nreact=4%"]
     B -- follow-up --> G["delai 500-2000ms\nignore=0%\nreact=3%"]
     B -- random --> H["delai 1500-5000ms\nignore=15%\nreact=2%"]
@@ -241,7 +257,7 @@ flowchart LR
 |---------|-----------|-----------|---------------|-----------------|
 | `mention` | 300ms | 1500ms | 0% | 8% |
 | `dm` | 400ms | 1800ms | 0% | 5% |
-| `name` | 800ms | 3000ms | 5% | 6% |
+| `name` | 800ms | 4000ms | 5% | 6% |
 | `keyword` | 1000ms | 3500ms | 8% | 4% |
 | `follow-up` | 500ms | 2000ms | 0% | 3% |
 | `random` | 1500ms | 5000ms | 15% | 2% |
@@ -274,6 +290,26 @@ stateDiagram-v2
 ```
 
 Chaque clé est `"channelId:userId"` — un utilisateur ne peut avoir qu'un message en attente par salon. Quand la réponse en cours termine, le message en file est traité immédiatement.
+
+### Persistance d'état
+
+Le bot sauvegarde son état dans `state.json` pour survivre aux redémarrages :
+
+```mermaid
+flowchart LR
+    A[Mutation d'état] --> B[scheduleSave\ndebounce 500ms]
+    B --> C[writeFileSync\nstate.json]
+    D[Démarrage] --> E[loadState]
+    E --> F[restoreState\ntrigger.ts]
+    E --> G[récupère messages\nen attente via API]
+```
+
+**Ce qui est persisté :**
+- `pendingMessages` — file d'attente (channelId, messageId, userId, raison).
+- `paused` — état pause.
+- Cooldowns, timestamps d'activité, dernier interlocuteur, compteurs de follow-up.
+
+Sauvegardé à chaque mutation (ajout/retrait de la file, pause/dépause, clear) avec un debounce de 500ms pour grouper les changements rapides.
 
 ### Plages de sommeil
 
@@ -414,9 +450,9 @@ Voir le fichier complet à la racine.
 | Variable | Défaut | Description |
 |---|---|---|
 | `DISCORD_TOKEN` | — | Token du bot Discord (obligatoire) |
-| `LLAMA_CLI_PATH` | `../llama-b9682/llama-cli` | Chemin vers l'exécutable `llama-cli` |
-| `LLAMA_MODEL_PATH` | `./models/*.gguf` | Chemin du modèle GGUF |
-| `PORT` | `3124` | Port du serveur LLM HTTP |
+| `LLAMA_CLI_PATH` | `llama/llama-cli` | Chemin vers l'exécutable `llama-cli` |
+| `LLAMA_MODEL_PATH` | `models/Discord-Hermes-3-8B.Q2_K.gguf` | Chemin du modèle GGUF |
+| `LLM_PORT` | `3124` | Port du serveur LLM HTTP |
 
 ### `prompt.txt`
 
@@ -462,7 +498,9 @@ Le bot trace toutes ses décisions avec des préfixes filtrables :
 | `[mannerisms]` | Délai calculé, rolls d'ignore/réaction avec la valeur |
 | `[bot]` | Décision de répondre, follow-up immédiat, reply style choisi |
 | `[spontaneous]` | Message spontané envoyé ou réponse vide |
-| `[eris]` | Erreurs de la librairie Discord (attrapées sans crash, signalées par ❌) |
+| `[eris]` | Erreurs de la librairie Discord (attrapées sans crash, log uniquement) |
+| `[tts]` | Synthèse vocale, upload CDN, ou envoi de voice message |
+| `[persist]` | Sauvegarde/restauration de l'état du bot (`state.json`) |
 
 ---
 
@@ -494,11 +532,16 @@ npm start
 |---|---|
 | `npm run dev` | LLM server (hot) + esbuild watch + bot client (watch) |
 | `npm run start` | LLM server + bot client (production) |
-| `npm run build` | Bundle le bot avec esbuild → `self-cli.js` |
+| `npm run build` | Bundle bot + serveur avec esbuild → `self-cli.js` + `llm-server.js` |
+| `npm run build-client` | Bundle bot uniquement |
+| `npm run build-server` | Bundle serveur LLM uniquement |
 | `npm run client-only` | Build watch + bot client (sans LLM server) |
 | `npm run server-only` | LLM server uniquement |
 | `npm run lint` | Biome lint |
+| `npm run lint:write` | Biome lint avec auto-fix |
 | `npm run format` | Biome format |
+| `npm run check` | Biome check complet |
+| `npm run download-model` | Télécharge le modèle Discord-Hermes-3-8B.Q2_K.gguf depuis HuggingFace |
 
 ---
 
@@ -523,6 +566,8 @@ src/
 ├── typo.ts           # Simulation de fautes de frappe + correction
 ├── spontaneous.ts    # Messages spontanés pondérés
 ├── guild.ts          # findMostActiveChannel helper
+├── persistence.ts    # Sauvegarde/restauration d'état (state.json)
+├── tts.ts            # Synthèse vocale PiperTTS, upload CDN, voice messages
 ├── llm-server.ts     # Serveur HTTP NDJSON, spawn llama-cli, queue
 ├── llm-client.ts     # Client HTTP vers le serveur LLM
 └── llm.ts            # Ancienne version monolithique (archivée)
