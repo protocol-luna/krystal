@@ -10,6 +10,7 @@ import {
 	typoLayout,
 } from "./config.js";
 import { askLLM, resetLLM } from "./core/llm-core.js";
+import { llmBus } from "./core/llm-bus.js";
 import { evaluateMessage, type TriggerResult } from "./state/trigger.js";
 import {
 	isRecentBotActivity,
@@ -40,10 +41,9 @@ import { loadState } from "./state/persistence.js";
 import {
 	processing,
 	pendingKey,
-	saveAllState,
+	queuePending,
 	markProcessing,
 	doneProcessing,
-	queuePending,
 	drainPending,
 	restorePending,
 } from "./bot/pending.js";
@@ -93,6 +93,8 @@ async function triggerLunaReply(
 		? { messageReference: false, mentionRepliedUser: false }
 		: style;
 
+	let onToken: ((chunk: string) => void) | null = null;
+
 	try {
 		const content = message.content
 			.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "")
@@ -104,15 +106,14 @@ async function triggerLunaReply(
 		const isVoice = shouldSendVoice();
 		const chunks: string[] = [];
 
-		const fullText = await askLLM(
-			{ username: displayName, text: content },
-			{
-				onFirstToken: isVoice ? undefined : startTyping,
-				onChunk: (chunk: string) => {
-					chunks.push(chunk);
-				},
-			}
-		);
+		onToken = (chunk: string) => chunks.push(chunk);
+		llmBus.on("token", onToken);
+
+		if (!isVoice) {
+			llmBus.once("token", startTyping);
+		}
+
+		const fullText = await askLLM({ username: displayName, text: content });
 
 		if (isVoice && !hasUnsafeTTSText(fullText)) {
 			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
@@ -186,6 +187,9 @@ async function triggerLunaReply(
 		if (typingInterval) {
 			clearInterval(typingInterval);
 		}
+		if (onToken) {
+			llmBus.off("token", onToken);
+		}
 
 		const queued = drainPending(key);
 		if (queued) {
@@ -213,7 +217,6 @@ async function handleCommand(
 		clearCooldown(channelId);
 		trackSpeaker(channelId, message.author.id);
 		setPaused(true);
-		saveAllState();
 		try {
 			await message.addReaction("✅");
 		} catch {
@@ -225,7 +228,6 @@ async function handleCommand(
 
 	if (result.reason === "start") {
 		setPaused(false);
-		saveAllState();
 		try {
 			await message.addReaction("✅");
 		} catch {
@@ -239,7 +241,6 @@ async function handleCommand(
 		await resetLLM();
 		clearCooldown(channelId);
 		trackSpeaker(channelId, message.author.id);
-		saveAllState();
 		try {
 			await message.addReaction("✅");
 		} catch {

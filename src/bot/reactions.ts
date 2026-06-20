@@ -1,7 +1,6 @@
 import * as Eris from "eris";
 import { resetLLM } from "../core/llm-core.js";
 import { clearCooldown, trackSpeaker, setPaused } from "../state/state.js";
-import { saveAllState } from "./pending.js";
 
 export const reactionCommands: Record<string, "stop" | "start" | "clear"> = {
 	"❌": "stop",
@@ -31,15 +30,12 @@ export async function handleReactionCommand(
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
 		setPaused(true);
-		saveAllState();
 	} else if (cmd === "start") {
 		setPaused(false);
-		saveAllState();
 	} else if (cmd === "clear") {
 		await resetLLM();
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
-		saveAllState();
 	}
 
 	try {

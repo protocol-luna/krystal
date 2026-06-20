@@ -1,4 +1,5 @@
 import { cooldownSeconds } from "../config.js";
+import { stateBus } from "./state-bus.js";
 
 const channelCooldowns = new Map<string, number>();
 const botActivity = new Map<string, number>();
@@ -18,6 +19,7 @@ export function isPaused(): boolean {
 
 export function setPaused(v: boolean): void {
 	paused = v;
+	stateBus.emit("state:changed");
 }
 
 export function isOnCooldown(channelId: string): boolean {
@@ -38,10 +40,12 @@ export function markReplied(channelId: string): void {
 		const c = responseCount.get(channelId) ?? 1;
 		responseCount.set(channelId, Math.max(0, c - 1));
 	}, FOLLOWUP_WINDOW);
+	stateBus.emit("state:changed");
 }
 
 export function markBotActivity(channelId: string): void {
 	botActivity.set(channelId, Date.now());
+	stateBus.emit("state:changed");
 }
 
 export function isRecentBotActivity(
@@ -61,6 +65,7 @@ export function trackSpeaker(
 ): string | undefined {
 	const previous = lastSpeaker.get(channelId);
 	lastSpeaker.set(channelId, { userId: authorId, timestamp: Date.now() });
+	stateBus.emit("state:changed");
 	return previous?.userId;
 }
 
@@ -87,6 +92,7 @@ export function clearCooldown(channelId: string): void {
 	botActivity.delete(channelId);
 	responseCount.delete(channelId);
 	lastSpeaker.delete(channelId);
+	stateBus.emit("state:changed");
 }
 
 export function dumpState() {

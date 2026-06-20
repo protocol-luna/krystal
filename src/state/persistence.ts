@@ -1,5 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { stateBus } from "./state-bus.js";
+import { dumpState } from "./state.js";
 
 const STATE_FILE = path.resolve("state.json");
 
@@ -92,3 +94,15 @@ export function scheduleSave(state: PersistedState): void {
 		saveTimer = null;
 	}, 500);
 }
+
+stateBus.on("state:changed", () => {
+	const raw = dumpState();
+	scheduleSave({
+		pendingMessages: [],
+		paused: raw.paused,
+		channelCooldowns: raw.channelCooldowns,
+		botActivity: raw.botActivity,
+		lastSpeaker: raw.lastSpeaker,
+		responseCount: raw.responseCount,
+	});
+});

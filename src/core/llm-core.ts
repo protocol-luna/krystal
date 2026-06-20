@@ -1,38 +1,34 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { LLAMA_CLI_PATH, llamaArgs } from "../config.js";
+import { llmBus } from "./llm-bus.js";
 
 export interface UserMessage {
 	username: string;
 	text: string;
 }
 
-export interface LLMCallbacks {
-	onFirstToken?: () => void;
-	onChunk: (chunk: string) => void;
-}
-
 interface QueueItem {
 	userMessage: UserMessage;
-	callbacks: LLMCallbacks;
 	resolve: (value: string) => void;
 	reject: (reason: unknown) => void;
+	onFirstToken?: () => void;
+	onChunk?: (chunk: string) => void;
 }
 
 const requestQueue: QueueItem[] = [];
 let queueHead = 0;
 let isProcessing = false;
-let currentOnChunk: ((chunk: string) => void) | null = null;
-let currentOnDone: ((text: string) => void) | null = null;
-let currentOnFirstToken: (() => void) | null = null;
 let isModelReady = false;
 let stdoutBuffer = "";
 let currentUsername = "";
+let currentItem: QueueItem | null = null;
+let hasSentFirstToken = false;
 
 let llama: ChildProcess;
 let shutdownRequested = false;
 let restartCount = 0;
 const MAX_RESTARTS = 5;
-let restartDelay = 1_000; // doubles each attempt
+let restartDelay = 1_000;
 
 function spawnLlama(): void {
 	console.log(`[llm-core] spawn: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
@@ -40,10 +36,6 @@ function spawnLlama(): void {
 
 	isModelReady = false;
 	stdoutBuffer = "";
-
-	currentOnFirstToken = null;
-	currentOnChunk = null;
-	currentOnDone = null;
 	isProcessing = false;
 
 	llama.stdout!.on("data", handleStdout);
@@ -64,11 +56,13 @@ function spawnLlama(): void {
 			return;
 		}
 		console.error(`[llm-core] llama-cli crashé (code=${code}), redémarrage...`);
+		llmBus.emit("crash", code);
 		scheduleRestart();
 	});
 
 	llama.on("error", (err: Error) => {
 		console.error(`[llm-core] erreur spawn: ${err.message}`);
+		llmBus.emit("error", err);
 		scheduleRestart();
 	});
 }
@@ -123,6 +117,7 @@ function handleStdout(data: Buffer): void {
 			isModelReady = true;
 			restartCount = 0;
 			restartDelay = 1_000;
+			llmBus.emit("ready");
 			console.log("[llm-core] modèle prêt");
 			void processQueue();
 		}
@@ -131,29 +126,24 @@ function handleStdout(data: Buffer): void {
 
 	stdoutBuffer += str;
 
-	if (!(currentOnChunk || currentOnDone)) {
-		return;
-	}
-
-	if (currentOnFirstToken) {
-		currentOnFirstToken();
-		currentOnFirstToken = null;
-	}
-
 	const endMatch = stdoutBuffer.match(/\n> $/);
 	if (endMatch) {
 		const fullText = stdoutBuffer.slice(0, endMatch.index);
 		stdoutBuffer = "";
 		const cleaned = cleanFullResponse(fullText);
-		for (const line of cleaned.split("\n")) {
-			const l = line.trim();
-			if (l) {
-				currentOnChunk?.(l);
+		const lines = cleaned
+			.split("\n")
+			.map((l) => l.trim())
+			.filter(Boolean);
+		for (const l of lines) {
+			if (!hasSentFirstToken) {
+				hasSentFirstToken = true;
+				currentItem?.onFirstToken?.();
 			}
+			llmBus.emit("token", l);
+			currentItem?.onChunk?.(l);
 		}
-		if (currentOnDone) {
-			currentOnDone(cleaned);
-		}
+		llmBus.emit("done", cleaned);
 		return;
 	}
 
@@ -171,7 +161,12 @@ function handleStdout(data: Buffer): void {
 
 	const cleaned = cleanLine(chunk);
 	if (cleaned) {
-		currentOnChunk?.(cleaned);
+		if (!hasSentFirstToken) {
+			hasSentFirstToken = true;
+			currentItem?.onFirstToken?.();
+		}
+		llmBus.emit("token", cleaned);
+		currentItem?.onChunk?.(cleaned);
 	}
 }
 
@@ -188,29 +183,36 @@ function processQueue(): void {
 		queueHead = 0;
 	}
 
-	const { userMessage, callbacks, resolve } = item;
+	const { userMessage, resolve } = item;
 	stdoutBuffer = "";
 	currentUsername = userMessage.username;
+	currentItem = item;
+	hasSentFirstToken = false;
 
-	currentOnFirstToken = callbacks.onFirstToken ?? null;
-	currentOnChunk = callbacks.onChunk;
-	currentOnDone = (text: string) => {
-		currentOnChunk = null;
-		currentOnDone = null;
-		resolve(text);
+	const doneHandler = (text: string) => {
+		llmBus.off("done", doneHandler);
+		currentItem = null;
 		isProcessing = false;
+		resolve(text);
 		setTimeout(() => processQueue(), 100);
 	};
+	llmBus.on("done", doneHandler);
 
 	llama.stdin!.write(`${userMessage.username}: ${userMessage.text}\n`);
 }
 
 export function askLLM(
 	userMessage: UserMessage,
-	callbacks: LLMCallbacks
+	callbacks?: { onFirstToken?: () => void; onChunk?: (chunk: string) => void }
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
-		requestQueue.push({ userMessage, callbacks, resolve, reject });
+		requestQueue.push({
+			userMessage,
+			resolve,
+			reject,
+			onFirstToken: callbacks?.onFirstToken,
+			onChunk: callbacks?.onChunk,
+		});
 		void processQueue();
 	});
 }
@@ -223,9 +225,8 @@ export async function resetLLM(): Promise<void> {
 	requestQueue.length = 0;
 	queueHead = 0;
 	isProcessing = false;
-	currentOnChunk = null;
-	currentOnDone = null;
 	stdoutBuffer = "";
+	llmBus.emit("reset");
 	llama.stdin!.write("/clear\n");
 	await new Promise<void>((resolve) => {
 		const timeout = setTimeout(resolve, 5_000);
@@ -246,5 +247,4 @@ export function shutdown(): void {
 	llama?.kill();
 }
 
-// Initial spawn
 spawnLlama();
