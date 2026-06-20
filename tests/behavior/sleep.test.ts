@@ -1,26 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
-
-function mockSleepSchedule(overrides: Record<string, unknown> = {}) {
-	mock.module("../../src/config.js", () => ({
-		config: {
-			get sleepSchedule() {
-				return {
-					enabled: true,
-					start: "00:00",
-					end: "23:59",
-					timezone: "UTC",
-					behavior: "sleep",
-					...overrides,
-				};
-			},
-		},
-	}));
-}
+import { describe, it, expect, beforeAll, afterAll, } from "bun:test";
+import { mockConfig } from "../_mock-config.js";
 
 describe("getSleepBehavior enabled", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
-		mockSleepSchedule();
+		mockConfig({
+			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "sleep" },
+		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
@@ -35,7 +21,9 @@ describe("getSleepBehavior enabled", () => {
 describe("getSleepBehavior slow", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
-		mockSleepSchedule({ behavior: "slow" });
+		mockConfig({
+			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "slow" },
+		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
@@ -50,7 +38,9 @@ describe("getSleepBehavior slow", () => {
 describe("getSleepBehavior short", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
-		mockSleepSchedule({ behavior: "short" });
+		mockConfig({
+			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "short" },
+		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
@@ -64,13 +54,9 @@ describe("getSleepBehavior short", () => {
 
 describe("getSleepBehavior disabled", () => {
 	beforeAll(() => {
-		mock.module("../../src/config.js", () => ({
-			config: {
-				get sleepSchedule() {
-					return { enabled: false };
-				},
-			},
-		}));
+		mockConfig({
+			sleepSchedule: { enabled: false },
+		});
 	});
 
 	it("returns null when disabled", async () => {
@@ -81,19 +67,9 @@ describe("getSleepBehavior disabled", () => {
 
 describe("getSleepBehavior outside window", () => {
 	beforeAll(() => {
-		mock.module("../../src/config.js", () => ({
-			config: {
-				get sleepSchedule() {
-					return {
-						enabled: true,
-						start: "23:00",
-						end: "00:00",
-						timezone: "UTC",
-						behavior: "sleep",
-					};
-				},
-			},
-		}));
+		mockConfig({
+			sleepSchedule: { enabled: true, start: "23:00", end: "00:00", timezone: "UTC", behavior: "sleep" },
+		});
 	});
 
 	it("returns null when current time is outside window", async () => {

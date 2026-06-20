@@ -76,7 +76,7 @@ describe("applyTypo", () => {
 		expect(result).not.toBeNull();
 		let diffs = 0;
 		for (let i = 0; i < result!.text.length; i++) {
-			if (result!.text[i] !== result!.original[i]) diffs++;
+			if (result!.text[i] !== result!.original[i]) { diffs++; }
 		}
 		expect(diffs).toBe(1);
 	});
