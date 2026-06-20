@@ -2,14 +2,14 @@
 
 ## Comportement de "frappe"
 - [x] Délai entre chunks basé sur un WPM "humain" (au lieu des délais fixes actuels) [Implémenté : config.typingWpm, 300 WPM par défaut]
-- [!] Commencer par une hésitation aléatoire ("Uh...", "Um...", "Well...", "I mean...") [Reformulé en anglais — retiré dépréciation]
+- [x] Commencer par une hésitation aléatoire ("Uh...", "Um...", "Well...", "I mean...") [Implémenté : hesitationChance, configurable]
 - [x] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond [Implémenté : msgLength dans computeDelay]
 
 ## Corrections et erreurs
 - ~~[/] Fautes de grammaire intentionnelles (rare, type "j'ai vu" → "j'ai vue") [Trop d'effort, LLM en fait déjà naturellement]~~
 - [~] Auto-correction "humaine" (corriger un doigt qui a dérapé entre deux mots différents, pas seulement adjacent) [Passé en ~, trop d'effort pour le rendu]
 - ~~[~] Changer d'avis : éditer le message après envoi pour ajouter/supprimer un mot [Barré — trop d'effort pour un détail quasi imperceptible]~~
-- [!] Oubli de répondre malgré trigger (probabilité faible)
+- [x] Oubli de répondre malgré trigger (probabilité faible) [Implémenté : forgetChance dans config]
 
 ## Contexte temporel et humeur
 ~~- [~] Ton adapté à l'heure : plus fatiguée / irritable le soir, plus énergique le matin [Barré — injection ignorée par le modèle, restart trop lourd]~~

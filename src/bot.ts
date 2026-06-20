@@ -136,6 +136,13 @@ async function triggerLunaReply(
 
 			let isFirstChunk = true;
 			let typoMessageId: string | null = null;
+
+			if (chunks.length > 0 && Math.random() < config.hesitationChance) {
+				const words = config.hesitationWords;
+				const word = words[Math.floor(Math.random() * words.length)];
+				chunks[0] = `${word} `;
+			}
+
 			for (const chunk of chunks) {
 				if (!isFirstChunk) {
 					const cpm = config.typingWpm * 5;
@@ -354,6 +361,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		trackSpeaker(message.channel.id, message.author.id);
 		if (shouldIgnore(result.reason, sleepBehavior)) {
 			console.log(`[bot] #${channelName} ${author}: ignoré (${result.reason})`);
+			return;
+		}
+
+		if (Math.random() < config.forgetChance) {
+			console.log(`[bot] #${channelName} ${author}: oublié (${result.reason})`);
 			return;
 		}
 

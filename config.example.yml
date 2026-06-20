@@ -152,6 +152,20 @@ inactivity_warmup_minutes: 10
 inactivity_warmup_multiplier: 2
 # Simule le "réveil" : réponse plus lente après une période d'inactivité.
 
+# --- Hesitation — le bot hésite parfois avant de répondre ---
+hesitation_chance: 0.15
+hesitation_words:
+  - "uh..."
+  - "um..."
+  - "well..."
+  - "i mean..."
+  - "hmm..."
+  - "so..."
+
+# --- Forget — le bot oublie parfois de répondre ---
+forget_chance: 0.03
+# Probabilité faible que le bot ignore un message même après trigger.
+
 # --- Sleep schedule (plages de sommeil / présence variable) ---
 sleep_schedule:
   enabled: false

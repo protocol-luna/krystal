@@ -342,6 +342,22 @@ export const config = {
 	get typingWpm(): number {
 		return v<number>("typing_wpm", 300);
 	},
+	get hesitationChance(): number {
+		return v<number>("hesitation_chance", 0.15);
+	},
+	get hesitationWords(): string[] {
+		return v<string[]>("hesitation_words", [
+			"uh...",
+			"um...",
+			"well...",
+			"i mean...",
+			"hmm...",
+			"so...",
+		]);
+	},
+	get forgetChance(): number {
+		return v<number>("forget_chance", 0.03);
+	},
 	get inactivityWarmupMinutes(): number {
 		return v<number>("inactivity_warmup_minutes", 10);
 	},
