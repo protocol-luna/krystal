@@ -422,7 +422,9 @@ src/
 ├── bot.ts            # Client Eris, message handler, triggerLunaReply
 ├── config.ts         # Toute la configuration (env, triggers, LLM, styles)
 ├── trigger.ts        # Évaluation des messages, cooldowns, follow-up
-├── mannerisms.ts     # Délai, ignore, réactions
+├── mannerisms.ts     # Délai, ignore, réactions, concentration
+├── sleep.ts          # Plages de sommeil (présence variable)
+├── typo.ts           # Simulation de fautes de frappe + correction
 ├── spontaneous.ts    # Messages spontanés pondérés
 ├── guild.ts          # findMostActiveChannel helper
 ├── llm-server.ts     # Serveur HTTP NDJSON, spawn llama-cli, queue
@@ -439,6 +441,8 @@ sequenceDiagram
     participant bot.ts
     participant trigger.ts
     participant mannerisms.ts
+    participant sleep.ts
+    participant typo.ts
     participant llm-client.ts
     participant llm-server.ts
     participant llama
@@ -448,42 +452,64 @@ sequenceDiagram
     bot.ts->>trigger.ts: evaluateMessage()
     trigger.ts-->>bot.ts: { shouldRespond, reason }
 
+    bot.ts->>sleep.ts: getSleepBehavior()
+    sleep.ts-->>bot.ts: behavior (sleep/slow/short/null)
+    alt sleep mode + pas mention/dm
+        bot.ts-->>Discord: ignoré
+    end
+
     alt shouldRespond = true
         bot.ts->>trigger.ts: markReplied() + trackSpeaker()
-        bot.ts->>mannerisms.ts: shouldIgnore(reason)
+        bot.ts->>mannerisms.ts: shouldIgnore(reason, sleepBehavior)
         alt ignoré
             mannerisms.ts-->>bot.ts: true → return
         else pas ignoré
-            bot.ts->>mannerisms.ts: computeDelay(reason)
+            bot.ts->>mannerisms.ts: computeDelay(reason, sleepBehavior)
             mannerisms.ts-->>bot.ts: delay ms
             bot.ts-->>bot.ts: attend delay
-            bot.ts->>mannerisms.ts: shouldReact(reason) + pickReaction()
+            bot.ts->>mannerisms.ts: shouldReact(reason, sleepBehavior) + pickReaction()
             alt réaction
                 bot.ts->>Discord: addReaction()
             end
-            bot.ts->>llm-client.ts: askLLM({ username, text })
-            llm-client.ts->>llm-server.ts: POST /ask (NDJSON)
-            llm-server.ts->>llama: stdin (prompt)
-            llama-->>llm-server.ts: stdout stream
-            llm-server.ts-->>llm-client.ts: NDJSON stream
-            llm-client.ts-->>bot.ts: onFirstToken()
-            bot.ts->>Discord: sendChannelTyping()
-            loop every 8s
+
+            bot.ts->>bot.ts: check processing["C:U"]
+            alt déjà en cours
+                bot.ts->>bot.ts: stocke dans pendingMessages["C:U"]
+                bot.ts-->>Discord: ignoré (mis en attente)
+            else libre
+                bot.ts->>llm-client.ts: askLLM({ username, text })
+                llm-client.ts->>llm-server.ts: POST /ask (NDJSON)
+                llm-server.ts->>llama: stdin (prompt)
+                llama-->>llm-server.ts: stdout stream
+                llm-server.ts-->>llm-client.ts: NDJSON stream
+                llm-client.ts-->>bot.ts: onFirstToken()
                 bot.ts->>Discord: sendChannelTyping()
+                loop every 8s
+                    bot.ts->>Discord: sendChannelTyping()
+                end
+                loop each chunk
+                    llm-client.ts-->>bot.ts: onChunk(chunk)
+                    bot.ts->>bot.ts: délai inter-chunk
+                    bot.ts->>bot.ts: typo possible (applyTypo)
+                    bot.ts->>Discord: createMessage(chunk)
+                    bot.ts->>trigger.ts: markBotActivity()
+                end
+                alt typo appliqué
+                    bot.ts->>Discord: editMessage (correction après 2-4s)
+                end
+                bot.ts->>trigger.ts: trackSpeaker(bot)
+                bot.ts->>bot.ts: pendingMessages["C:U"] ?
+                alt message en attente
+                    bot.ts->>bot.ts: triggerLunaReply(msg en attente)
+                end
             end
-            loop each chunk
-                llm-client.ts-->>bot.ts: onChunk(chunk)
-                bot.ts->>Discord: createMessage(chunk)
-                bot.ts->>trigger.ts: markBotActivity()
-            end
-            bot.ts->>trigger.ts: trackSpeaker(bot)
         end
     else shouldRespond = false
         bot.ts->>trigger.ts: canFollowUp()
         alt follow-up
             bot.ts->>trigger.ts: markReplied()
-            bot.ts->>mannerisms.ts: computeDelay("follow-up")
-            bot.ts->>mannerisms.ts: shouldReact("follow-up")
+            bot.ts->>mannerisms.ts: computeDelay("follow-up", sleepBehavior)
+            bot.ts->>mannerisms.ts: shouldReact("follow-up", sleepBehavior)
             bot.ts->>Discord: (delay, réaction, réponse...)
         else
             bot.ts->>trigger.ts: trackSpeaker(user)
