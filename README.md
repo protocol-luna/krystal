@@ -1,6 +1,6 @@
 # pixieglow
 
-Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de façon naturelle — sommeil, inattention, fautes de frappe, messages vocaux, file anti-spam, persistance, auto-restart.
+Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de façon naturelle — sommeil, inattention, fautes de frappe, hésitations, oublis, messages vocaux, tempo WPM, file anti-spam, persistance, auto-restart, statut rotatif.
 
 - Modèle fine-tuné sur [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M échanges, 17M turns)
 - Format GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
@@ -81,13 +81,22 @@ flowchart TD
     D -- "oui 🌙" --> E["🙈 Ignoré\n(sauf mention)"]
     D -- "non" --> F{"🎯 Le bot est\nconcerné ?"}
     F -- "non" --> G["👋 Pas répondu\n(pas pour lui)"]
-    F -- "oui" --> H["⏳ Attend un peu\n(et réagit peut-être)"]
-    H --> I["✍️ Tape la réponse\nen plusieurs messages"]
-    I --> J{"🗣️ Réponse\nvocale ?"}
-    J -- "oui" --> K["🎵 Envoie un\nmessage vocal"]
-    J -- "non" --> L["💬 Continue\n(avec fautes, délais...)"]
-    K --> M["✔️ Fini !"]
+    F -- "oui" --> H{"🤷 Oublié ?\n(forget_chance)"}
+    H -- "oui 3%" --> I["🙈 Ignoré\n(silence)"]
+    H -- "non" --> J["⏳ Attend\n(délai + réaction)"]
+    J --> K{"📈 Inactif\ndepuis 10min+ ?"}
+    K -- "oui" --> L["×2 warmup"]
     L --> M
+    K -- "non" --> M["✍️ Hésite ?\n(hesitation_chance)"]
+    M -- "15%" --> N["uh... bien sûr\nque oui"]
+    M -- "non" --> O["réponse\ndirecte"]
+    N --> P["✍️ Tape en WPM\n(1 chunk = 1 msg)"]
+    O --> P
+    P --> Q{"🗣️ Réponse\nvocale ?"}
+    Q -- "oui" --> R["🎵 Envoie un\nmessage vocal"]
+    Q -- "non" --> S["💬 Continue\n(avec fautes, délais...)"]
+    R --> T["✔️ Fini !"]
+    S --> T
 ```
 
 ---
@@ -105,6 +114,7 @@ stateDiagram-v2
     state "Évaluation" as eval
     state "Sommeil ?" as sleep
     state "Ignore ?" as ignore
+    state "Oubli ?" as forget
     state "Délai + Réaction" as prereply
     state "Réponse LLM" as reply
     state "Follow-up ?" as followup
@@ -149,6 +159,8 @@ stateDiagram-v2
 
     prereply --> ignore : roll < chance
     ignore --> [*] : ignoré
+    prereply --> forget : roll < forget_chance
+    forget --> [*] : oublié
     prereply --> reply : pas ignoré
 
     reply --> track
@@ -273,7 +285,7 @@ Pas de typing pendant le délai de concentration — le typing n'apparaît que q
 
 ### Réponse multi-chunk
 
-Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai proportionnel à la longueur du chunk (`min(délai × length/200, 1)`) entre chaque message — simule le temps d'écrire. Seul le premier message a un `messageReference` (reply visuel). En mode vocal, le typing indicator est désactivé et les chunks sont ignorés (un seul message vocal).
+Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai calculé via WPM (`typing_wpm`, défaut 300) entre chaque message — `delay = (chunk.length / (wpm * 5)) * 60000 * random(0.5-1.0)`. Simule le temps d'écrire chaque message individuellement. Seul le premier message a un `messageReference` (reply visuel). En mode vocal, le typing indicator est désactivé et les chunks sont ignorés (un seul message vocal).
 
 ### Réactions
 
@@ -360,6 +372,22 @@ flowchart LR
 ```
 
 **Sélection du serveur** : classement par `lastMessageID` du salon le plus actif, poids linéaire décroissant (le serveur le plus actif a N× plus de chances que le dernier).
+
+### Hésitation
+
+Le bot commence parfois sa réponse par un mot d'hésitation : `uh...`, `um...`, `well...`, `i mean...`, `hmm...`, `so...`. Configurable via `hesitation_chance` (défaut 15%) et `hesitation_words`.
+
+### Oubli
+
+Même après avoir matché un trigger, le bot peut "oublier" de répondre avec une probabilité `forget_chance` (défaut 3%). Aucun message, aucune réaction — comme s'il n'avait pas vu.
+
+### Inactivity warmup
+
+Si le bot n'a pas été actif depuis `inactivity_warmup_minutes` (défaut 10 min), le délai de réponse est multiplié par `inactivity_warmup_multiplier` (défaut ×2) — simule un temps de "réveil" après une absence.
+
+### Statut Discord dynamique
+
+Le statut Discord alterne entre plusieurs presets configurés (`dynamic_status_presets`), avec une rotation toutes les `dynamic_status_interval_minutes` minutes. Types supportés : Playing (0), Streaming (1), Listening (2), Watching (3), Custom (4), Competing (5). Pendant les heures de sommeil, le bot passe en `invisible`.
 
 ### Anti-spam
 
@@ -537,7 +565,9 @@ end
 
 ## Configuration
 
-Fichier unique `config.yml`. Variables d'env shell surchargent les clés YAML si présentes.
+Fichier unique `config.yml`. Variables d'env shell surchargent les clés YAML si présentes. Hot-reload pour les valeurs dynamiques (triggers, délais, comportements) — pas de restart nécessaire.
+
+Voir `config.example.yml` pour la liste exhaustive : LLM, TTS, triggers, concentration, typos, WPM, hesitation, forget, inactivity warmup, statut dynamique, sleep, spontané, reply styles.
 
 ### `system_prompt`
 
@@ -608,10 +638,10 @@ xychart-beta
 ## Logs
 
 | Préfixe | Info |
-|---|---|
+|---|---|---|
 | `[trigger]` | Évaluation + résultat de chaque message |
-| `[mannerisms]` | Délai, ignore, réaction |
-| `[bot]` | Décision, follow-up, reply style |
+| `[mannerisms]` | Délai, ignore, réaction, msgLength, inactivity |
+| `[bot]` | Décision, follow-up, reply style, oubli |
 | `[tts]` | Synthèse, upload, voice message |
 | `[persist]` | Sauvegarde/restauration |
 | `[llm-core]` | Spawn, crash, restart, mode CLI/server |
