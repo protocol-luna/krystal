@@ -10,7 +10,14 @@ system_prompt: |
 discord_token: "ton_token_ici"
 llama_cli_path: "bin/llama/llama-cli"
 llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
+# Hôte du LLM — utilisé uniquement en mode "server"
+llm_host: "localhost"
+# Port du LLM (CLI ou serveur HTTP llama-server)
 llm_port: 3124
+# Mode de connexion au LLM :
+#   "cli"    → spawn llama-cli en subprocess (défaut)
+#   "server" → HTTP POST à llama-server (endpoint /completion, SSE)
+llm_mode: "cli"
 tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
 tts_binary_path: "bin/piper/piper"
 ffmpeg_path: "bin/ffmpeg/ffmpeg"
