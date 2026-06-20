@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { applyTypo } from "./typo.js";
+import { applyTypo } from "../../src/behavior/typo.js";
 
 describe("applyTypo", () => {
 	let originalRandom: typeof Math.random;

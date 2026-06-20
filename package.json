@@ -14,9 +14,9 @@
     "check": "bunx --bun @biomejs/biome check ./src",
     "lint": "bunx --bun @biomejs/biome lint ./src",
     "lint:write": "bunx --bun @biomejs/biome lint --write ./src",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage",
+    "test": "bun test ./tests",
+    "test:watch": "bun test --watch ./tests",
+    "test:coverage": "bun test --coverage ./tests",
     "download-model": "mkdir models && cd models && wget https://huggingface.co/mradermacher/Discord-Hermes-3-8B-GGUF/resolve/main/Discord-Hermes-3-8B.Q2_K.gguf && cd .."
   },
   "dependencies": {
