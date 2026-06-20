@@ -30,7 +30,7 @@ import { getSleepBehavior } from "./sleep.js";
 import { applyTypo } from "./typo.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
-	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
+	intents: ["guilds", "guildMessages", "guildMessageReactions", "messageContent", "directMessages"],
 });
 
 const processing = new Set<string>();
@@ -163,17 +163,7 @@ async function triggerLunaReply(
 		trackSpeaker(message.channel.id, client.user.id);
 	} catch (err) {
 		console.error(err);
-		await client
-			.createMessage(message.channel.id, {
-				content: `Erreur interne avec le processus llama-cli : ${(err as Error).message}`,
-				...(refStyle.messageReference
-					? {
-							messageReference: { messageID: message.id },
-							allowedMentions: { repliedUser: style.mentionRepliedUser },
-						}
-					: {}),
-			})
-			.then(() => markBotActivity(message.channel.id));
+		try { await message.addReaction("❌"); } catch { /* ignore */ }
 	} finally {
 		processing.delete(key);
 		if (typingInterval) {
@@ -224,10 +214,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, message.author.id);
 		setPaused(true);
-		await client.createMessage(
-			message.channel.id,
-			"⏸️  Bot mis en pause. Envoie `-start` pour réactiver."
-		);
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
 
@@ -236,7 +223,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			`[bot] #${channel.name ?? message.channel.id} ${author}: -start → reprise`
 		);
 		setPaused(false);
-		await client.createMessage(message.channel.id, "▶️  Bot réactivé !");
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
 
@@ -247,10 +234,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		await resetLLM();
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, message.author.id);
-		await client.createMessage(
-			message.channel.id,
-			"🧹  Historique et mémoire effacés !"
-		);
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
 		return;
 	}
 
@@ -313,6 +297,39 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	}
 
 	trackSpeaker(message.channel.id, message.author.id);
+});
+
+const reactionCommands: Record<string, "stop" | "start" | "clear"> = {
+	"❌": "stop",
+	"▶️": "start",
+	"🗑️": "clear",
+};
+
+client.on("messageReactionAdd", async (message: Eris.Message, emoji: { name: string; id?: string }, userId: string) => {
+	if (userId === client.user.id) { return; }
+	if (message.author.id !== client.user.id) { return; }
+	if (!(message.channel instanceof Eris.TextChannel)) { return; }
+
+	const cmd = reactionCommands[emoji.name];
+	if (!cmd) { return; }
+
+	console.log(`[bot] #${message.channel.name} réaction ${emoji.name} → ${cmd}`);
+
+	if (cmd === "stop") {
+		await resetLLM();
+		clearCooldown(message.channel.id);
+		trackSpeaker(message.channel.id, userId);
+		setPaused(true);
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
+	} else if (cmd === "start") {
+		setPaused(false);
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
+	} else if (cmd === "clear") {
+		await resetLLM();
+		clearCooldown(message.channel.id);
+		trackSpeaker(message.channel.id, userId);
+		try { await message.addReaction("✅"); } catch { /* ignore */ }
+	}
 });
 
 export function startBot(): void {

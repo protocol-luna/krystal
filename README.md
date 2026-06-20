@@ -53,7 +53,8 @@ Le bot est prévu pour tourner sur un GGUF quantifié (ex. `Discord-Hermes-3-8B.
 stateDiagram-v2
     state "Message reçu" as received
     state "Skip bot" as skipbot
-    state "Commande ?" as cmd
+    state "Commande texte ?" as cmd_txt
+    state "Réaction commande ?" as cmd_rct
     state "Évaluation" as eval
     state "Sommeil ?" as sleep
     state "Ignore ?" as ignore
@@ -65,13 +66,18 @@ stateDiagram-v2
     received --> skipbot : author = bot ?
     skipbot --> [*] : oui (return)
 
-    skipbot --> cmd : non
-    cmd --> stop : -stop
-    cmd --> start : -start
-    cmd --> clear : -clear
-    cmd --> eval : autre
+    skipbot --> cmd_txt : non
+    cmd_txt --> stop : "-stop"
+    cmd_txt --> start : "-start"
+    cmd_txt --> clear : "-clear"
+    cmd_txt --> cmd_rct : autre
 
-    stop --> [*]
+    cmd_rct --> stop : ❌ réaction
+    cmd_rct --> start : ▶️ réaction
+    cmd_rct --> clear : 🗑️ réaction
+    cmd_rct --> eval : autre / pas une réaction
+
+    stop --> [*] : ✅ silencieux
     start --> [*]
     clear --> [*]
 
@@ -275,11 +281,27 @@ flowchart LR
 
 ## Commandes
 
+Les commandes sont **invisibles** — pas de message public, juste une ✅ de confirmation.
+
+### Par message texte
+
 | Commande | Effet |
 |---|---|
 | `-stop` | Pause tous les déclencheurs, reset le contexte LLM, vide les cooldowns |
 | `-start` | Réactive le bot |
 | `-clear` | Reset l'historique de conversation du salon + cooldowns + follow-up |
+
+### Par réactions
+
+Réagis sur **n'importe quel message du bot** avec :
+
+| Emoji | Effet |
+|---|---|
+| ❌ | Stop (pause + reset) |
+| ▶️ | Start (reprise) |
+| 🗑️ | Clear (reset historique) |
+
+En cas d'erreur interne, le bot réagit avec ❌ sur ton message au lieu d'afficher un gros message d'erreur.
 
 ---
 
@@ -372,7 +394,7 @@ Le bot trace toutes ses décisions avec des préfixes filtrables :
 | `[mannerisms]` | Délai calculé, rolls d'ignore/réaction avec la valeur |
 | `[bot]` | Décision de répondre, follow-up immédiat, reply style choisi |
 | `[spontaneous]` | Message spontané envoyé ou réponse vide |
-| `[eris]` | Erreurs de la librairie Discord (attrapées sans crash) |
+| `[eris]` | Erreurs de la librairie Discord (attrapées sans crash, signalées par ❌) |
 
 ---
 
