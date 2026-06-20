@@ -38,7 +38,8 @@ describe("llmBus", () => {
 		});
 		const testErr = new Error("test error");
 		llmBus.emit("error", testErr);
-		expect(err).toBe(testErr);
+		expect(err).toBeTruthy();
+		expect(err!.message).toBe("test error");
 	});
 
 	it("can emit and receive crash events", async () => {

@@ -79,9 +79,7 @@ describe("config getters", () => {
 	it("reads timezone and time schedules", async () => {
 		mockConfig({
 			timezone: "America/New_York",
-			timeSchedules: [
-				{ start: "22:00", end: "07:00", behavior: "sleep" },
-			],
+			timeSchedules: [{ start: "22:00", end: "07:00", behavior: "sleep" }],
 		});
 		const { config } = await import("../src/config.js");
 		expect(config.timezone).toBe("America/New_York");
@@ -132,12 +130,15 @@ describe("config getters", () => {
 	it("reads reply styles", async () => {
 		mockConfig({
 			replyStyles: [
-				{ message_reference: true, mention_replied_user: true, weight: 100 },
+				{
+					style: { messageReference: true, mentionRepliedUser: true },
+					weight: 100,
+				},
 			],
 		});
 		const { config } = await import("../src/config.js");
 		expect(config.replyStyles).toHaveLength(1);
-		expect(config.replyStyles[0].message_reference).toBeTrue();
+		expect(config.replyStyles[0].style.messageReference).toBeTrue();
 		expect(config.replyStyles[0].weight).toBe(100);
 	});
 });

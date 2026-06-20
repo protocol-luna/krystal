@@ -6,7 +6,7 @@ describe("requestUploadUrl", () => {
 
 	it("throws on non-ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 403 });
+		globalThis.fetch = (async () => new Response(null, { status: 403 })) as any;
 		const { requestUploadUrl } = await import("../../src/tts/upload.js");
 		await expect(requestUploadUrl("c1", 1000, 5)).rejects.toThrow(
 			"attachments POST 403"
@@ -16,8 +16,10 @@ describe("requestUploadUrl", () => {
 
 	it("throws on missing upload_url in response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () =>
-			new Response(JSON.stringify({ attachments: [{}] }), { status: 200 });
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ attachments: [{}] }), {
+				status: 200,
+			})) as any;
 		const { requestUploadUrl } = await import("../../src/tts/upload.js");
 		await expect(requestUploadUrl("c1", 1000, 5)).rejects.toThrow(
 			"URL d'upload"
@@ -27,7 +29,7 @@ describe("requestUploadUrl", () => {
 
 	it("returns upload URL and filename on success", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () =>
+		globalThis.fetch = (async () =>
 			new Response(
 				JSON.stringify({
 					attachments: [
@@ -38,7 +40,7 @@ describe("requestUploadUrl", () => {
 					],
 				}),
 				{ status: 200 }
-			);
+			)) as any;
 		const { requestUploadUrl } = await import("../../src/tts/upload.js");
 		const result = await requestUploadUrl("c1", 1000, 5);
 		expect(result.uploadUrl).toBe("https://cdn.example.com/upload");
@@ -52,7 +54,7 @@ describe("putFileToUploadUrl", () => {
 
 	it("throws on non-ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 400 });
+		globalThis.fetch = (async () => new Response(null, { status: 400 })) as any;
 		const { putFileToUploadUrl } = await import("../../src/tts/upload.js");
 		await expect(
 			putFileToUploadUrl("https://cdn.example.com/upload", Buffer.from("test"))
@@ -62,7 +64,7 @@ describe("putFileToUploadUrl", () => {
 
 	it("succeeds on ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 200 });
+		globalThis.fetch = (async () => new Response(null, { status: 200 })) as any;
 		const { putFileToUploadUrl } = await import("../../src/tts/upload.js");
 		await putFileToUploadUrl(
 			"https://cdn.example.com/upload",
@@ -77,7 +79,7 @@ describe("postVoiceMessage", () => {
 
 	it("throws on non-ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 429 });
+		globalThis.fetch = (async () => new Response(null, { status: 429 })) as any;
 		const { postVoiceMessage } = await import("../../src/tts/upload.js");
 		await expect(
 			postVoiceMessage("c1", "voice.ogg", 5, "dGVzdA==")
@@ -88,10 +90,10 @@ describe("postVoiceMessage", () => {
 	it("includes message_reference when replyToMessageId is given", async () => {
 		const originalFetch = globalThis.fetch;
 		let body = "";
-		globalThis.fetch = async (url: string, opts: any) => {
+		globalThis.fetch = (async (_url: string, opts: any) => {
 			body = opts.body;
 			return new Response(null, { status: 200 });
-		};
+		}) as any;
 		const { postVoiceMessage } = await import("../../src/tts/upload.js");
 		await postVoiceMessage("c1", "voice.ogg", 5, "dGVzdA==", "m1");
 		const parsed = JSON.parse(body);
@@ -103,10 +105,10 @@ describe("postVoiceMessage", () => {
 	it("omits message_reference when not given", async () => {
 		const originalFetch = globalThis.fetch;
 		let body = "";
-		globalThis.fetch = async (url: string, opts: any) => {
+		globalThis.fetch = (async (_url: string, opts: any) => {
 			body = opts.body;
 			return new Response(null, { status: 200 });
-		};
+		}) as any;
 		const { postVoiceMessage } = await import("../../src/tts/upload.js");
 		await postVoiceMessage("c1", "voice.ogg", 5, "dGVzdA==");
 		const parsed = JSON.parse(body);

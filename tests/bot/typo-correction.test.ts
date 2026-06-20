@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, mock } from "bun:test";
+import { describe, it, expect, beforeAll } from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
 describe("applyTypoCorrection", () => {
@@ -72,7 +72,7 @@ describe("resolveStyle", () => {
 			original: "test",
 			correctedWord: "test",
 		});
-		expect(style).toBe("edit");
+		expect(style as string | null).toBe("edit");
 	});
 
 	it("returns message when config is message", async () => {
@@ -94,7 +94,7 @@ describe("resolveStyle", () => {
 			original: "test",
 			correctedWord: "test",
 		});
-		expect(style).toBe("message");
+		expect(style as string | null).toBe("message");
 	});
 
 	it("handles errors gracefully", async () => {

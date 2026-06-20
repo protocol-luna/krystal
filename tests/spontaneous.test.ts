@@ -6,7 +6,7 @@ describe("trySpawn", () => {
 
 	function mockFetch(busy: boolean, responseBody = "") {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async (url: string) => {
+		globalThis.fetch = (async (url: string) => {
 			if (url.includes("/health")) {
 				return new Response(JSON.stringify({ busy }), { status: 200 });
 			}
@@ -15,9 +15,9 @@ describe("trySpawn", () => {
 			}
 			if (url.includes("/ask")) {
 				const lines = [
-					JSON.stringify({ type: "firstToken" }) + "\n",
-					JSON.stringify({ type: "chunk", data: responseBody }) + "\n",
-					JSON.stringify({ type: "done", data: responseBody }) + "\n",
+					`${JSON.stringify({ type: "firstToken" })}\n`,
+					`${JSON.stringify({ type: "chunk", data: responseBody })}\n`,
+					`${JSON.stringify({ type: "done", data: responseBody })}\n`,
 				];
 				const body = lines.join("");
 				const stream = new ReadableStream({
@@ -29,7 +29,7 @@ describe("trySpawn", () => {
 				return new Response(stream, { status: 200 });
 			}
 			return new Response(null, { status: 404 });
-		};
+		}) as any;
 		return originalFetch;
 	}
 

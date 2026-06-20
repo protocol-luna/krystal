@@ -17,7 +17,6 @@ describe("bot", () => {
 				default: class MockClient {
 					user = { id: "bot1", username: "Luna" };
 					guilds = new Map();
-					constructor(_token: string, _opts: any) {}
 					connect() {}
 					editStatus() {}
 					createMessage() {}
@@ -27,7 +26,6 @@ describe("bot", () => {
 				Client: class MockClient {
 					user = { id: "bot1", username: "Luna" };
 					guilds = new Map();
-					constructor(_token: string, _opts: any) {}
 					connect() {}
 					editStatus() {}
 					createMessage() {}

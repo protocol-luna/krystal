@@ -92,7 +92,7 @@ describe("pendingMessages", () => {
 		mod.queuePending("c1:u1", msg as any, "mention");
 		const drained = mod.drainPending("c1:u1");
 		expect(drained).not.toBeNull();
-		expect(drained!.message).toBe(msg);
+		expect((drained!.message as any).id).toBe((msg as any).id);
 		expect(drained!.reason).toBe("mention");
 	});
 

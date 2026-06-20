@@ -4,14 +4,15 @@ import { mockConfig } from "../../tests/_mock-config.js";
 function mockFetchOK() {
 	const orig = globalThis.fetch;
 	const encoder = new TextEncoder();
-	globalThis.fetch = async (url: string) => {
-		if (url.includes("/reset")) return new Response(null, { status: 200 });
+	globalThis.fetch = (async (url: string) => {
+		if (url.includes("/reset")) {
+			return new Response(null, { status: 200 });
+		}
 		if (url.includes("/ask")) {
-			const body =
-				[
-					JSON.stringify({ type: "chunk", data: "Hello" }),
-					JSON.stringify({ type: "done", data: "Hello" }),
-				].join("\n") + "\n";
+			const body = `${[
+				JSON.stringify({ type: "chunk", data: "Hello" }),
+				JSON.stringify({ type: "done", data: "Hello" }),
+			].join("\n")}\n`;
 			const stream = new ReadableStream({
 				start(controller) {
 					controller.enqueue(encoder.encode(body));
@@ -21,7 +22,7 @@ function mockFetchOK() {
 			return new Response(stream, { status: 200 });
 		}
 		return new Response(null, { status: 404 });
-	};
+	}) as any;
 	return orig;
 }
 
@@ -76,10 +77,12 @@ describe("resetLLM", () => {
 
 	it("clears queue and resets state in proxy mode", async () => {
 		const orig = globalThis.fetch;
-		globalThis.fetch = async (url: string) => {
-			if (url.includes("/reset")) return new Response(null, { status: 200 });
+		globalThis.fetch = (async (url: string) => {
+			if (url.includes("/reset")) {
+				return new Response(null, { status: 200 });
+			}
 			return new Response(null, { status: 404 });
-		};
+		}) as any;
 		const mod = await import("../../src/core/llm-core.js");
 		await mod.resetLLM();
 		expect(mod.isLLMBusy()).toBeFalse();

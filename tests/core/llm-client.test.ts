@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
+import { describe, it, expect, beforeAll } from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
 describe("askLLM", () => {
@@ -6,7 +6,7 @@ describe("askLLM", () => {
 
 	it("throws on non-ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 500 });
+		globalThis.fetch = (async () => new Response(null, { status: 500 })) as any;
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		await expect(
 			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
@@ -20,27 +20,28 @@ describe("askLLM", () => {
 		const stream = new ReadableStream({
 			start(controller) {
 				controller.enqueue(
-					encoder.encode(JSON.stringify({ type: "firstToken" }) + "\n")
+					encoder.encode(`${JSON.stringify({ type: "firstToken" })}\n`)
 				);
 				controller.enqueue(
 					encoder.encode(
-						JSON.stringify({ type: "chunk", data: "Hello" }) + "\n"
+						`${JSON.stringify({ type: "chunk", data: "Hello" })}\n`
 					)
 				);
 				controller.enqueue(
 					encoder.encode(
-						JSON.stringify({ type: "chunk", data: " world" }) + "\n"
+						`${JSON.stringify({ type: "chunk", data: " world" })}\n`
 					)
 				);
 				controller.enqueue(
 					encoder.encode(
-						JSON.stringify({ type: "done", data: "Hello world" }) + "\n"
+						`${JSON.stringify({ type: "done", data: "Hello world" })}\n`
 					)
 				);
 				controller.close();
 			},
 		});
-		globalThis.fetch = async () => new Response(stream, { status: 200 });
+		globalThis.fetch = (async () =>
+			new Response(stream, { status: 200 })) as any;
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		let firstToken = false;
 		const chunks: string[] = [];
@@ -68,13 +69,14 @@ describe("askLLM", () => {
 			start(controller) {
 				controller.enqueue(
 					encoder.encode(
-						JSON.stringify({ type: "error", data: "model overloaded" }) + "\n"
+						`${JSON.stringify({ type: "error", data: "model overloaded" })}\n`
 					)
 				);
 				controller.close();
 			},
 		});
-		globalThis.fetch = async () => new Response(stream, { status: 200 });
+		globalThis.fetch = (async () =>
+			new Response(stream, { status: 200 })) as any;
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		await expect(
 			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
@@ -89,12 +91,13 @@ describe("askLLM", () => {
 			start(controller) {
 				controller.enqueue(encoder.encode("not json\n"));
 				controller.enqueue(
-					encoder.encode(JSON.stringify({ type: "done", data: "" }) + "\n")
+					encoder.encode(`${JSON.stringify({ type: "done", data: "" })}\n`)
 				);
 				controller.close();
 			},
 		});
-		globalThis.fetch = async () => new Response(stream, { status: 200 });
+		globalThis.fetch = (async () =>
+			new Response(stream, { status: 200 })) as any;
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		const result = await askLLM(
 			{ username: "test", text: "hi" },
@@ -111,10 +114,10 @@ describe("resetLLM", () => {
 	it("sends POST to /reset", async () => {
 		const originalFetch = globalThis.fetch;
 		let called = "";
-		globalThis.fetch = async (url: string, opts: any) => {
+		globalThis.fetch = (async (url: string, opts: any) => {
 			called = `${opts.method} ${url}`;
 			return new Response("ok", { status: 200 });
-		};
+		}) as any;
 		const { resetLLM } = await import("../../src/core/llm-client.js");
 		await resetLLM();
 		expect(called).toContain("POST");
@@ -124,7 +127,7 @@ describe("resetLLM", () => {
 
 	it("handles reset failure gracefully", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 500 });
+		globalThis.fetch = (async () => new Response(null, { status: 500 })) as any;
 		const { resetLLM } = await import("../../src/core/llm-client.js");
 		await resetLLM(); // should not throw
 		globalThis.fetch = originalFetch;
@@ -136,9 +139,9 @@ describe("isLLMBusy", () => {
 
 	it("returns true on fetch failure", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => {
+		globalThis.fetch = (async () => {
 			throw new Error("network error");
-		};
+		}) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeTrue();
@@ -147,7 +150,7 @@ describe("isLLMBusy", () => {
 
 	it("returns true on non-ok response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () => new Response(null, { status: 503 });
+		globalThis.fetch = (async () => new Response(null, { status: 503 })) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeTrue();
@@ -156,8 +159,8 @@ describe("isLLMBusy", () => {
 
 	it("returns the busy field from response", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = async () =>
-			new Response(JSON.stringify({ busy: false }), { status: 200 });
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ busy: false }), { status: 200 })) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeFalse();

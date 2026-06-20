@@ -5,13 +5,48 @@ describe("computeDelay", () => {
 	beforeAll(() => {
 		mockConfig({
 			concentration: {
-				mention: { delay_min: 300, delay_max: 1500, ignore_chance: 0, reaction_chance: 0.08 },
-				dm: { delay_min: 400, delay_max: 1800, ignore_chance: 0, reaction_chance: 0.05 },
-				name: { delay_min: 800, delay_max: 4000, ignore_chance: 0.05, reaction_chance: 0.06 },
-				keyword: { delay_min: 1000, delay_max: 3500, ignore_chance: 0.08, reaction_chance: 0.04 },
-				"follow-up": { delay_min: 500, delay_max: 2000, ignore_chance: 0, reaction_chance: 0.03 },
-				random: { delay_min: 1500, delay_max: 5000, ignore_chance: 0.15, reaction_chance: 0.02 },
-				default: { delay_min: 800, delay_max: 4000, ignore_chance: 0.08, reaction_chance: 0.06 },
+				mention: {
+					delay_min: 300,
+					delay_max: 1500,
+					ignore_chance: 0,
+					reaction_chance: 0.08,
+				},
+				dm: {
+					delay_min: 400,
+					delay_max: 1800,
+					ignore_chance: 0,
+					reaction_chance: 0.05,
+				},
+				name: {
+					delay_min: 800,
+					delay_max: 4000,
+					ignore_chance: 0.05,
+					reaction_chance: 0.06,
+				},
+				keyword: {
+					delay_min: 1000,
+					delay_max: 3500,
+					ignore_chance: 0.08,
+					reaction_chance: 0.04,
+				},
+				"follow-up": {
+					delay_min: 500,
+					delay_max: 2000,
+					ignore_chance: 0,
+					reaction_chance: 0.03,
+				},
+				random: {
+					delay_min: 1500,
+					delay_max: 5000,
+					ignore_chance: 0.15,
+					reaction_chance: 0.02,
+				},
+				default: {
+					delay_min: 800,
+					delay_max: 4000,
+					ignore_chance: 0.08,
+					reaction_chance: 0.06,
+				},
 			},
 			inactivityWarmupMinutes: 10,
 			inactivityWarmupMultiplier: 2,

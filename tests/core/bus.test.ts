@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { TypedBus } from "../../src/core/bus.js";
 
 interface TestEvents {
+	[key: string]: unknown[];
 	foo: [string];
 	bar: [number, string];
 	empty: [];

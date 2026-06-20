@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, mock } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 
 describe("isTTSReady", () => {
 	it("returns false before init", async () => {

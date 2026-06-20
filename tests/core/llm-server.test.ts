@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, mock } from "bun:test";
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import { mockConfig } from "../../tests/_mock-config.js";
 
 let capturedHandler: ((req: any, res: any) => void) | null = null;
@@ -26,7 +26,9 @@ function mockRes() {
 				writes.push(d);
 			},
 			end: (d?: string) => {
-				if (d !== undefined) body = d;
+				if (d !== undefined) {
+					body = d;
+				}
 				resolveEnd!();
 			},
 		},
@@ -49,7 +51,7 @@ describe("llm-server", () => {
 	});
 
 	it("imports and triggers listen", async () => {
-		const mod = await import("../../src/core/llm-server.js");
+		const _mod = await import("../../src/core/llm-server.js");
 		expect(capturedHandler).toBeDefined();
 	});
 
@@ -83,10 +85,12 @@ describe("llm-server", () => {
 
 	it("handles POST /reset", async () => {
 		const origFetch = globalThis.fetch;
-		globalThis.fetch = async (url: string) => {
-			if (url.includes("/reset")) return new Response(null, { status: 200 });
+		globalThis.fetch = (async (url: string) => {
+			if (url.includes("/reset")) {
+				return new Response(null, { status: 200 });
+			}
 			return new Response(null, { status: 404 });
-		};
+		}) as any;
 		await import("../../src/core/llm-server.js");
 		const m = mockRes();
 		const req = new EventEmitter() as any;
@@ -102,13 +106,12 @@ describe("llm-server", () => {
 	it("handles POST /ask with streaming response", async () => {
 		const origFetch = globalThis.fetch;
 		const encoder = new TextEncoder();
-		globalThis.fetch = async (url: string) => {
+		globalThis.fetch = (async (url: string) => {
 			if (url.includes("/ask")) {
-				const body =
-					[
-						JSON.stringify({ type: "chunk", data: "Hi" }),
-						JSON.stringify({ type: "done", data: "Hi" }),
-					].join("\n") + "\n";
+				const body = `${[
+					JSON.stringify({ type: "chunk", data: "Hi" }),
+					JSON.stringify({ type: "done", data: "Hi" }),
+				].join("\n")}\n`;
 				const stream = new ReadableStream({
 					start(ctrl) {
 						ctrl.enqueue(encoder.encode(body));
@@ -118,7 +121,7 @@ describe("llm-server", () => {
 				return new Response(stream, { status: 200 });
 			}
 			return new Response(null, { status: 200 });
-		};
+		}) as any;
 		await import("../../src/core/llm-server.js");
 		const m = mockRes();
 		const req = new EventEmitter() as any;

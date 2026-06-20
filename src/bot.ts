@@ -26,6 +26,7 @@ import {
 	shouldReact,
 	pickReaction,
 } from "./behavior/mannerisms.js";
+import type { SleepBehavior } from "./behavior/sleep.js";
 import { initTTS } from "./tts/piper.js";
 import {
 	sendTextAsVoiceMessage,
@@ -273,7 +274,7 @@ function getServerEmojis(
 
 function handleSleep(
 	result: TriggerResult,
-	sleepBehavior: string | null,
+	sleepBehavior: SleepBehavior,
 	author: string,
 	channelName: string
 ): boolean {
@@ -293,7 +294,7 @@ function logAndReact(
 	author: string,
 	channelName: string,
 	reason: string | null,
-	sleepBehavior: string | null
+	sleepBehavior: SleepBehavior
 ): void {
 	const delay = computeDelay(
 		reason,

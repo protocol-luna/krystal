@@ -378,14 +378,17 @@ export const config = {
 	},
 	get timeSchedules(): TimeScheduleEntry[] {
 		const raw = v<unknown[]>("time_schedules", []);
-		if (!Array.isArray(raw)) return [];
-		return raw.map((entry: any) => ({
-			start: String(entry?.start ?? "00:00"),
-			end: String(entry?.end ?? "00:00"),
-			behavior: ["sleep", "slow", "short"].includes(entry?.behavior)
-				? (entry.behavior as "sleep" | "slow" | "short")
-				: undefined,
-		}));
+		if (!Array.isArray(raw)) { return []; }
+		return raw.map((entry) => {
+			const e = entry as Record<string, unknown>;
+			return {
+				start: String(e?.start ?? "00:00"),
+				end: String(e?.end ?? "00:00"),
+				behavior: ["sleep", "slow", "short"].includes(e?.behavior as string)
+					? (e.behavior as "sleep" | "slow" | "short")
+					: undefined,
+			};
+		});
 	},
 	get dynamicStatus(): DynamicStatusPreset[] {
 		const raw = v<{ status: string; text: string; type: number }[]>(

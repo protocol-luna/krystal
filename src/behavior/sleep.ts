@@ -1,4 +1,4 @@
-import { config, type TimeScheduleEntry } from "../config.js";
+import { config } from "../config.js";
 
 function parseTime(t: string): number {
 	const [h, m] = t.split(":").map(Number);
@@ -12,7 +12,9 @@ function isInWindow(now: number, start: number, end: number): boolean {
 	return now >= start || now < end;
 }
 
-export function getSleepBehavior(): TimeScheduleEntry["behavior"] | null {
+export type SleepBehavior = "sleep" | "slow" | "short" | null;
+
+export function getSleepBehavior(): SleepBehavior {
 	const schedules = config.timeSchedules;
 	if (!Array.isArray(schedules) || schedules.length === 0) {
 		return null;

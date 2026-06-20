@@ -270,9 +270,10 @@
 			"includes": ["tests/**"],
 			"linter": {
 				"rules": {
-					"suspicious": {
-						"noExplicitAny": "off"
-					}
+				"suspicious": {
+					"noExplicitAny": "off",
+					"useAwait": "off"
+				}
 				}
 			}
 		}
