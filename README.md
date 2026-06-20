@@ -4,7 +4,7 @@ Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de faço
 
 - Modèle fine-tuné sur [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M échanges, 17M turns)
 - Format GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Deux modes LLM : `cli` (spawn llama-cli) ou `server` (HTTP → llama-server)
+- Trois modes LLM : `cli` (spawn llama-cli), `server` (HTTP → llama-server), `proxy` (bot → HTTP → llm-server séparé)
 - Architecture événementielle : `llmBus` pour les tokens/erreurs LLM, `stateBus` pour l'auto-persist
 - Auto-restart du LLM (mode cli) avec backup exponentiel et file préservée
 
@@ -27,7 +27,9 @@ Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de faço
 │ mode server      │  │ state/state.ts             │
 │   HTTP → llama-  │  │ behavior/*                 │
 │   server:port    │  │ tts/*                      │
-│                  │  │ spontaneous.ts             │
+│ mode proxy       │  │ spontaneous.ts             │
+│   HTTP → llm-    │  │                            │
+│   server (sép.)  │  │                            │
 └──────────────────┘  └────────────────────────────┘
 ```
 
@@ -45,8 +47,8 @@ src/
 │   ├── bus.ts         # TypedBus générique (on/off/once/emit)
 │   ├── llm-bus.ts     # Bus LLM (token, done, error, crash, ready, reset)
 │   ├── llm-core.ts    # Spawn CLI ou HTTP server, queue, parsing, restart
-│   ├── llm-client.ts  # Client HTTP vers llm-server (legacy)
-│   └── llm-server.ts  # Serveur HTTP NDJSON (legacy)
+│   ├── llm-client.ts  # Client HTTP vers llm-server (mode proxy)
+│   └── llm-server.ts  # Serveur HTTP NDJSON (mode proxy)
 ├── state/
 │   ├── state-bus.ts   # Bus state (state:changed → auto-persist)
 │   ├── state.ts       # Cooldowns, activité, suivi conversation
@@ -547,7 +549,7 @@ llama_cli_path: "bin/llama/llama-cli"
 llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
 llm_host: "localhost"
 llm_port: 3124
-llm_mode: "cli"          # cli → spawn llama-cli, server → HTTP llama-server
+llm_mode: "cli"          # cli → spawn llama-cli, server → HTTP llama-server, proxy → bot client via llm-server
 system_prompt: |
   Tu es Luna...
 tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
@@ -623,19 +625,41 @@ xychart-beta
 npm install
 cp config.example.yml config.yml
 # éditer config.yml
-npm run dev          # dev (hot reload)
-npm run build && npm start  # production
+npm run dev                    # dev (hot reload)
+npm run build && npm start     # production
 ```
 
 | Script | Description |
 |---|---|---|
-| `dev` | Bot (hot reload) |
-| `start` | Bot (production) |
-| `build` | Bundle bot |
-| `client-only` | Bot uniquement (watch) |
+| `dev` | Bot + server (hot reload, bun) |
+| `start` | Bot + server (production, concurrently) |
+| `build` | Bundle bot + server |
+| `client-only` | Bot uniquement (proxy mode) |
+| `server-only` | Serveur LLM uniquement |
 | `direct` | Mode CLI direct : `node . direct` |
 | `lint` / `format` / `check` | Biome |
 | `download-model` | GGUF depuis HuggingFace |
+
+### Modes de déploiement LLM
+
+| Mode | Usage | Description |
+|---|---|---|
+| `cli` | `llm_mode: cli` | Bot gère le LLM en direct (spawn llama-cli). Monolithique, un seul process. |
+| `server` | `llm_mode: server` | Bot appelle llama-server via HTTP. llama-server doit tourner à côté. |
+| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (qui gère le LLM). Deux processes, idéal pour PM2. |
+
+### PM2 (production)
+
+```bash
+./start.sh   # lance llm-server + llm-client sous PM2
+```
+
+### Hot-reload config
+
+`config.yml` est relu à chaud via `watchConfig()` (appelé dans `startBot()`).  
+Les getters de `export const config` (ex: `config.typoChance`, `config.concentration`) retournent les valeurs live.  
+Pas de restart nécessaire pour modifier les triggers, délais, comportements.  
+Les valeurs statiques (`discord_token`, `llama_cli_path`, `llm_mode`, etc.) nécessitent un restart.
 
 ## Discord Developer Portal
 
