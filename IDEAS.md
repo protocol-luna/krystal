@@ -1,7 +1,7 @@
 # IDEAS — Améliorations du réalisme humain
 
 ## Comportement de "frappe"
-- [!] Délai entre chunks basé sur un WPM "humain" (au lieu des délais fixes actuels) [15min de dev, rendu plus naturel]
+- [x] Délai entre chunks basé sur un WPM "humain" (au lieu des délais fixes actuels) [Implémenté : config.typingWpm, 300 WPM par défaut]
 - [!] Commencer par une hésitation aléatoire ("Uh...", "Um...", "Well...", "I mean...") [Reformulé en anglais — retiré dépréciation]
 - [x] Ajouter un délai de "lecture" proportionnel à la longueur du message auquel on répond [Implémenté : msgLength dans computeDelay]
 

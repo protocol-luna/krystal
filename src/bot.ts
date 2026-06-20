@@ -137,12 +137,9 @@ async function triggerLunaReply(
 			let typoMessageId: string | null = null;
 			for (const chunk of chunks) {
 				if (!isFirstChunk) {
-					const ratio = chunk.length / 200;
-					const delay =
-						config.chunkDelayMin +
-						Math.random() *
-							(config.chunkDelayMax - config.chunkDelayMin) *
-							Math.min(ratio, 1);
+					const cpm = config.typingWpm * 5;
+					const baseDelay = (chunk.length / cpm) * 60000;
+					const delay = baseDelay * (0.5 + Math.random() * 0.5);
 					await new Promise((r) => setTimeout(r, delay));
 				}
 				const sent = await client.createMessage(message.channel.id, {

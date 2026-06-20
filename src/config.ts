@@ -339,11 +339,8 @@ export const config = {
 	get typoCorrectionStyle(): "edit" | "message" | "mixed" {
 		return v<"edit" | "message" | "mixed">("typo_correction_style", "mixed");
 	},
-	get chunkDelayMin(): number {
-		return v<number>("chunk_delay_min", 300);
-	},
-	get chunkDelayMax(): number {
-		return v<number>("chunk_delay_max", 1500);
+	get typingWpm(): number {
+		return v<number>("typing_wpm", 300);
 	},
 	get voiceMessageChance(): number {
 		return v<number>("voice_message_chance", 0.08);
