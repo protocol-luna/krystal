@@ -24,7 +24,7 @@ import {
 	shouldReact,
 	pickReaction,
 } from "./mannerisms.js";
-import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
+import { initTTS, sendTextAsVoiceMessage, shouldSendVoice, hasUnsafeTTSText } from "./tts.js";
 import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout, typoCorrectionStyle } from "./config.js";
 import { getSleepBehavior } from "./sleep.js";
 import { applyTypo } from "./typo.js";
@@ -94,7 +94,7 @@ async function triggerLunaReply(
 			}
 		);
 
-		if (isVoice) {
+		if (isVoice && !hasUnsafeTTSText(fullText)) {
 			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
 		} else {
 			let typoIndex = -1;
