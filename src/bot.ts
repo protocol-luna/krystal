@@ -290,7 +290,7 @@ function logAndReact(
 	reason: string | null,
 	sleepBehavior: string | null
 ): void {
-	const delay = computeDelay(reason, sleepBehavior);
+	const delay = computeDelay(reason, sleepBehavior, message.content.length);
 	console.log(
 		`[bot] #${channelName} ${author}: répond (${reason}) delay=${delay.toFixed(0)}ms`
 	);
@@ -356,7 +356,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
 		logAndReact(message, author, channelName, result.reason, sleepBehavior);
 
-		const delay = computeDelay(result.reason, sleepBehavior);
+		const delay = computeDelay(
+			result.reason,
+			sleepBehavior,
+			message.content.length
+		);
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
 		return;
@@ -371,7 +375,11 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		markReplied(message.channel.id);
 		console.log(`[bot] #${channelName} ${author}: follow-up immédiat`);
 
-		const delay = computeDelay("follow-up", sleepBehavior);
+		const delay = computeDelay(
+			"follow-up",
+			sleepBehavior,
+			message.content.length
+		);
 		await new Promise((r) => setTimeout(r, delay));
 
 		if (shouldReact("follow-up", sleepBehavior)) {

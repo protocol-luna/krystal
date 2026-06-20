@@ -20,15 +20,20 @@ function getThresholds(
 
 export function computeDelay(
 	reason: string | null = null,
-	sleepBehavior?: string | null
+	sleepBehavior?: string | null,
+	msgLength?: number
 ): number {
 	const t = getThresholds(reason);
 	let delay = t.delay_min + Math.random() * (t.delay_max - t.delay_min);
+	if (msgLength) {
+		const readingFactor = Math.min(msgLength / 500, 3);
+		delay *= 1 + readingFactor * (0.3 + Math.random() * 0.7);
+	}
 	if (sleepBehavior === "slow") {
 		delay *= 3 + Math.random() * 2;
 	}
 	console.log(
-		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"})`
+		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"} len=${msgLength ?? 0})`
 	);
 	return delay;
 }
