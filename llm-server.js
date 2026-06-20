@@ -89,6 +89,10 @@ var typoChance = v("typo_chance", 0.06);
 var typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
 var typoCorrectionDelayMax = v("typo_correction_delay_max", 4e3);
 var typoLayout = v("typo_layout", "azerty");
+var typoCorrectionStyle = v(
+  "typo_correction_style",
+  "mixed"
+);
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
 var rawSleep = v("sleep_schedule", {
@@ -99,10 +103,10 @@ var rawSleep = v("sleep_schedule", {
   behavior: "sleep"
 });
 var sleepSchedule = {
-  enabled: Boolean(rawSleep.enabled),
-  start: String(rawSleep.start ?? "23:00"),
-  end: String(rawSleep.end ?? "08:00"),
-  timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+  enabled: rawSleep.enabled === true,
+  start: rawSleep.start ?? "23:00",
+  end: rawSleep.end ?? "08:00",
+  timezone: rawSleep.timezone ?? "Europe/Paris",
   behavior: rawSleep.behavior ?? "sleep"
 };
 var voiceMessageChance = v("voice_message_chance", 0.08);

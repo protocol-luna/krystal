@@ -88,6 +88,10 @@ var typoChance = v("typo_chance", 0.06);
 var typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
 var typoCorrectionDelayMax = v("typo_correction_delay_max", 4e3);
 var typoLayout = v("typo_layout", "azerty");
+var typoCorrectionStyle = v(
+  "typo_correction_style",
+  "mixed"
+);
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
 var rawSleep = v("sleep_schedule", {
@@ -98,10 +102,10 @@ var rawSleep = v("sleep_schedule", {
   behavior: "sleep"
 });
 var sleepSchedule = {
-  enabled: Boolean(rawSleep.enabled),
-  start: String(rawSleep.start ?? "23:00"),
-  end: String(rawSleep.end ?? "08:00"),
-  timezone: String(rawSleep.timezone ?? "Europe/Paris"),
+  enabled: rawSleep.enabled === true,
+  start: rawSleep.start ?? "23:00",
+  end: rawSleep.end ?? "08:00",
+  timezone: rawSleep.timezone ?? "Europe/Paris",
   behavior: rawSleep.behavior ?? "sleep"
 };
 var voiceMessageChance = v("voice_message_chance", 0.08);
@@ -571,6 +575,8 @@ function computeDelay(reason = null, sleepBehavior) {
       min = 1500;
       max = 5e3;
       break;
+    default:
+      break;
   }
   let delay = min + Math.random() * (max - min);
   if (sleepBehavior === "slow") {
@@ -866,6 +872,9 @@ function shouldSendVoice() {
   );
   return send;
 }
+function hasUnsafeTTSText(text) {
+  return /[\u{1F000}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/u.test(text);
+}
 
 // src/sleep.ts
 function parseTime(t) {
@@ -982,12 +991,16 @@ function applyTypo(text, layout) {
   const typoChar = adjacent[Math.floor(Math.random() * adjacent.length)];
   const typed = text[idx] === originalChar ? typoChar : typoChar.toUpperCase();
   const newText = text.slice(0, idx) + typed + text.slice(idx + 1);
-  return { text: newText, original: text, charIndex: idx, originalChar, typoChar };
+  const wordStart = text.slice(0, idx).search(/\S*$/);
+  const wordEnd = text.slice(idx).search(/\s|$/) + idx;
+  const originalWord = text.slice(wordStart, wordEnd);
+  const correctedWord = newText.slice(wordStart, wordEnd);
+  return { text: newText, original: text, charIndex: idx, originalChar, typoChar, originalWord, correctedWord };
 }
 
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
-  intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
+  intents: ["guilds", "guildMessages", "guildMessageReactions", "messageContent", "directMessages"]
 });
 var processing = /* @__PURE__ */ new Set();
 var pendingMessages = /* @__PURE__ */ new Map();
@@ -1030,14 +1043,15 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
         }
       }
     );
-    if (isVoice) {
+    if (isVoice && !hasUnsafeTTSText(fullText)) {
       await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
     } else {
       let typoIndex = -1;
       let typoOriginal = "";
+      let result = null;
       if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
         typoIndex = Math.floor(Math.random() * chunks.length);
-        const result = applyTypo(chunks[typoIndex], typoLayout);
+        result = applyTypo(chunks[typoIndex], typoLayout);
         if (result) {
           typoOriginal = result.original;
           chunks[typoIndex] = result.text;
@@ -1068,11 +1082,19 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
       }
       if (typoMessageId && typoOriginal) {
         const delay = typoCorrectionDelay + Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+        const style2 = typoCorrectionStyle === "mixed" ? Math.random() < 0.5 ? "edit" : "message" : typoCorrectionStyle;
         await (async () => {
           await new Promise((r) => setTimeout(r, delay));
           try {
-            await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
-            console.log(`[bot] typo corrig\xE9 dans le message ${typoMessageId}`);
+            if (style2 === "edit") {
+              await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
+              console.log(`[bot] typo corrig\xE9 par edit sur ${typoMessageId}`);
+            } else {
+              await client.createMessage(message.channel.id, {
+                content: `${result.correctedWord}*`
+              });
+              console.log(`[bot] typo corrig\xE9 par message: ${result.correctedWord}*`);
+            }
           } catch {
           }
         })();
@@ -1081,13 +1103,10 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
     trackSpeaker(message.channel.id, client.user.id);
   } catch (err) {
     console.error(err);
-    await client.createMessage(message.channel.id, {
-      content: `Erreur interne avec le processus llama-cli : ${err.message}`,
-      ...refStyle.messageReference ? {
-        messageReference: { messageID: message.id },
-        allowedMentions: { repliedUser: style.mentionRepliedUser }
-      } : {}
-    }).then(() => markBotActivity(message.channel.id));
+    try {
+      await message.addReaction("\u274C");
+    } catch {
+    }
   } finally {
     processing.delete(key);
     if (typingInterval) {
@@ -1131,10 +1150,10 @@ client.on("messageCreate", async (message) => {
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
     setPaused(true);
-    await client.createMessage(
-      message.channel.id,
-      "\u23F8\uFE0F  Bot mis en pause. Envoie `-start` pour r\xE9activer."
-    );
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
     return;
   }
   if (result.reason === "start") {
@@ -1142,7 +1161,10 @@ client.on("messageCreate", async (message) => {
       `[bot] #${channel.name ?? message.channel.id} ${author}: -start \u2192 reprise`
     );
     setPaused(false);
-    await client.createMessage(message.channel.id, "\u25B6\uFE0F  Bot r\xE9activ\xE9 !");
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
     return;
   }
   if (result.reason === "clear") {
@@ -1152,10 +1174,10 @@ client.on("messageCreate", async (message) => {
     await resetLLM();
     clearCooldown(message.channel.id);
     trackSpeaker(message.channel.id, message.author.id);
-    await client.createMessage(
-      message.channel.id,
-      "\u{1F9F9}  Historique et m\xE9moire effac\xE9s !"
-    );
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
     return;
   }
   const sleepBehavior = getSleepBehavior();
@@ -1203,6 +1225,51 @@ client.on("messageCreate", async (message) => {
     await triggerLunaReply(message, isDM, "follow-up");
   }
   trackSpeaker(message.channel.id, message.author.id);
+});
+var reactionCommands = {
+  "\u274C": "stop",
+  "\u25B6\uFE0F": "start",
+  "\u{1F5D1}\uFE0F": "clear"
+};
+client.on("messageReactionAdd", async (message, emoji, userId) => {
+  if (userId === client.user.id) {
+    return;
+  }
+  if (message.author.id !== client.user.id) {
+    return;
+  }
+  if (!(message.channel instanceof Eris.TextChannel)) {
+    return;
+  }
+  const cmd = reactionCommands[emoji.name];
+  if (!cmd) {
+    return;
+  }
+  console.log(`[bot] #${message.channel.name} r\xE9action ${emoji.name} \u2192 ${cmd}`);
+  if (cmd === "stop") {
+    await resetLLM();
+    clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, userId);
+    setPaused(true);
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
+  } else if (cmd === "start") {
+    setPaused(false);
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
+  } else if (cmd === "clear") {
+    await resetLLM();
+    clearCooldown(message.channel.id);
+    trackSpeaker(message.channel.id, userId);
+    try {
+      await message.addReaction("\u2705");
+    } catch {
+    }
+  }
 });
 function startBot() {
   void initTTS();
