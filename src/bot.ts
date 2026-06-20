@@ -29,15 +29,15 @@ import {
 	shouldIgnore,
 	shouldReact,
 	pickReaction,
-} from "./mannerisms.js";
+} from "./behavior/mannerisms.js";
 import {
 	initTTS,
 	sendTextAsVoiceMessage,
 	shouldSendVoice,
 	hasUnsafeTTSText,
 } from "./tts.js";
-import { getSleepBehavior } from "./sleep.js";
-import { applyTypo } from "./typo.js";
+import { getSleepBehavior } from "./behavior/sleep.js";
+import { applyTypo } from "./behavior/typo.js";
 import { loadState } from "./state/persistence.js";
 import {
 	processing,

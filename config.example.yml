@@ -34,21 +34,39 @@ reply_in_dm: true
 # Si true, le bot répond aux messages privés (DM). Sinon, il les ignore.
 
 # --- Mannerisms (comportement) ---
-response_delay_min: 800
-response_delay_max: 4000
-# Délai aléatoire (en ms) entre la réception d'un message et l'envoi de la réponse,
-# pour simuler un temps de réflexion humain.
-
-reaction_chance: 0.06
-# Probabilité d'ajouter une réaction (emoji) à un message avant de répondre (0.0 - 1.0).
-
-ignore_chance: 0.08
-# Probabilité d'ignorer un message même si les conditions de réponse sont réunies
-# (sauf mention directe). Utile pour rendre le comportement moins prévisible.
-
-ignore_chance_mention: 0
-# Probabilité d'ignorer un message qui mentionne le bot directement (@Luna).
-# 0 = répond toujours aux mentions.
+# La concentration est configurable par type de déclencheur.
+# Chaque entrée définit les seuils de délai, d'ignore et de réaction.
+concentration:
+  mention:
+    delay_min: 300
+    delay_max: 1500
+    ignore_chance: 0
+    reaction_chance: 0.08
+  dm:
+    delay_min: 400
+    delay_max: 1800
+    ignore_chance: 0
+    reaction_chance: 0.05
+  name:
+    delay_min: 800
+    delay_max: 4000
+    ignore_chance: 0.05
+    reaction_chance: 0.06
+  keyword:
+    delay_min: 1000
+    delay_max: 3500
+    ignore_chance: 0.08
+    reaction_chance: 0.04
+  follow-up:
+    delay_min: 500
+    delay_max: 2000
+    ignore_chance: 0
+    reaction_chance: 0.03
+  random:
+    delay_min: 1500
+    delay_max: 5000
+    ignore_chance: 0.15
+    reaction_chance: 0.02
 
 server_emoji_chance: 0.3
 # Probabilité que la réaction soit un emoji personnalisé du serveur (vs un emoji standard).

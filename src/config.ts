@@ -68,12 +68,52 @@ export const randomChance = v<number>("random_chance", 0.015);
 export const cooldownSeconds = v<number>("cooldown_seconds", 8);
 export const replyInDM = v<boolean>("reply_in_dm", true);
 
-// --- Mannerisms ---
-export const responseDelayMin = v<number>("response_delay_min", 800);
-export const responseDelayMax = v<number>("response_delay_max", 4000);
-export const reactionChance = v<number>("reaction_chance", 0.06);
-export const ignoreChance = v<number>("ignore_chance", 0.08);
-export const ignoreChanceMention = v<number>("ignore_chance_mention", 0);
+// --- Concentration (seuils par type de déclencheur) ---
+export interface ConcentrationEntry {
+	delay_min: number;
+	delay_max: number;
+	ignore_chance: number;
+	reaction_chance: number;
+}
+
+export interface ConcentrationThresholds {
+	mention: ConcentrationEntry;
+	dm: ConcentrationEntry;
+	name: ConcentrationEntry;
+	keyword: ConcentrationEntry;
+	"follow-up": ConcentrationEntry;
+	random: ConcentrationEntry;
+	default: ConcentrationEntry;
+}
+
+const DEFAULT_CONCENTRATION: ConcentrationThresholds = {
+	mention: { delay_min: 300, delay_max: 1500, ignore_chance: 0, reaction_chance: 0.08 },
+	dm: { delay_min: 400, delay_max: 1800, ignore_chance: 0, reaction_chance: 0.05 },
+	name: { delay_min: 800, delay_max: 4000, ignore_chance: 0.05, reaction_chance: 0.06 },
+	keyword: { delay_min: 1000, delay_max: 3500, ignore_chance: 0.08, reaction_chance: 0.04 },
+	"follow-up": { delay_min: 500, delay_max: 2000, ignore_chance: 0, reaction_chance: 0.03 },
+	random: { delay_min: 1500, delay_max: 5000, ignore_chance: 0.15, reaction_chance: 0.02 },
+	default: { delay_min: 800, delay_max: 4000, ignore_chance: 0.08, reaction_chance: 0.06 },
+};
+
+const rawConcentration = v<Record<string, unknown>>("concentration", {});
+function mergeConcentration(raw: Record<string, unknown>, defaults: ConcentrationThresholds): ConcentrationThresholds {
+	const merged = { ...defaults };
+	for (const key of Object.keys(defaults) as (keyof ConcentrationThresholds)[]) {
+		const entry = raw[key] as Record<string, unknown> | undefined;
+		if (entry) {
+			merged[key] = {
+				delay_min: (entry.delay_min as number) ?? defaults[key].delay_min,
+				delay_max: (entry.delay_max as number) ?? defaults[key].delay_max,
+				ignore_chance: (entry.ignore_chance as number) ?? defaults[key].ignore_chance,
+				reaction_chance: (entry.reaction_chance as number) ?? defaults[key].reaction_chance,
+			};
+		}
+	}
+	return merged;
+}
+export const concentration = mergeConcentration(rawConcentration, DEFAULT_CONCENTRATION);
+
 export const serverEmojiChance = v<number>("server_emoji_chance", 0.3);
 export const reactions: string[] = v<string[]>("reactions", [
 	"👀",

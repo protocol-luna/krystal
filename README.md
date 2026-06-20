@@ -247,6 +247,8 @@ En DM, `messageReference` est toujours `false`.
 
 Le bot adapte son comportement (délai, réaction, inattention) selon le type de déclencheur. Plus on s'adresse directement à lui, plus il répond vite et attentivement.
 
+Les seuils sont configurables via la section `concentration` dans `config.yml`.
+
 ```mermaid
 flowchart LR
     A[Trigger reason] --> B{type ?}
@@ -583,13 +585,13 @@ src/
 ├── cli.ts            # CLI unifié (bot|server|direct)
 ├── bot.ts            # Handler principal Eris (allégé)
 ├── config.ts         # Toute la configuration (env, triggers, LLM, styles)
-├── mannerisms.ts     # Délai, ignore, réactions, concentration
-├── sleep.ts          # Plages de sommeil (présence variable)
-├── typo.ts           # Simulation de fautes de frappe + correction
+├── mannerisms.ts     # Ré-export rétrocompatible vers behavior/
+├── sleep.ts          # Ré-export rétrocompatible vers behavior/
+├── typo.ts           # Ré-export rétrocompatible vers behavior/
 ├── spontaneous.ts    # Messages spontanés pondérés
 ├── guild.ts          # findMostActiveChannel helper
-├── tts.ts            # Synthèse vocale PiperTTS, upload CDN, voice messages
-├── llm-client.ts     # Client HTTP vers le serveur LLM
+├── tts.ts            # Ré-export rétrocompatible vers tts/
+├── llm-client.ts     # Ré-export rétrocompatible vers core/llm-client.ts
 ├── llm-server.ts     # Ré-export rétrocompatible vers core/llm-server.ts
 ├── llm.ts            # Ré-export rétrocompatible vers core/llm-core.ts
 ├── persistence.ts    # Ré-export rétrocompatible vers state/persistence.ts
@@ -597,6 +599,7 @@ src/
 ├── core/
 │   ├── index.ts      # Barrel export
 │   ├── llm-core.ts   # Logique LLM partagée (spawn, queue, parsing, restart)
+│   ├── llm-client.ts # Client HTTP vers le serveur LLM
 │   ├── llm-server.ts # Serveur HTTP NDJSON
 │   └── llm-direct.ts # Mode CLI direct (standalone)
 ├── state/
@@ -604,10 +607,21 @@ src/
 │   ├── state.ts      # Cooldowns, activité, suivi conversation
 │   ├── trigger.ts    # Évaluation des déclencheurs uniquement
 │   └── persistence.ts # Sauvegarde/restauration d'état (async)
-└── bot/
-    ├── pending.ts     # File d'attente anti-spam (processing + pendingMessages)
-    ├── reactions.ts   # Commandes par réactions (❌▶️🗑️)
-    └── typo-correction.ts # Correction différée des fautes de frappe
+├── behavior/
+│   ├── index.ts      # Barrel export
+│   ├── mannerisms.ts # Délai, ignore, réactions, concentration (configurable)
+│   ├── sleep.ts      # Plages de sommeil (présence variable)
+│   └── typo.ts       # Simulation de fautes de frappe + correction
+├── bot/
+│   ├── pending.ts     # File d'attente anti-spam (processing + pendingMessages)
+│   ├── reactions.ts   # Commandes par réactions (❌▶️🗑️)
+│   └── typo-correction.ts # Correction différée des fautes de frappe
+└── tts/
+    ├── index.ts      # Barrel export
+    ├── piper.ts       # Initialisation et synthèse PiperTTS
+    ├── audio.ts       # Sanitization, waveform, conversion OGG, détection durée
+    ├── upload.ts      # Upload CDN Discord (3 étapes)
+    └── voice-message.ts # Orchestration envoi message vocal
 ```
 
 ### Flux détaillé d'une réponse
@@ -619,11 +633,10 @@ sequenceDiagram
     participant bot.ts
     participant state/trigger.ts
     participant state/state.ts
-    participant mannerisms.ts
-    participant sleep.ts
-    participant sleep.ts
-    participant typo.ts
-    participant llm-client.ts
+    participant behavior/mannerisms.ts
+    participant behavior/sleep.ts
+    participant behavior/typo.ts
+    participant core/llm-client.ts
     participant core/llm-server.ts
     participant llama
 
