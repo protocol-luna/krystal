@@ -84,6 +84,10 @@ var spontaneousWhitelist = v(
   "spontaneous_whitelist",
   "*"
 );
+var typoChance = v("typo_chance", 0.06);
+var typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
+var typoCorrectionDelayMax = v("typo_correction_delay_max", 4e3);
+var typoLayout = v("typo_layout", "azerty");
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
 var rawSleep = v("sleep_schedule", {
@@ -898,6 +902,89 @@ function getSleepBehavior() {
   return sleepSchedule.behavior;
 }
 
+// src/typo.ts
+var azertyAdjacent = {
+  a: ["z", "q", "w"],
+  z: ["a", "e", "s", "x"],
+  e: ["z", "r", "d", "s"],
+  r: ["e", "t", "f", "d"],
+  t: ["r", "y", "g", "f"],
+  y: ["t", "u", "h", "g"],
+  u: ["y", "i", "j", "h"],
+  i: ["u", "o", "k", "j"],
+  o: ["i", "p", "l", "k"],
+  p: ["o", "^", "l"],
+  q: ["a", "s", "w"],
+  s: ["q", "d", "z", "x"],
+  d: ["s", "f", "e", "c"],
+  f: ["d", "g", "r", "v"],
+  g: ["f", "h", "t", "b"],
+  h: ["g", "j", "y", "n"],
+  j: ["h", "k", "u"],
+  k: ["j", "l", "i"],
+  l: ["k", "m", "o"],
+  m: ["l", "\xF9", "p"],
+  \u00F9: ["m", "$", "\xE8"],
+  w: ["a", "x", "s"],
+  x: ["w", "c", "z"],
+  c: ["x", "v", "d"],
+  v: ["c", "b", "f"],
+  b: ["v", "n", "g"],
+  n: ["b", "?", "h"]
+};
+var qwertyAdjacent = {
+  q: ["w", "a"],
+  w: ["q", "e", "a", "s"],
+  e: ["w", "r", "s", "d"],
+  r: ["e", "t", "d", "f"],
+  t: ["r", "y", "f", "g"],
+  y: ["t", "u", "g", "h"],
+  u: ["y", "i", "h", "j"],
+  i: ["u", "o", "j", "k"],
+  o: ["i", "p", "k", "l"],
+  p: ["o", "l"],
+  a: ["q", "s", "z"],
+  s: ["w", "a", "x", "d", "z"],
+  d: ["e", "s", "c", "f", "x"],
+  f: ["r", "d", "v", "g", "c"],
+  g: ["t", "f", "b", "h", "v"],
+  h: ["y", "g", "n", "j", "b"],
+  j: ["u", "h", "m", "k", "n"],
+  k: ["i", "j", "l"],
+  l: ["o", "k", "m"],
+  z: ["a", "x"],
+  x: ["z", "c", "s"],
+  c: ["x", "v", "d"],
+  v: ["c", "b", "f"],
+  b: ["v", "n", "g"],
+  n: ["b", "m", "h"],
+  m: ["n", "k", "j"]
+};
+function pickLetter(text) {
+  const letters = text.split("").map((c, i) => ({ c, i }));
+  const candidates = letters.filter(({ c }) => /[a-zA-Z]/.test(c));
+  if (candidates.length === 0) {
+    return null;
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)].i;
+}
+function applyTypo(text, layout) {
+  const map = layout === "azerty" ? azertyAdjacent : qwertyAdjacent;
+  const idx = pickLetter(text);
+  if (idx === null) {
+    return null;
+  }
+  const originalChar = text[idx].toLowerCase();
+  const adjacent = map[originalChar];
+  if (!adjacent || adjacent.length === 0) {
+    return null;
+  }
+  const typoChar = adjacent[Math.floor(Math.random() * adjacent.length)];
+  const typed = text[idx] === originalChar ? typoChar : typoChar.toUpperCase();
+  const newText = text.slice(0, idx) + typed + text.slice(idx + 1);
+  return { text: newText, original: text, charIndex: idx, originalChar, typoChar };
+}
+
 // src/bot.ts
 var client = new Eris.Client(DISCORD_TOKEN, {
   intents: ["guilds", "guildMessages", "messageContent", "directMessages"]
@@ -946,14 +1033,25 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
     if (isVoice) {
       await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
     } else {
+      let typoIndex = -1;
+      let typoOriginal = "";
+      if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
+        typoIndex = Math.floor(Math.random() * chunks.length);
+        const result = applyTypo(chunks[typoIndex], typoLayout);
+        if (result) {
+          typoOriginal = result.original;
+          chunks[typoIndex] = result.text;
+        }
+      }
       let isFirstChunk = true;
+      let typoMessageId = null;
       for (const chunk of chunks) {
         if (!isFirstChunk) {
           const ratio = chunk.length / 200;
           const delay = chunkDelayMin + Math.random() * (chunkDelayMax - chunkDelayMin) * Math.min(ratio, 1);
           await new Promise((r) => setTimeout(r, delay));
         }
-        await client.createMessage(message.channel.id, {
+        const sent = await client.createMessage(message.channel.id, {
           content: chunk,
           ...isFirstChunk && refStyle.messageReference ? {
             messageReference: { messageID: message.id },
@@ -964,6 +1062,20 @@ async function triggerLunaReply(message, isDM = false, reason = null) {
         });
         isFirstChunk = false;
         markBotActivity(message.channel.id);
+        if (typoOriginal && typoIndex >= 0 && typoMessageId === null) {
+          typoMessageId = sent.id;
+        }
+      }
+      if (typoMessageId && typoOriginal) {
+        const delay = typoCorrectionDelay + Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+        await (async () => {
+          await new Promise((r) => setTimeout(r, delay));
+          try {
+            await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
+            console.log(`[bot] typo corrig\xE9 dans le message ${typoMessageId}`);
+          } catch {
+          }
+        })();
       }
     }
     trackSpeaker(message.channel.id, client.user.id);

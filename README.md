@@ -159,6 +159,19 @@ finally: clearInterval      → arrête le typing
 
 Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai variable configurable entre chaque (simule le temps d'écrire). Seul le premier message a un `messageReference` (reply visuel).
 
+### Simulation de fautes de frappe
+
+Avec une probabilité configurable (`typo_chance`), le bot introduit une faute de frappe sur une lettre aléatoire d'un des messages (remplacement par une touche adjacente sur le clavier, layout AZERTY ou QWERTY). Après un court délai (2–4s), il édite le message pour corriger la faute — comme un humain qui tape vite et corrige.
+
+```yaml
+typo_chance: 0.06
+typo_correction_delay_min: 2000
+typo_correction_delay_max: 4000
+typo_layout: "azerty"
+```
+
+Exemple de fautes AZERTY : `bonjour → bonjpur`, `salut → slaut`, `comment → cpmment`.
+
 ### Reply style
 
 Pondéré selon que le salon est en "conversation active" (bot a parlé récemment) ou non :

@@ -46,40 +46,22 @@ Comportements possibles :
 
 ---
 
-## 3. Simulation de typos + correction (edit)
+## 3. Simulation de typos + correction (edit) ✅
 
 **Problème** : les humains font des fautes de frappe et les corrigent. Le bot est trop parfait.
 
-**Solution** : avec une certaine probabilité, introduire une faute de frappe réaliste (touche adjacente sur le clavier), puis éditer le message après un court délai pour la corriger.
+**Solution** : avec une certaine probabilité, introduire une faute de frappe réaliste (touche adjacente sur le clavier AZERTY/QWERTY), puis éditer le message après un court délai pour la corriger.
 
 ```yaml
-# config.yml
-typo_chance: 0.06             # probabilité par message
-typo_correction_delay: 2000   # ms avant correction (min)
-typo_correction_delay_max: 4000  # ms avant correction (max)
-typo_layout: "azerty"         # azerty | qwerty
+typo_chance: 0.06
+typo_correction_delay_min: 2000
+typo_correction_delay_max: 4000
+typo_layout: "azerty"
 ```
 
-**Principe** :
-1. Le bot envoie un message normal
-2. Avec `typo_chance`, on introduit une faute de frappe sur un mot aléatoire du message :
-   - Remplacement d'une lettre par une touche adjacente (layout AZERTY/QWERTY)
-   - Doublon de lettre (ex. "bonjour" → "bonj our")
-   - Inversion de lettres (ex. "le" → "el")
-3. Après `typo_correction_delay` ms, le bot édite le message pour corriger la faute
-4. Si le message est déjà édité manuellement par quelqu'un, on annule
+**Fichiers** : `src/typo.ts` (mapping + logique), `bot.ts` (éditer le message après l'envoi), `config.ts`.
 
-**Mapping AZERTY** (exemple partiel) :
-```
-a → z/q, z → a/e, e → z/r, r → e/t, t → r/y, y → t/u, u → y/i, i → u/o, o → i/p...
-```
-
-**Mapping QWERTY** :
-```
-q → w/a, w → q/e/s, e → w/r, r → e/t, t → r/y, y → t/u, u → y/i, i → u/o, o → i/p...
-```
-
-**Fichiers** : nouveau fichier `src/typo.ts` (mapping + logique), modification de `bot.ts` (éditer le message après l'envoi).
+**Statut : ✅ Implémenté**.
 
 ---
 
@@ -132,4 +114,4 @@ q → w/a, w → q/e/s, e → w/r, r → e/t, t → r/y, y → t/u, u → y/i, i
 2. **✅ Concentration variable** (#4) — implémenté
 3. **✅ Délai inter-chunks** (#1) — implémenté
 4. **✅ Plages de sommeil** (#2) — implémenté
-5. **Typos + correction** (#3) — le plus complexe (mapping clavier, logique d'edit, gestion des races)
+5. **✅ Typos + correction** (#3) — implémenté

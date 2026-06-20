@@ -85,6 +85,10 @@ var spontaneousWhitelist = v(
   "spontaneous_whitelist",
   "*"
 );
+var typoChance = v("typo_chance", 0.06);
+var typoCorrectionDelay = v("typo_correction_delay_min", 2e3);
+var typoCorrectionDelayMax = v("typo_correction_delay_max", 4e3);
+var typoLayout = v("typo_layout", "azerty");
 var chunkDelayMin = v("chunk_delay_min", 300);
 var chunkDelayMax = v("chunk_delay_max", 1500);
 var rawSleep = v("sleep_schedule", {

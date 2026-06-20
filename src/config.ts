@@ -107,6 +107,12 @@ export const spontaneousWhitelist = v<string>(
 	"*"
 );
 
+// --- Typos ---
+export const typoChance = v<number>("typo_chance", 0.06);
+export const typoCorrectionDelay = v<number>("typo_correction_delay_min", 2000);
+export const typoCorrectionDelayMax = v<number>("typo_correction_delay_max", 4000);
+export const typoLayout = v<"azerty" | "qwerty">("typo_layout", "azerty");
+
 // --- Chunk delays ---
 export const chunkDelayMin = v<number>("chunk_delay_min", 300);
 export const chunkDelayMax = v<number>("chunk_delay_max", 1500);

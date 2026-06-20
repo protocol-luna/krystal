@@ -89,6 +89,15 @@ spontaneous_whitelist: "*"
 # Exemple avec plusieurs serveurs : "123456789,987654321"
 # Exemple avec un seul serveur : "123456789"
 
+# --- Typos (simulation de fautes de frappe + correction) ---
+typo_chance: 0.06
+# Probabilité qu'un message contienne une faute de frappe (0.0 - 1.0).
+typo_correction_delay_min: 2000
+typo_correction_delay_max: 4000
+# Intervalle (ms) avant que le bot corrige la faute en edittant le message.
+typo_layout: "azerty"
+# Disposition du clavier pour les fautes de touche adjacente : "azerty" | "qwerty".
+
 # --- Chunk delays (temps entre chaque message d'une réponse multi-chunk) ---
 chunk_delay_min: 300
 chunk_delay_max: 1500

@@ -25,8 +25,9 @@ import {
 	pickReaction,
 } from "./mannerisms.js";
 import { initTTS, sendTextAsVoiceMessage, shouldSendVoice } from "./tts.js";
-import { chunkDelayMin, chunkDelayMax } from "./config.js";
+import { chunkDelayMin, chunkDelayMax, typoChance, typoCorrectionDelay, typoCorrectionDelayMax, typoLayout } from "./config.js";
 import { getSleepBehavior } from "./sleep.js";
+import { applyTypo } from "./typo.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: ["guilds", "guildMessages", "messageContent", "directMessages"],
@@ -96,14 +97,26 @@ async function triggerLunaReply(
 		if (isVoice) {
 			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
 		} else {
+			let typoIndex = -1;
+			let typoOriginal = "";
+			if (typoChance > 0 && Math.random() < typoChance && chunks.length > 0) {
+				typoIndex = Math.floor(Math.random() * chunks.length);
+				const result = applyTypo(chunks[typoIndex], typoLayout);
+				if (result) {
+					typoOriginal = result.original;
+					chunks[typoIndex] = result.text;
+				}
+			}
+
 			let isFirstChunk = true;
+			let typoMessageId: string | null = null;
 			for (const chunk of chunks) {
 				if (!isFirstChunk) {
 					const ratio = chunk.length / 200;
 					const delay = chunkDelayMin + Math.random() * (chunkDelayMax - chunkDelayMin) * Math.min(ratio, 1);
 					await new Promise((r) => setTimeout(r, delay));
 				}
-				await client.createMessage(message.channel.id, {
+				const sent = await client.createMessage(message.channel.id, {
 					content: chunk,
 					...(isFirstChunk && refStyle.messageReference
 						? {
@@ -116,6 +129,23 @@ async function triggerLunaReply(
 				});
 				isFirstChunk = false;
 				markBotActivity(message.channel.id);
+
+				if (typoOriginal && typoIndex >= 0 && typoMessageId === null) {
+					typoMessageId = sent.id;
+				}
+			}
+
+			if (typoMessageId && typoOriginal) {
+				const delay = typoCorrectionDelay + Math.random() * (typoCorrectionDelayMax - typoCorrectionDelay);
+				await (async () => {
+					await new Promise((r) => setTimeout(r, delay));
+					try {
+						await client.editMessage(message.channel.id, typoMessageId, { content: typoOriginal });
+						console.log(`[bot] typo corrigé dans le message ${typoMessageId}`);
+					} catch {
+						// message déjà supprimé ou édité par quelqu'un
+					}
+				})();
 			}
 		}
 
