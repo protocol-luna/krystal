@@ -170,12 +170,10 @@ export interface ConcentrationThresholds {
 	default: ConcentrationEntry;
 }
 
-export interface SleepSchedule {
-	enabled: boolean;
+export interface TimeScheduleEntry {
 	start: string;
 	end: string;
-	timezone: string;
-	behavior: "sleep" | "slow" | "short";
+	behavior?: "sleep" | "slow" | "short";
 }
 
 export type SelfStatus = "online" | "idle" | "dnd" | "invisible";
@@ -375,21 +373,19 @@ export const config = {
 	get voiceMessageChance(): number {
 		return v<number>("voice_message_chance", 0.08);
 	},
-	get sleepSchedule(): SleepSchedule {
-		const raw = v<Record<string, unknown>>("sleep_schedule", {
-			enabled: false,
-			start: "23:00",
-			end: "08:00",
-			timezone: "Europe/Paris",
-			behavior: "sleep",
-		});
-		return {
-			enabled: raw.enabled === true,
-			start: (raw.start as string) ?? "23:00",
-			end: (raw.end as string) ?? "08:00",
-			timezone: (raw.timezone as string) ?? "Europe/Paris",
-			behavior: (raw.behavior as SleepSchedule["behavior"]) ?? "sleep",
-		};
+	get timezone(): string {
+		return v<string>("timezone", "Europe/Paris");
+	},
+	get timeSchedules(): TimeScheduleEntry[] {
+		const raw = v<unknown[]>("time_schedules", []);
+		if (!Array.isArray(raw)) return [];
+		return raw.map((entry: any) => ({
+			start: String(entry?.start ?? "00:00"),
+			end: String(entry?.end ?? "00:00"),
+			behavior: ["sleep", "slow", "short"].includes(entry?.behavior)
+				? (entry.behavior as "sleep" | "slow" | "short")
+				: undefined,
+		}));
 	},
 	get dynamicStatus(): DynamicStatusPreset[] {
 		const raw = v<{ status: string; text: string; type: number }[]>(

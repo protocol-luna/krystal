@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll, } from "bun:test";
-import { mockConfig } from "../_mock-config.js";
+import { mockConfig } from "../../tests/_mock-config.js";
 
 describe("getSleepBehavior enabled", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
 		mockConfig({
-			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "sleep" },
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "00:00", end: "23:59", behavior: "sleep" },
+			],
 		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
 	});
 
-	it("returns sleep behavior inside window", async () => {
+	it("returns 'sleep' when inside the window", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
 		expect(getSleepBehavior()).toBe("sleep");
 	});
@@ -22,14 +25,17 @@ describe("getSleepBehavior slow", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
 		mockConfig({
-			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "slow" },
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "00:00", end: "23:59", behavior: "slow" },
+			],
 		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
 	});
 
-	it("returns slow behavior", async () => {
+	it("returns 'slow' when inside the window", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
 		expect(getSleepBehavior()).toBe("slow");
 	});
@@ -39,14 +45,17 @@ describe("getSleepBehavior short", () => {
 	beforeAll(() => {
 		process.env.TZ = "UTC";
 		mockConfig({
-			sleepSchedule: { enabled: true, start: "00:00", end: "23:59", timezone: "UTC", behavior: "short" },
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "00:00", end: "23:59", behavior: "short" },
+			],
 		});
 	});
 	afterAll(() => {
 		delete process.env.TZ;
 	});
 
-	it("returns short behavior", async () => {
+	it("returns 'short' when inside the window", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
 		expect(getSleepBehavior()).toBe("short");
 	});
@@ -55,11 +64,11 @@ describe("getSleepBehavior short", () => {
 describe("getSleepBehavior disabled", () => {
 	beforeAll(() => {
 		mockConfig({
-			sleepSchedule: { enabled: false },
+			timeSchedules: [],
 		});
 	});
 
-	it("returns null when disabled", async () => {
+	it("returns null when no schedules", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
 		expect(getSleepBehavior()).toBeNull();
 	});
@@ -68,11 +77,57 @@ describe("getSleepBehavior disabled", () => {
 describe("getSleepBehavior outside window", () => {
 	beforeAll(() => {
 		mockConfig({
-			sleepSchedule: { enabled: true, start: "23:00", end: "00:00", timezone: "UTC", behavior: "sleep" },
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "23:00", end: "00:00", behavior: "sleep" },
+			],
 		});
 	});
 
-	it("returns null when current time is outside window", async () => {
+	it("returns null when current time is outside all windows", async () => {
+		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
+		// Current time is not 23:00-00:00, so returns null
+		expect(getSleepBehavior()).toBeNull();
+	});
+});
+
+describe("getSleepBehavior multiple windows", () => {
+	beforeAll(() => {
+		process.env.TZ = "UTC";
+		mockConfig({
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "10:00", end: "11:00", behavior: "short" },
+				{ start: "22:00", end: "08:00", behavior: "sleep" },
+			],
+		});
+	});
+	afterAll(() => {
+		delete process.env.TZ;
+	});
+
+	it("picks the first matching window", async () => {
+		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
+		// Current time is not in any of the windows above
+		expect(getSleepBehavior()).toBeNull();
+	});
+});
+
+describe("getSleepBehavior entry without behavior", () => {
+	beforeAll(() => {
+		process.env.TZ = "UTC";
+		mockConfig({
+			timezone: "UTC",
+			timeSchedules: [
+				{ start: "00:00", end: "23:59" }, // no behavior = normal
+			],
+		});
+	});
+	afterAll(() => {
+		delete process.env.TZ;
+	});
+
+	it("returns null when window matches but has no behavior", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
 		expect(getSleepBehavior()).toBeNull();
 	});

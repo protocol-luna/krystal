@@ -36,7 +36,8 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 			inactivityWarmupMinutes: 10,
 			inactivityWarmupMultiplier: 2,
 			voiceMessageChance: 0.08,
-			sleepSchedule: { enabled: false, start: "23:00", end: "08:00", timezone: "Europe/Paris", behavior: "sleep" },
+			timezone: "Europe/Paris",
+			timeSchedules: [] as { start: string; end: string; behavior?: string }[],
 			dynamicStatus: [] as { status: string; text: string; type: number }[],
 			dynamicStatusIntervalMinutes: 15,
 			replyStyles: [

@@ -186,21 +186,29 @@ dynamic_status_presets:
 # type: 0=Playing, 1=Streaming, 2=Listening, 3=Watching, 4=Custom, 5=Competing
 # Laissez le tableau vide [] pour désactiver.
 
-# --- Sleep schedule (plages de sommeil / présence variable) ---
-sleep_schedule:
-  enabled: false
-  start: "23:00"
-  end: "08:00"
-  timezone: "Europe/Paris"
-  behavior: "sleep"
-# Permet de simuler une présence non-24/7.
-# enabled: false → toujours actif, true → applique la plage.
-# start/end: heures de début et fin (format 24h). Gère les plages chevauchant minuit.
-# timezone: fuseau horaire (ex: "Europe/Paris", "America/New_York").
-# behavior:
-#   sleep → le bot ne répond qu'aux mentions et DMs
-#   slow  → délais x3-5, réactions quasi nulles
-#   short → ignore chance augmenté, réactions quasi nulles
+# --- Time schedules (présence variable) ---
+# Tranches horaires avec comportements différents.
+# Laissez vide pour toujours actif.
+# behavior: sleep (seules mentions/DMs passent),
+#           slow (délais ×3-5, réactions quasi nulles),
+#           short (ignore chance +30%, réactions quasi nulles)
+timezone: "Europe/Paris"
+time_schedules:
+  - start: "07:00"
+    end: "10:00"
+  - start: "10:00"
+    end: "11:00"
+    behavior: "short"
+  - start: "11:00"
+    end: "16:00"
+  - start: "16:00"
+    end: "18:00"
+    behavior: "slow"
+  - start: "18:00"
+    end: "22:00"
+  - start: "22:00"
+    end: "07:00"
+    behavior: "sleep"
 
 # --- TTS / Voice messages ---
 voice_message_chance: 0.08

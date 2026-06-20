@@ -1,4 +1,4 @@
-import { config, type SleepSchedule } from "../config.js";
+import { config, type TimeScheduleEntry } from "../config.js";
 
 function parseTime(t: string): number {
 	const [h, m] = t.split(":").map(Number);
@@ -12,23 +12,25 @@ function isInWindow(now: number, start: number, end: number): boolean {
 	return now >= start || now < end;
 }
 
-export function getSleepBehavior(): SleepSchedule["behavior"] | null {
-	if (!config.sleepSchedule.enabled) {
+export function getSleepBehavior(): TimeScheduleEntry["behavior"] | null {
+	const schedules = config.timeSchedules;
+	if (!Array.isArray(schedules) || schedules.length === 0) {
 		return null;
 	}
 
-	const tz = config.sleepSchedule.timezone;
+	const tz = config.timezone;
 
 	const now = new Date();
 	const localNow = new Date(now.toLocaleString("en-US", { timeZone: tz }));
 	const currentMinutes = localNow.getHours() * 60 + localNow.getMinutes();
 
-	const startMinutes = parseTime(config.sleepSchedule.start);
-	const endMinutes = parseTime(config.sleepSchedule.end);
-
-	if (!isInWindow(currentMinutes, startMinutes, endMinutes)) {
-		return null;
+	for (const entry of schedules) {
+		const startMinutes = parseTime(entry.start);
+		const endMinutes = parseTime(entry.end);
+		if (isInWindow(currentMinutes, startMinutes, endMinutes)) {
+			return entry.behavior ?? null;
+		}
 	}
 
-	return config.sleepSchedule.behavior;
+	return null;
 }
