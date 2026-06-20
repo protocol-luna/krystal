@@ -8,11 +8,13 @@ system_prompt: |
 
 # --- Secrets & chemins ---
 discord_token: "ton_token_ici"
-llama_cli_path: "llama/llama-cli"
+llama_cli_path: "bin/llama/llama-cli"
 llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
 llm_port: 3124
-tts_model_path: "./tts-engine/en_GB-southern_english_female-low.onnx"
-tts_binary_path: "./piper/piper"
+tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
+tts_binary_path: "bin/piper/piper"
+ffmpeg_path: "bin/ffmpeg/ffmpeg"
+ffprobe_path: "bin/ffmpeg/ffprobe"
 
 # --- Triggers (déclencheurs de réponse) ---
 names:

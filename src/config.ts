@@ -205,7 +205,17 @@ export const ttsModelPath: string =
 
 export const ttsBinaryPath: string =
 	v<string | null>("tts_binary_path", null) ??
-	process.env.TTS_BINARY_PATH ?? join(ROOT, "piper/piper");
+	process.env.TTS_BINARY_PATH ?? join(ROOT, "bin/piper/piper");
+
+export const ffmpegPath: string =
+	v<string | null>("ffmpeg_path", null) ??
+	process.env.FFMPEG_PATH ??
+	join(ROOT, "bin/ffmpeg/ffmpeg");
+
+export const ffprobePath: string =
+	v<string | null>("ffprobe_path", null) ??
+	process.env.FFPROBE_PATH ??
+	join(ROOT, "bin/ffmpeg/ffprobe");
 
 // --- Reply style ---
 export interface ReplyStyle {

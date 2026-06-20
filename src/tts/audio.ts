@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { ffmpegPath, ffprobePath } from "../config.js";
 
 export function sanitizeForTTS(text: string): string {
 	let t = (text || "")
@@ -30,7 +31,7 @@ export async function wavToOgg(wavBuf: Buffer): Promise<Buffer> {
 		fs.writeFileSync(tmpWav, wavBuf);
 		await new Promise<void>((resolve, reject) => {
 			execFile(
-				path.join(process.cwd(), "bin/ffmpeg"),
+				ffmpegPath,
 				[
 					"-y",
 					"-i",
@@ -71,7 +72,7 @@ export async function getAudioDuration(oggBuf: Buffer): Promise<number> {
 		fs.writeFileSync(tmpOgg, oggBuf);
 		const duration = await new Promise<number>((resolve, reject) => {
 			execFile(
-				path.join(process.cwd(), "bin/ffprobe"),
+				ffprobePath,
 				[
 					"-v",
 					"error",
