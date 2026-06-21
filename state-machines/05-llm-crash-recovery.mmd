@@ -1,40 +1,40 @@
+%%{init: {"theme":"dark"}}%%
 stateDiagram-v2
     [*] --> UNINITIALIZED: system start
-    UNINITIALIZED --> WAITING_MODEL: ensureLLM() → spawnLlama()
+    UNINITIALIZED --> WAITING_MODEL: ensureLLM() / spawnLlama()
     
     WAITING_MODEL --> MODEL_READY: stdout shows "> " or "Enter no prompt"
     WAITING_MODEL --> MODEL_ERROR: spawn error
     MODEL_ERROR --> SCHEDULE_RESTART: llmBus.emit("error", err)
 
-    MODEL_READY --> IDLE_PROCESSING: llmBus.emit("ready")\nrestartCount=0, restartDelay=1000
-    IDLE_PROCESSING --> PROCESSING_REQUEST: processQueue() → write stdin
+    MODEL_READY --> IDLE_PROCESSING: llmBus.emit("ready")
+    note right of MODEL_READY: restartCount=0, restartDelay=1000
+    
+    IDLE_PROCESSING --> PROCESSING_REQUEST: processQueue() / write stdin
     
     PROCESSING_REQUEST --> READING_RESPONSE: waiting for stdout
-    READING_RESPONSE --> CRASH_DETECTED: process "close" with non-zero code
-    READING_RESPONSE --> RESPONSE_COMPLETE: "\n> $" pattern detected
-    RESPONSE_COMPLETE --> IDLE_PROCESSING: done → processQueue() next
+    READING_RESPONSE --> CRASH_DETECTED: process "close" non-zero code
+    READING_RESPONSE --> RESPONSE_COMPLETE: pattern "<br/>> $" detected
+    RESPONSE_COMPLETE --> IDLE_PROCESSING: done / processQueue() next
 
     CRASH_DETECTED --> EMIT_CRASH: llmBus.emit("crash", code)
     EMIT_CRASH --> INCREMENT_RESTART: restartCount++
     
-    INCREMENT_RESTART --> CHECK_MAX_RESTARTS: restartCount > MAX_RESTARTS (5)?
-    CHECK_MAX_RESTARTS --> EXIT_ABORT: YES → process.exit(1)
-    CHECK_MAX_RESTARTS --> APPLY_BACKOFF: NO → delay = restartDelay
+    INCREMENT_RESTART --> CHECK_MAX_RESTARTS
+    CHECK_MAX_RESTARTS --> EXIT_ABORT: restartCount > 5
+    CHECK_MAX_RESTARTS --> APPLY_BACKOFF: still <= 5
 
     APPLY_BACKOFF --> DOUBLE_DELAY: restartDelay = min(delay*2, 30000)
     DOUBLE_DELAY --> WAIT_DELAY: setTimeout(delay)
     WAIT_DELAY --> SPAWN_AGAIN: spawnLlama()
+    SPAWN_AGAIN --> WAITING_MODEL
 
-    SPAWN_AGAIN --> WAITING_MODEL: try again
-
-    state "Exponential Backoff" as BACKOFF {
-        1: "1s"
-        2: "2s"
-        3: "4s"
-        4: "8s"
-        5: "16s"
-    }
-
-    note right of CHECK_MAX_RESTARTS: Séquence de backoff:\n1s → 2s → 4s → 8s → 16s\n(max 30s, max 5 tentatives)
-    note right of EXIT_ABORT: Abandon total du processus\naprès 5 échecs consécutifs
-    note right of CRASH_DETECTED: Causes possibles:\n- OOM (Out Of Memory)\n- Segfault\n- Model incompatibilité\n- Disk I/O error
+    note right of CHECK_MAX_RESTARTS
+      Exponential backoff: 1s 2s 4s 8s 16s, max 30s, max 5 retries
+    end note
+    note right of EXIT_ABORT
+      Abandon after 5 consecutive failures - process.exit(1)
+    end note
+    note right of CRASH_DETECTED
+      Causes: OOM, segfault, model incompatibility, disk I/O error
+    end note

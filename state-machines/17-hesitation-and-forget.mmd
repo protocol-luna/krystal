@@ -1,75 +1,74 @@
+%%{init: {"theme":"dark"}}%%
 flowchart LR
     subgraph "Hesitation"
         H1["triggerLunaReply() start"]
-        H2{"Math.random() <\nhesitationChance (15%) ?"}
-        H3["Choisir mot:\nuh..., um..., well...\ni mean..., hmm..., so..."]
-        H4["Préfixer le premier\nflush avec le mot"]
-        H5["✅ Message normal"]
+        H2{"Math.random() <<br/>hesitationChance (15%) ?"}
+        H3["Choose word:<br/>uh..., um..., well...<br/>i mean..., hmm..., so..."]
+        H4["Prefix the first<br/>flush with the word"]
+        H5["Normal message"]
         
         H1 --> H2
-        H2 -->|"oui"| H3
-        H2 -->|"non"| H5
+        H2 -->|"yes"| H3
+        H2 -->|"no"| H5
         H3 --> H4
         H4 --> FLUSH
     end
 
     subgraph "Forget"
-        F1["Après shouldIgnore()\nmais avant logAndReact()"]
-        F2{"Math.random() <\nforgetChance (3%) ?"}
-        F3["✅ Oublié\n(ne répond pas)"]
-        F4["Continue vers\nlogAndReact()"]
+        F1["After shouldIgnore()<br/>but before logAndReact()"]
+        F2{"Math.random() <<br/>forgetChance (3%) ?"}
+        F3["Forget (does not respond)"]
+        F4["Continue to logAndReact()"]
         
         F1 --> F2
-        F2 -->|"oui"| F3
-        F2 -->|"non"| F4
+        F2 -->|"yes"| F3
+        F2 -->|"no"| F4
     end
 
     subgraph "Ignore"
         G1["evaluateMessage() = respond"]
-        G2["getThresholds(reason)\n→ ignore_chance"]
+        G2["getThresholds(reason)<br/>ignore_chance"]
         G3{"sleepBehavior == 'short' ?"}
-        G4["chance += 0.3\n(capped à 0.9)"]
+        G4["chance += 0.3 (capped at 0.9)"]
         G5{"Math.random() < chance ?"}
-        G6["✅ Ignoré"]
-        G7["Continue vers forget"]
+        G6["Ignore"]
+        G7["Continue to forget"]
         
         G1 --> G2
         G2 --> G3
-        G3 -->|"oui"| G4
-        G3 -->|"non"| G5
+        G3 -->|"yes"| G4
+        G3 -->|"no"| G5
         G4 --> G5
-        G5 -->|"oui"| G6
-        G5 -->|"non"| G7
+        G5 -->|"yes"| G6
+        G5 -->|"no"| G7
         G7 --> F1
     end
 
     subgraph "Reaction"
         R1["logAndReact() setTimeout"]
-        R2{"shouldReact(reason,\n  sleepBehavior) ?"}
-        R3{"sleepBehavior == 'slow'\n|| 'short' ?"}
+        R2{"shouldReact(reason, sleepBehavior) ?"}
+        R3{"sleepBehavior == 'slow'<br/>ou 'short' ?"}
         R4["chance = min(chance, 0.02)"]
         R5{"Math.random() < chance ?"}
-        R6{"Custom emoji roll:\nMath.random() < 0.3 ?"}
-        R7["Choisir emoji serveur"]
-        R8["Choisir emoji unicode\n(parmi 14)"]
+        R6{"Custom emoji:<br/>Math.random() < 0.3 ?"}
+        R7["Choose server emoji"]
+        R8["Choose unicode emoji<br/>(among 14)"]
         R9["message.addReaction()"]
-        R10["❌ Pas de réaction"]
+        R10["No reaction"]
         
         R1 --> R2
         R2 --> R3
-        R3 -->|"oui"| R4
-        R3 -->|"non"| R5
+        R3 -->|"yes"| R4
+        R3 -->|"no"| R5
         R4 --> R5
-        R5 -->|"oui"| R6
-        R5 -->|"non"| R10
+        R5 -->|"yes"| R6
+        R5 -->|"no"| R10
         R6 -->|"30%"| R7
         R6 -->|"70%"| R8
         R7 --> R9
         R8 --> R9
     end
 
-    FLUSH["Premier message\nenvoyé à Discord"]
+    FLUSH["First message sent to Discord"]
 
-    note right of H4: L'hésitation est préfixée\nseulement au premier message\nsi plusieurs flushes
-    note right of G4: En mode 'short':\nla probabilité d'ignorer\naugmente de 30%
-    note right of R5: reaction_chance par type:\nmention 8%, dm 5%, name 6%\nkeyword 4%, follow-up 3%, random 2%
+

@@ -1,3 +1,4 @@
+%%{init: {"theme":"dark"}}%%
 stateDiagram-v2
     [*] --> IDLE: system start
 
@@ -20,7 +21,7 @@ stateDiagram-v2
         READ_STDOUT --> PARSE_RESPONSE: stdout "data" event
         PARSE_RESPONSE --> EMIT_TOKENS_LINE: newline detected
         EMIT_TOKENS_LINE --> EMIT_FLUSH: line cleaned & sent
-        PARSE_RESPONSE --> DETECT_PROMPT: matches "\n> $" pattern
+        PARSE_RESPONSE --> DETECT_PROMPT: matches "<br/>> $" pattern
         DETECT_PROMPT --> EMIT_DONE: signalDone(cleaned)
         EMIT_DONE --> [*]
         READ_STDOUT --> CLOSE_CRASH: process "close" event
@@ -77,5 +78,5 @@ stateDiagram-v2
     FINISH --> SCHEDULE_NEXT_PROCESS: setTimeout(processQueue, 100)
     SCHEDULE_NEXT_PROCESS --> PROCESS_QUEUE
 
-    note right of PROCESS_WORD_QUEUE: Les mots sont émis un par un\navec 20-80ms de délai aléatoire\nsimulant la frappe humaine
-    note right of EMIT_DONE: Le texte complet est envoyé\nvia signalDone() seulement\nquand tous les mots sont émis
+    note right of PROCESS_WORD_QUEUE: Words are emitted one by one<br/>with 20-80ms random delay<br/>simulating human typing
+    note right of EMIT_DONE: The full text is sent<br/>via signalDone() only<br/>when all words are emitted

@@ -1,44 +1,37 @@
+%%{init: {"theme":"dark"}}%%
 flowchart TD
     START(["sendTextAsVoiceMessage()"]) --> TTS_READY{"isTTSReady() ?"}
-    TTS_READY -->|"non"| WARN_NO_TTS["⚠️ Piper not ready\nskip voice message"]
+    TTS_READY -->|"non"| WARN_NO_TTS["Piper not ready<br/>skip voice message"]
     TTS_READY -->|"oui"| SANITIZE["sanitizeForTTS(text)"]
     
-    SANITIZE --> REPLACE_MENTIONS["<@123> → @utilisateur"]
-    REPLACE_MENTIONS --> REMOVE_CHANNELS["<#123> → ''"]
-    REMOVE_CHANNELS --> REMOVE_EMOJIS["<:name:id> → ''"]
-    REMOVE_EMOJIS --> REMOVE_URLS["https://... → ''"]
-    REMOVE_URLS --> STRIP_NON_TEXT["Supprimer [^\\p{L}\\p{N}\\s@]"]
-    STRIP_NON_TEXT --> TRUNCATE["Tronquer à 500 caractères"]
-    TRUNCATE --> CHECK_EMPTY{"Texte vide après\nnettoyage ?"}
+    SANITIZE --> REPLACE_MENTIONS["<@123> to @user"]
+    REPLACE_MENTIONS --> REMOVE_CHANNELS["<#123> to ''"]
+    REMOVE_CHANNELS --> REMOVE_EMOJIS["<:name:id> to ''"]
+    REMOVE_EMOJIS --> REMOVE_URLS["https://... to ''"]
+    REMOVE_URLS --> STRIP_NON_TEXT["Remove [^\\p{L}\\p{N}\\s@]"]
+    STRIP_NON_TEXT --> TRUNCATE["Truncate to 500 characters"]
+    TRUNCATE --> CHECK_EMPTY{"Empty text after<br/>cleaning ?"}
     
-    CHECK_EMPTY -->|"oui"| WARN_EMPTY["⚠️ Empty text\nskip voice message"]
-    CHECK_EMPTY -->|"non"| CHECK_UNSAFE{"hasUnsafeTTSText() ?\n(emoji ranges)"}
+    CHECK_EMPTY -->|"yes"| WARN_EMPTY["Empty text<br/>skip voice message"]
+    CHECK_EMPTY -->|"no"| CHECK_UNSAFE{"hasUnsafeTTSText() ?<br/>(emoji ranges)"}
     
-    CHECK_UNSAFE -->|"oui"| UNSAFE["⚠️ Texte unsafe\n(emoji/unicode problématique)\nskip"]
-    CHECK_UNSAFE -->|"non"| SYNTHESIZE["piper.synthesize(safeText)\n→ {audio: Buffer WAV}"]
+    CHECK_UNSAFE -->|"yes"| UNSAFE["Unsafe text (emoji)<br/>send as text instead"]
+    CHECK_UNSAFE -->|"non"| SYNTHESIZE["piper.synthesize(safeText)<br/>{audio: Buffer WAV}"]
     
-    SYNTHESIZE --> WAV_TO_OGG["wavToOgg(wavBuf)\nffmpeg -c:a libopus -b:a 32k\n-ar 24000 -ac 1"]
+    SYNTHESIZE --> WAV_TO_OGG["wavToOgg(wavBuf)<br/>ffmpeg libopus 32k<br/>24000Hz mono"]
     
-    WAV_TO_OGG --> GET_DURATION["getAudioDuration(oggBuf)\nffprobe → duration_secs"]
-    GET_DURATION --> BUILD_WAVEFORM["buildWaveformBase64()\n→ sinus 256 points en base64"]
+    WAV_TO_OGG --> GET_DURATION["getAudioDuration(oggBuf)<br/>ffprobe duration_secs"]
+    GET_DURATION --> BUILD_WAVEFORM["buildWaveformBase64()<br/>sine wave 256 points base64"]
     
-    BUILD_WAVEFORM --> REQUEST_UPLOAD["requestUploadUrl()\nPOST Discord /attachments"]
-    REQUEST_UPLOAD --> PARSE_UPLOAD["Extraire upload_url\net upload_filename"]
+    BUILD_WAVEFORM --> REQUEST_UPLOAD["requestUploadUrl()<br/>POST Discord /attachments"]
+    REQUEST_UPLOAD --> PARSE_UPLOAD["Extraire upload_url<br/>et upload_filename"]
     
-    PARSE_UPLOAD --> PUT_FILE["putFileToUploadUrl()\nPUT ogg → CDN Discord"]
-    PUT_FILE --> POST_MESSAGE["postVoiceMessage()\nPOST message avec flags=8192\n(voice message type)"]
+    PARSE_UPLOAD --> PUT_FILE["putFileToUploadUrl()<br/>PUT ogg vers CDN Discord"]
+    PUT_FILE --> POST_MESSAGE["postVoiceMessage()<br/>POST message flags=8192<br/>(voice message type)"]
     
-    POST_MESSAGE --> SUCCESS["✅ Voice message sent"]
-    WARN_NO_TTS --> END
-    WARN_EMPTY --> END
-    UNSAFE --> END
+    POST_MESSAGE --> SUCCESS["Voice message sent"]
+    WARN_NO_TTS --> DONE_DUMMY
+    WARN_EMPTY --> DONE_DUMMY
+    UNSAFE --> DONE_DUMMY
     
-    subgraph "3-Step Discord Upload"
-        S1["1. POST /attachments\n→ récupérer upload URL"]
-        S2["2. PUT file → CDN URL"]
-        S3["3. POST message\navec attachment metadata"]
-    end
-    
-    note right of SYNTHESIZE: Piper TTS génère du WAV\nà partir du texte nettoyé
-    note right of WAV_TO_OGG: ffmpeg convertit WAV → OGG\navec libopus (obligatoire Discord)
-    note right of POST_MESSAGE: flags=8192 = VOICE_MESSAGE\npermet d'activer le\nlecteur audio Discord
+

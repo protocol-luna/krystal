@@ -1,43 +1,36 @@
+%%{init: {"theme":"dark"}}%%
 flowchart TD
-    START(["Timer: setInterval(5min)"]) --> CHANCE_ROLL{"Math.random() <\nspontaneousChance (12%) ?"}
-    CHANCE_ROLL -->|"non (88%)"| WAIT(["Attendre prochain cycle"])
-    CHANCE_ROLL -->|"oui (12%)"| CHECK_BUSY{"isLLMBusy() ?"}
-    CHECK_BUSY -->|"oui"| WAIT
-    CHECK_BUSY -->|"non"| PICK_GUILD["pickWeightedGuild(client)"]
+    START(["Timer: setInterval(5min)"]) --> CHANCE_ROLL{"Math.random() <<br/>spontaneousChance (12%) ?"}
+    CHANCE_ROLL -->|"no (88%)"| WAIT(["Wait for next cycle"])
+    CHANCE_ROLL -->|"yes (12%)"| CHECK_BUSY{"isLLMBusy() ?"}
+    CHECK_BUSY -->|"yes"| WAIT
+    CHECK_BUSY -->|"no"| PICK_GUILD["pickWeightedGuild(client)"]
     
-    PICK_GUILD --> FILTER_GUILDS["Filtrer par whitelist\n(spontaneousWhitelist)"]
-    FILTER_GUILDS --> RANK_CHANNELS["Classer les serveurs par\nactivité (lastMessageID)"]
+    PICK_GUILD --> FILTER_GUILDS["Filter by whitelist<br/>(spontaneousWhitelist)"]
+    FILTER_GUILDS --> RANK_CHANNELS["Rank guilds by<br/>activity (lastMessageID)"]
     
-    RANK_CHANNELS --> LINEAR_WEIGHT["Sélection pondérée linéaire\npoids = (rang + 1)"]
-    LINEAR_WEIGHT --> SELECTED{"Un serveur/channel\na été sélectionné ?"}
-    SELECTED -->|"non"| WAIT
-    SELECTED -->|"oui"| CHECK_CACHE["Vérifier cache (60s TTL)\nfindMostActiveChannel()"]
+    RANK_CHANNELS --> LINEAR_WEIGHT["Linear weighted selection<br/>weight = (rank + 1)"]
+    LINEAR_WEIGHT --> SELECTED{"A guild/channel<br/>was selected ?"}
+    SELECTED -->|"no"| WAIT
+    SELECTED -->|"yes"| CHECK_CACHE["Check cache (60s TTL)<br/>findMostActiveChannel()"]
     
-    CHECK_CACHE --> FETCH_CONTEXT["fetchContext(channel, N)\n→ getMessages({limit: N})"]
-    FETCH_CONTEXT --> BUILD_PROMPT["Construire le prompt système"]
+    CHECK_CACHE --> FETCH_CONTEXT["fetchContext(channel, N)<br/>getMessages({limit: N})"]
+    FETCH_CONTEXT --> BUILD_PROMPT["Build the system prompt"]
     
-    BUILD_PROMPT --> RESET_CONTEXT["resetLLM() → /clear"]
-    RESET_CONTEXT --> ASK_LLM["askLLM({\n  username: 'system',\n  text: context\n})"]
+    BUILD_PROMPT --> RESET_CONTEXT["resetLLM() / clear"]
+    RESET_CONTEXT --> ASK_LLM["askLLM({username: 'system', text})"]
     
-    ASK_LLM --> CHECK_REPLY{"reply.trim()\nest non-vide ?"}
-    CHECK_REPLY -->|"non"| EMPTY_LOG["log: 'réponse vide'"]
-    CHECK_REPLY -->|"oui"| SEND_MESSAGE["client.createMessage(\n  channel.id, reply\n)"]
+    ASK_LLM --> CHECK_REPLY{"reply.trim()<br/>is not empty ?"}
+    CHECK_REPLY -->|"no"| EMPTY_LOG["log: 'empty response'"]
+    CHECK_REPLY -->|"yes"| SEND_MESSAGE["client.createMessage(channel.id, reply)"]
     
     SEND_MESSAGE --> MARK_ACTIVITY["markBotActivity(channel.id)"]
-    SEND_MESSAGE --> CATCH_ERROR{"Erreur ?\n(permissions)"}
-    CATCH_ERROR -->|"oui"| PERM_LOG["log: 'échec envoi'"]
+    SEND_MESSAGE --> CATCH_ERROR{"Error ?<br/>(permissions)"}
+    CATCH_ERROR -->|"yes"| PERM_LOG["log: 'send failure'"]
     
     MARK_ACTIVITY --> RESET_AGAIN["resetLLM()"]
     PERM_LOG --> RESET_AGAIN
     EMPTY_LOG --> RESET_AGAIN
     RESET_AGAIN --> WAIT
-    
-    subgraph "Construction du prompt"
-        CONTEXT_EXISTS{"context non-vide ?"}
-        CONTEXT_EXISTS -->|"oui"| WITH_CONTEXT["Recent conversation in #channel:\n...\n\nJoin the conversation naturally.\nKeep it short and relevant."]
-        CONTEXT_EXISTS -->|"non"| WITHOUT_CONTEXT["You are in #channel.\nThe channel is quiet.\nSay something engaging to spark\nconversation. Keep it short."]
-    end
-    
-    note right of LINEAR_WEIGHT: Plus le channel est actif\nplus il a de chances d'être choisi\npoids linéaire décroissant
-    note right of BUILD_PROMPT: Utilise un prompt système\ndifférent selon qu'il y a\ndu contexte récent ou non
-    note right of FETCH_CONTEXT: Récupère les N derniers\nmessages (defaut: 5)\net les formate en\n"username: content"
+
+

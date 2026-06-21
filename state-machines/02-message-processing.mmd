@@ -1,3 +1,4 @@
+%%{init: {"theme":"dark"}}%%
 stateDiagram-v2
     [*] --> MESSAGE_CREATE: Discord Event
 
@@ -22,14 +23,14 @@ stateDiagram-v2
 
     CHECK_IGNORE --> CHECK_FORGET: !shouldIgnore()
     CHECK_IGNORE --> IGNORE_PROB: shouldIgnore() → [*]
-    CHECK_FORGET --> COMPUTE_DELAY: roll < forgetChance → oublié [*]
+    CHECK_FORGET --> COMPUTE_DELAY: roll < forgetChance → forgotten [*]
 
     COMPUTE_DELAY --> REACT_AND_WAIT: computeDelay() + setTimeout
     REACT_AND_WAIT --> TRIGGER_REPLY: delay elapsed
     REACT_AND_WAIT --> ADD_REACTION: shouldReact() → addReaction
 
     TRIGGER_REPLY --> ANTI_SPAM_CHECK: triggerLunaReply()
-    ANTI_SPAM_CHECK --> QUEUE_PENDING: processing.has(key) → attente [*]
+    ANTI_SPAM_CHECK --> QUEUE_PENDING: processing.has(key) → wait [*]
     ANTI_SPAM_CHECK --> MARK_PROCESSING: free to proceed
 
     MARK_PROCESSING --> PICK_REPLY_STYLE: pickReplyStyle()
@@ -68,7 +69,7 @@ stateDiagram-v2
     IGNORE_SILENT --> [*]
     IGNORE_PROB --> [*]
 
-    note right of PAUSED_QUEUE: Messages mis en file d'attente\njusqu'à la fin de la pause session
-    note right of STREAM_TOKENS: Émission mot par mot avec délai\n20-80ms entre chaque mot
-    note right of FLUSH_MESSAGE: Chaque newline = un message\nDiscord séparé
-    note right of RECURSE_TRIGGER: Permet de traiter le message\nsuivant dans la file d'attente
+    note right of PAUSED_QUEUE: Messages queued until<br/>the end of the session pause
+    note right of STREAM_TOKENS: Word-by-word emission with delay<br/>20-80ms between each word
+    note right of FLUSH_MESSAGE: Each newline = a separate<br/>Discord message
+    note right of RECURSE_TRIGGER: Allows processing the next<br/>message in the queue

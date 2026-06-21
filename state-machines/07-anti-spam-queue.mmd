@@ -1,29 +1,28 @@
+%%{init: {"theme":"dark"}}%%
 flowchart TD
-    START(["triggerLunaReply(key)\nchannelId:userId"]) --> processing_has{"processing.has(key) ?"}
+    START(["triggerLunaReply(key)<br/>channelId:userId"]) --> processing_has{"processing.has(key) ?"}
     
-    processing_has -->|"non, libre"| MARK["markProcessing(key)\n→ Set.add(key)"]
-    processing_has -->|"oui, déjà en cours"| QUEUE["queuePending(key, msg, reason)\n→ Map.set(key, {msg, reason})\n→ saveAllState()"]
-    QUEUE --> EXIT_QUEUED(["Attente du prochain appel"])
+    processing_has -->|"no, free"| MARK["markProcessing(key)<br/>Set.add(key)"]
+    processing_has -->|"yes, already in progress"| QUEUE["queuePending(key, msg, reason)<br/>Map.set(key, {msg, reason})<br/>saveAllState()"]
+    QUEUE --> EXIT_QUEUED(["Wait for next call"])
     
-    MARK --> EXECUTE["Exécution de la requête LLM\nstreaming, typo, TTS..."]
-    EXECUTE --> DONE["doneProcessing(key)\n→ Set.delete(key)"]
+    MARK --> EXECUTE["LLM request execution<br/>streaming, typo, TTS..."]
+    EXECUTE --> DONE["doneProcessing(key)<br/>Set.delete(key)"]
     
-    DONE --> DRAIN["drainPending(key)\n→ Map.get(key) → Map.delete(key)\n→ saveAllState()"]
+    DONE --> DRAIN["drainPending(key)<br/>Map.get(key) / Map.delete(key)<br/>saveAllState()"]
     
     DRAIN --> EXISTS{"queued !== null ?"}
-    EXISTS -->|"oui"| RECURSE["triggerLunaReply(\n  queued.message,\n  queued.isDM,\n  queued.reason\n)"]
-    EXISTS -->|"non"| NORMAL_EXIT(["✅ Terminé"])
+    EXISTS -->|"yes"| RECURSE["triggerLunaReply(queued.message)"]
+    EXISTS -->|"no"| NORMAL_EXIT(["Done"])
     RECURSE --> processing_has
     
-    subgraph "État de la Map pendingMessages"
+    subgraph "Pending Messages Map State"
         MAP_DEF["Map<channelId:userId, {message, reason}>"]
     end
     
-    subgraph "Restauration (restart)"
-        RESTORE["restorePending(entries, client)\n→ getMessage(channelId, msgId)\n→ Map.set(key, msg)"]
-        STATE["state.json chargé"]
-        STATE --> RESTORE
+    subgraph "Restoration (restart)"
+        RESTORE["restorePending(entries, client)<br/>getMessage(channelId, msgId)<br/>Map.set(key, msg)"]
+        STATE["state.json loads"] --> RESTORE
     end
     
-    note right of QUEUE: Un seul message en attente\npar (channel:user)\nLe précédent est écrasé
-    note right of RECURSE: Boucle récursive sécurisée :\nsi le nouveau tour est aussi busy,\nil re-queue à nouveau
+

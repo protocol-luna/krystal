@@ -1,49 +1,50 @@
+%%{init: {"theme":"dark"}}%%
 graph TB
-    subgraph "TypedBus<LLMEvents> — llmBus"
-        LLMBUS[("llmBus\n(new TypedBus<LLMEvents>)")]
+    subgraph "TypedBus<LLMEvents> - llmBus"
+        LLMBUS[("llmBus<br/>(new TypedBus<LLMEvents>)")]
         
-        subgraph "Émetteurs"
+        subgraph "Emitters"
             CORE["llm-core.ts"]
             CORE_WORD["emitWordTokens()"]
             CORE_CRASH["scheduleRestart()"]
-            CORE_BACKEND["serverRequest()\nproxyRequest()"]
+            CORE_BACKEND["serverRequest() / proxyRequest()"]
         end
         
-        subgraph "Événements"
-            TOKEN["token → (chunk: string)\nMot individuel émis"]
-            FLUSH["flush → ()\nFin d'un chunk de mots"]
-            DONE["done → (fullText: string)\nTexte complet généré"]
-            ERROR["error → (err: Error)\nErreur LLM"]
-            CRASH["crash → (code: number|null)\nllama-cli crashé"]
-            READY["ready → ()\nModèle LLM prêt"]
-            RESET["reset → ()\nContexte LLM vidé"]
+        subgraph "Events"
+            TOKEN["token (chunk: string)<br/>Individual word emitted"]
+            FLUSH["flush ()<br/>End of a word chunk"]
+            DONE["done (fullText: string)<br/>Full text generated"]
+            ERROR["error (err: Error)<br/>LLM Error"]
+            CRASH["crash (code: number|null)<br/>llama-cli crash"]
+            READY["ready ()<br/>LLM model ready"]
+            RESET["reset ()<br/>LLM context empty"]
         end
         
-        subgraph "Souscripteurs"
-            BOT_TOKEN["bot.ts → on('token')\n→ accumulate chunks"]
-            BOT_FLUSH["bot.ts → on('flush')\n→ createMessage()"]
-            BOT_ONCE["bot.ts → once('token')\n→ startTyping()"]
-            CORE_DONE["llm-core.ts → on('done')\n→ item.resolve()"]
+        subgraph "Subscribers"
+            BOT_TOKEN["bot.ts on('token')<br/>accumulates chunks"]
+            BOT_FLUSH["bot.ts on('flush')<br/>createMessage()"]
+            BOT_ONCE["bot.ts once('token')<br/>startTyping()"]
+            CORE_DONE["llm-core.ts on('done')<br/>item.resolve()"]
         end
     end
 
-    subgraph "TypedBus<StateEvents> — stateBus"
-        STATEBUS[("stateBus\n(new TypedBus<StateEvents>)")]
+    subgraph "TypedBus<StateEvents> - stateBus"
+        STATEBUS[("stateBus<br/>(new TypedBus<StateEvents>)")]
         
-        subgraph "Émetteurs State"
-            ST_SET["state.ts → setPaused()"]
-            ST_MARK["state.ts → markReplied()"]
-            ST_ACT["state.ts → markBotActivity()"]
-            ST_TRACK["state.ts → trackSpeaker()"]
-            ST_CLEAR["state.ts → clearCooldown()"]
+        subgraph "State Emitters"
+            ST_SET["state.ts setPaused()"]
+            ST_MARK["state.ts markReplied()"]
+            ST_ACT["state.ts markBotActivity()"]
+            ST_TRACK["state.ts trackSpeaker()"]
+            ST_CLEAR["state.ts clearCooldown()"]
         end
         
-        subgraph "Événements State"
-            STATE_CH["state:changed → ()"]
+        subgraph "State Events"
+            STATE_CH["state:changed ()"]
         end
         
-        subgraph "Souscripteurs State"
-            PERSIST["persistence.ts → on('state:changed')\n→ scheduleSave()"]
+        subgraph "State Subscribers"
+            PERSIST["persistence.ts on('state:changed')<br/>scheduleSave()"]
         end
     end
 
@@ -68,15 +69,4 @@ graph TB
 
     STATE_CH --> PERSIST
 
-    subgraph "TypedBus Implementation"
-        BUS_CLASS["class TypedBus<Events>"]
-        BUS_CLASS --> ON["on(event, listener)\n→ add to Set"]
-        BUS_CLASS --> OFF["off(event, listener)\n→ delete from Set"]
-        BUS_CLASS --> ONCE["once(event, listener)\n→ wrapper that auto-off"]
-        BUS_CLASS --> EMIT["emit(event, ...args)\n→ iterate Set\n→ call all listeners"]
-    end
 
-    note right of TOKEN: Émission mot par mot\navec délai 20-80ms\nsimulant la frappe humaine
-    note right of FLUSH: Déclenché après chaque\nligne de texte complète\ndu LLM
-    note right of STATE_CH: Un seul événement\npour signaler\nn'importe quel changement d'état
-    note right of BUS_CLASS: TypedBus est générique\nUtilise Map<event, Set<listeners>>\nThread-safe pour Node.js

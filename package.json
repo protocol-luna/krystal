@@ -17,6 +17,7 @@
     "test": "bun test ./tests",
     "test:watch": "bun test --watch ./tests",
     "test:coverage": "bun test --coverage ./tests",
+    "diagrams": "./scripts/export-diagrams.sh",
     "download-model": "mkdir models && cd models && wget https://huggingface.co/mradermacher/Discord-Hermes-3-8B-GGUF/resolve/main/Discord-Hermes-3-8B.Q2_K.gguf && cd .."
   },
   "dependencies": {

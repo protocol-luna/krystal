@@ -1,37 +1,38 @@
+%%{init: {"theme":"dark"}}%%
 flowchart TD
-    START(["watchConfig()"]) --> CHECK_EXISTS{"config.yml\nexiste ?"}
-    CHECK_EXISTS -->|"non"| EXIT(["✅ Pas de watch"])
-    CHECK_EXISTS -->|"oui"| FS_WATCH["fs.watch(configPath,\n  (event) => ...)"]
+    START(["watchConfig()"]) -->     CHECK_EXISTS{"config.yml<br/>exists ?"}
+    CHECK_EXISTS -->|"no"| EXIT(["No watch"])
+    CHECK_EXISTS -->|"yes"| FS_WATCH["fs.watch(configPath,<br/>(event) => ...)"]
     
-    FS_WATCH --> WAIT_CHANGE["Attente modification..."]
+    FS_WATCH -->     WAIT_CHANGE["Waiting for change..."]
     WAIT_CHANGE --> EVENT_FIRED{"event === 'change' ?"}
-    EVENT_FIRED -->|"rename / delete"| IGNORE(["Ignorer"])
-    EVENT_FIRED -->|"change"| TRY_PARSE["Tenter de parser\nle nouveau YAML"]
+    EVENT_FIRED -->|"rename / delete"| IGNORE(["Ignore"])
+    EVENT_FIRED -->|"change"| TRY_PARSE["Attempt to parse<br/>the new YAML"]
     
-    TRY_PARSE --> PARSE_OK["yaml.load()\n→ rawCfg mis à jour"]
-    TRY_PARSE --> PARSE_ERR{"Erreur de\nparse YAML ?"}
-    PARSE_ERR -->|"oui"| LOG_ERROR["console.error(err)\nl'ancienne config reste active"]
-    PARSE_ERR -->|"non"| LOG_OK["console.log: hot-reloaded"]
+    TRY_PARSE -->     PARSE_OK["yaml.load()<br/>rawCfg updated"]
+    TRY_PARSE -->     PARSE_ERR{"YAML parse<br/>error ?"}
+    PARSE_ERR -->|"yes"| LOG_ERROR["console.error(err)<br/>old config remains active"]
+    PARSE_ERR -->|"no"| LOG_OK["console.log: hot-reloaded"]
     PARSE_OK --> LOG_OK
     
-    LOG_OK --> UPDATE_LIVE["Les getters du 'config' object\nutilisent rawCfg → valeurs à jour"]
+    LOG_OK --> UPDATE_LIVE["Les getters du 'config' object<br/>utilisent rawCfg (valeurs a jour)"]
     
-    subgraph "Ce qui change en direct"
-        HOT1["names, keywords,\nrandomChance,\ncooldownSeconds"]
-        HOT2["concentration thresholds\n(delays, ignore, reaction)"]
-        HOT3["typoChance, hesitationChance,\nforgetChance"]
-        HOT4["voiceMessageChance,\nserverEmojiChance"]
-        HOT5["timeSchedules,\ndynamicStatus"]
-        HOT6["sessionMessageLimit,\nreplyStyles"]
+    subgraph "What changes live"
+        HOT1["names, keywords, randomChance, cooldownSeconds"]
+        HOT2["concentration thresholds (delays, ignore, reaction)"]
+        HOT3["typoChance, hesitationChance, forgetChance"]
+        HOT4["voiceMessageChance, serverEmojiChance"]
+        HOT5["timeSchedules, dynamicStatus"]
+        HOT6["sessionMessageLimit, replyStyles"]
     end
     
-    subgraph "Ce qui nécessite un restart"
+    subgraph "What requires a restart"
         COLD1["DISCORD_TOKEN"]
-        COLD2["LLAMA_CLI_PATH,\nLLAMA_MODEL_PATH"]
-        COLD3["LLM_HOST, LLM_PORT,\nLLM_MODE"]
+        COLD2["LLAMA_CLI_PATH, LLAMA_MODEL_PATH"]
+        COLD3["LLM_HOST, LLM_PORT, LLM_MODE"]
         COLD4["SYSTEM_PROMPT"]
-        COLD5["llamaArgs\n(tous les flags)"]
-        COLD6["ttsModelPath,\nffmpegPath, ..."]
+        COLD5["llamaArgs (tous les flags)"]
+        COLD6["ttsModelPath, ffmpegPath, ..."]
     end
     
     UPDATE_LIVE --> HOT1
@@ -41,5 +42,4 @@ flowchart TD
     UPDATE_LIVE --> HOT5
     UPDATE_LIVE --> HOT6
     
-    note right of UPDATE_LIVE: Les getters JS sont évalués\nà chaque accès → pas de délai\nentre le save et l'utilisation
-    note right of PARSE_ERR: Si le YAML est invalide,\nla config précédente reste\nactive → pas de crash
+

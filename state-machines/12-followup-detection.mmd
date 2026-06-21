@@ -1,8 +1,9 @@
+%%{init: {"theme":"dark"}}%%
 stateDiagram-v2
     [*] --> IDLE
     
-    IDLE --> BOT_REPLIED: triggerLunaReply completes → trackSpeaker()
-    BOT_REPLIED --> BOT_SPOKE: trackSpeaker(botId) → lastSpeaker = botId
+    IDLE --> BOT_REPLIED: triggerLunaReply completes
+    BOT_REPLIED --> BOT_SPOKE: trackSpeaker(botId) sets lastSpeaker = botId
     BOT_SPOKE --> WATCHING: waiting 15s window
     
     WATCHING --> USER_REPLIES: user sends message in same channel
@@ -13,32 +14,32 @@ stateDiagram-v2
     USER_REPLIES --> CHECK_FOLLOWUP: canFollowUp() called
     
     CHECK_FOLLOWUP --> CHECK_RECENT_BOT: isRecentBotActivity(channel, 15000)?
-    CHECK_RECENT_BOT --> CHECK_SPEAKER: YES → lastSpeaker?.userId === botId?
+    CHECK_RECENT_BOT --> CHECK_SPEAKER: YES, lastSpeaker?.userId === botId?
     CHECK_RECENT_BOT --> NOT_FOLLOWUP: NO (bot inactive >15s)
     
-    CHECK_SPEAKER --> CHECK_COUNT: YES → responseCount < MAX_FOLLOWUPS (3)?
-    CHECK_SPEAKER --> NOT_FOLLOWUP: NO (someone else was last speaker)
+    CHECK_SPEAKER --> CHECK_COUNT: YES, responseCount < MAX_FOLLOWUPS (3)?
+    CHECK_SPEAKER --> NOT_FOLLOWUP: NO (someone else spoke last)
     
-    CHECK_COUNT --> FOLLOWUP_READY: YES → canFollowUp = true
-    CHECK_COUNT --> NOT_FOLLOWUP: NO → MAX_FOLLOWUPS reached
+    CHECK_COUNT --> FOLLOWUP_READY: YES, canFollowUp = true
+    CHECK_COUNT --> NOT_FOLLOWUP: NO, MAX_FOLLOWUPS reached
     
     FOLLOWUP_READY --> APPLY_DELAY: computeDelay("follow-up")
     APPLY_DELAY --> MAYBE_REACT: shouldReact("follow-up")?
-    MAYBE_REACT --> ADD_REACTION_IF: YES → addReaction
+    MAYBE_REACT --> ADD_REACTION_IF: YES, addReaction
     MAYBE_REACT --> EXECUTE_FOLLOWUP: NO
     
-    ADD_REACTION_IF --> EXECUTE_FOLLOWUP: reaction added
-    EXECUTE_FOLLOWUP --> triggerLunaReply("follow-up")
-    EXECUTE_FOLLOWUP --> INCREMENT_FOLLOWUP_COUNT: markReplied() → responseCount++
-    INCREMENT_FOLLOWUP_COUNT --> CHECK_SESSION_LIMIT
+    ADD_REACTION_IF --> EXECUTE_FOLLOWUP
+    EXECUTE_FOLLOWUP --> TRIGGER_REPLY_FUP: triggerLunaReply
+    EXECUTE_FOLLOWUP --> INCREMENT_COUNT: markReplied + responseCount++
+    INCREMENT_COUNT --> IDLE
     
     NOT_FOLLOWUP --> IDLE
 
-    state "Follow-Up Budget" as BUDGET {
-        COUNT0: "responseCount = 0"
-        COUNT1: "responseCount = 1"
-        COUNT2: "responseCount = 2"
-        COUNT3: "responseCount = 3 (MAX)"
+    state BUDGET {
+        COUNT0: responseCount = 0
+        COUNT1: responseCount = 1
+        COUNT2: responseCount = 2
+        COUNT3: responseCount = 3 max
         
         COUNT0 --> COUNT1: follow-up responded
         COUNT1 --> COUNT2: another follow-up
@@ -48,7 +49,6 @@ stateDiagram-v2
         COUNT1 --> COUNT0: 60s timeout
         COUNT2 --> COUNT1: 60s timeout
         COUNT3 --> COUNT2: 60s timeout
-    end
+    }
 
-    note right of WATCHING: Follow-up bypasses:\n- Trigger evaluation\n- Sleep check (sauf sleep)\n- Cooldown check\n- Ignore chance
-    note right of BUDGET: Budget de 3 follow-ups\npar fenêtre de 60s\nDécrémenté après 60s
+
