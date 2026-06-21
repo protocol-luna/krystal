@@ -362,6 +362,15 @@ export const config = {
 	get typoCorrectionStyle(): "edit" | "message" | "mixed" {
 		return v<"edit" | "message" | "mixed">("typo_correction_style", "mixed");
 	},
+	get burstChance(): number {
+		return v<number>("burst_chance", 0.15);
+	},
+	get burstDelayMin(): number {
+		return v<number>("burst_delay_min", 1500);
+	},
+	get burstDelayMax(): number {
+		return v<number>("burst_delay_max", 4000);
+	},
 	get hesitationChance(): number {
 		return v<number>("hesitation_chance", 0.15);
 	},

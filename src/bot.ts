@@ -50,7 +50,10 @@ import { handleReactionCommand } from "./bot/reactions.js";
 const sessionCounts = new Map<string, number>();
 const sessionPaused = new Set<string>();
 const sessionLastMessage = new Map<string, number>();
-const sessionQueue = new Map<string, { message: Eris.Message; isDM: boolean; reason: string }[]>();
+const sessionQueue = new Map<
+	string,
+	{ message: Eris.Message; isDM: boolean; reason: string }[]
+>();
 
 function drainSessionQueue(channelId: string): void {
 	const queued = sessionQueue.get(channelId);
@@ -142,6 +145,79 @@ async function triggerLunaReply(
 		let messageBuffer = "";
 		let isFirstChunk = true;
 
+		const willBurst = !isVoice && Math.random() < config.burstChance;
+
+		function sendFragments(parts: string[], hasRef: boolean): void {
+			let accDelay = 0;
+			for (let i = 0; i < parts.length; i++) {
+				const frag = parts[i];
+				if (!frag) {
+					continue;
+				}
+				if (i === 0) {
+					const content = hesitationWord ? `${hesitationWord} ${frag}` : frag;
+					hesitationWord = "";
+					client
+						.createMessage(message.channel.id, {
+							content,
+							...(hasRef && refStyle.messageReference
+								? {
+										messageReference: { messageID: message.id },
+										allowedMentions: {
+											repliedUser: refStyle.mentionRepliedUser,
+										},
+									}
+								: {}),
+						})
+						.then((_sent) => {
+							isFirstChunk = false;
+							markBotActivity(message.channel.id);
+						})
+						.catch(() => {});
+				} else {
+					const delay =
+						config.burstDelayMin +
+						Math.random() * (config.burstDelayMax - config.burstDelayMin);
+					accDelay += delay;
+					const fragContent = hesitationWord
+						? `${hesitationWord} ${frag}`
+						: frag;
+					hesitationWord = "";
+					setTimeout(() => {
+						client
+							.createMessage(message.channel.id, { content: fragContent })
+							.then(() => markBotActivity(message.channel.id))
+							.catch(() => {});
+					}, accDelay);
+				}
+			}
+		}
+
+		function splitBurst(text: string): string[] {
+			if (!willBurst) {
+				return [text];
+			}
+			const words = text.split(/\s+/);
+			if (words.length < 4) {
+				return [text];
+			}
+			const nFrags = Math.random() < 0.6 ? 2 : 3;
+			if (nFrags === 2) {
+				const splitAt = Math.floor(words.length * (0.3 + Math.random() * 0.25));
+				return [
+					words.slice(0, splitAt).join(" "),
+					words.slice(splitAt).join(" "),
+				];
+			}
+			const split1 = Math.floor(words.length * (0.2 + Math.random() * 0.15));
+			const split2 = Math.floor(words.length * (0.55 + Math.random() * 0.15));
+			return [
+				words.slice(0, split1).join(" "),
+				words.slice(split1, split2).join(" "),
+				words.slice(split2).join(" "),
+			];
+		}
+
 		onToken = (word: string) => {
 			chunks.push(word);
 			if (messageBuffer) {
@@ -169,28 +245,9 @@ async function triggerLunaReply(
 				if (!messageBuffer) {
 					return;
 				}
-				const content = hesitationWord
-					? `${hesitationWord} ${messageBuffer}`
-					: messageBuffer;
-				hesitationWord = "";
+				const parts = splitBurst(messageBuffer);
 				messageBuffer = "";
-				client
-					.createMessage(message.channel.id, {
-						content,
-						...(isFirstChunk && refStyle.messageReference
-							? {
-									messageReference: { messageID: message.id },
-									allowedMentions: {
-										repliedUser: refStyle.mentionRepliedUser,
-									},
-								}
-							: {}),
-					})
-					.then((_sent) => {
-						isFirstChunk = false;
-						markBotActivity(message.channel.id);
-					})
-					.catch(() => {});
+				sendFragments(parts, isFirstChunk);
 			};
 			llmBus.on("flush", onFlush);
 		}
@@ -199,20 +256,9 @@ async function triggerLunaReply(
 
 		// flush remaining buffer (last line without newline sentinel)
 		if (!isVoice && messageBuffer) {
-			await client.createMessage(message.channel.id, {
-				content: messageBuffer,
-				...(isFirstChunk && refStyle.messageReference
-					? {
-							messageReference: { messageID: message.id },
-							allowedMentions: {
-								repliedUser: refStyle.mentionRepliedUser,
-							},
-						}
-					: {}),
-			});
-			isFirstChunk = false;
-			markBotActivity(message.channel.id);
+			const parts = splitBurst(messageBuffer);
 			messageBuffer = "";
+			sendFragments(parts, isFirstChunk);
 		}
 
 		// voice TTS
@@ -484,7 +530,9 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		const q = sessionQueue.get(cid) ?? [];
 		q.push({ message, isDM, reason: result.reason ?? "mention" });
 		sessionQueue.set(cid, q);
-		console.log(`[bot] #${channelName} ${author}: mis en queue (session pause)`);
+		console.log(
+			`[bot] #${channelName} ${author}: mis en queue (session pause)`
+		);
 		return;
 	}
 
@@ -516,7 +564,9 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		);
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
-		checkSessionLimit(cid, () => { void resetLLM(); });
+		checkSessionLimit(cid, () => {
+			void resetLLM();
+		});
 		return;
 	}
 
@@ -544,7 +594,9 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		}
 
 		await triggerLunaReply(message, isDM, "follow-up");
-		checkSessionLimit(cid, () => { void resetLLM(); });
+		checkSessionLimit(cid, () => {
+			void resetLLM();
+		});
 	}
 
 	trackSpeaker(message.channel.id, message.author.id);

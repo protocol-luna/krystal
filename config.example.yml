@@ -150,6 +150,14 @@ typo_correction_style: "mixed"
 # Style de correction des fautes : "edit" (édite tout le message), "message" (envoie "mot*"),
 # ou "mixed" (50/50 aléatoire).
 
+# --- Burst (fragmentation des réponses) ---
+burst_chance: 0.15
+# Probabilité qu'une réponse soit découpée en 2-3 fragments envoyés avec un délai
+# (simule le rythme d'une personne qui tape par à-coups).
+burst_delay_min: 1500
+burst_delay_max: 4000
+# Délai (ms) minimum et maximum entre chaque fragment du burst.
+
 # --- Inactivity warmup -- délai plus long si le bot n'a pas parlé depuis longtemps ---
 inactivity_warmup_minutes: 10
 inactivity_warmup_multiplier: 2

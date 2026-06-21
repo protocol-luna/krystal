@@ -389,6 +389,14 @@ concentration:
 | `typo_layout` | `"azerty"` \| `"qwerty"` | `"azerty"` | Keyboard layout for adjacent-key typos |
 | `typo_correction_style` | `"edit"` \| `"message"` \| `"mixed"` | `"mixed"` | Correction style: edit message, new `word*` message, or 50/50 |
 
+### Message Burst (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `burst_chance` | number | `0.15` | Probability a response is split into 2-3 fragments sent at human pace |
+| `burst_delay_min` | number | `1500` | Min delay (ms) between burst fragments |
+| `burst_delay_max` | number | `4000` | Max delay (ms) between burst fragments |
+
 ### Human-like Behaviors (✅)
 
 | Key | Type | Default | Description |
