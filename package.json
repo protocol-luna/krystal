@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/core/llm-server.ts --bundle --platform=node --format=esm --packages=external --outfile=llm-server.js",
-    "start": "node llm-server.js",
-    "server-only": "node llm-server.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
+    "start": "node self-cli.js",
+    "client-only": "node self-cli.js",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
     "lint": "bunx --bun @biomejs/biome lint ./src",
@@ -26,6 +26,7 @@
     "@biomejs/biome": "^2.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.9.3",
+    "concurrently": "^10.0.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
   }
