@@ -5,7 +5,6 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
     "start": "node self-cli.js",
-    "client-only": "node self-cli.js",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
     "lint": "bunx --bun @biomejs/biome lint ./src",
