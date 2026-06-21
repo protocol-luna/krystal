@@ -1,6 +1,6 @@
 # Projet protocole Luna
 
-Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de façon naturelle — sommeil, inattention, fautes de frappe, hésitations, oublis, messages vocaux, tempo WPM, file anti-spam, persistance, auto-restart, statut rotatif.
+Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de façon naturelle — sommeil, inattention, fautes de frappe, hésitations, oublis, messages vocaux, file anti-spam, persistance, auto-restart, statut rotatif.
 
 - Modèle fine-tuné sur [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M échanges, 17M turns)
 - Format GGUF quantifié (ex. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
@@ -16,7 +16,8 @@ Bot Discord autonome. Fait tourner un LLM local (llama.cpp) et converse de faço
 │   core/llm-bus   │       state/state-bus             │
 │  token / done /  │     state:changed                 │
 │  error / crash / │     → persistence auto            │
-│  ready / reset   │                                   │
+│  flush / ready / │                                   │
+│  reset           │                                   │
 └────────┬─────────┴────────┬─────────────────────────┘
          │                  │
 ┌────────▼─────────┐  ┌────▼──────────────────────┐
@@ -45,7 +46,7 @@ src/
 ├── guild.ts           # findMostActiveChannel
 ├── core/
 │   ├── bus.ts         # TypedBus générique (on/off/once/emit)
-│   ├── llm-bus.ts     # Bus LLM (token, done, error, crash, ready, reset)
+│   ├── llm-bus.ts     # Bus LLM (token, done, flush, error, crash, ready, reset)
 │   ├── llm-core.ts    # Spawn CLI ou HTTP server, queue, parsing, restart
 │   ├── llm-client.ts  # Client HTTP vers llm-server (mode proxy)
 │   └── llm-server.ts  # Serveur HTTP NDJSON (mode proxy)
@@ -281,11 +282,11 @@ llmBus.once("token", startTyping)  → envoie typing + intervalle 8s
 finally: clearInterval, llmBus.off  → arrête le typing + nettoie
 ```
 
-Pas de typing pendant le délai de concentration — le typing n'apparaît que quand le LLM commence à générer (premier event `token` sur `llmBus`).
+Le typing n'apparaît que quand le LLM commence à générer (premier event `token` sur `llmBus`).
 
-### Réponse multi-chunk
+### Réponse temps réel
 
-Le LLM stream sa réponse en chunks (découpés sur les `\n`). Chaque chunk devient un message Discord séparé, avec un délai calculé via WPM (`typing_wpm`, défaut 300) entre chaque message — `delay = (chunk.length / (wpm * 5)) * 60000 * random(0.5-1.0)`. Simule le temps d'écrire chaque message individuellement. Seul le premier message a un `messageReference` (reply visuel). En mode vocal, le typing indicator est désactivé et les chunks sont ignorés (un seul message vocal).
+Le LLM stream sa réponse ligne par ligne (`\n`). Chaque ligne est découpée en mots (tokens), émis un par un sur `llmBus.emit("token", word)`. À chaque `\n`, un event `flush` est émis — le bot envoie immédiatement le message accumulé. Pas de délai simulé : le rythme est celui du LLM. Seul le premier message a un `messageReference` (reply visuel). En mode vocal, le streaming est ignoré (un seul message vocal).
 
 ### Réactions
 
@@ -509,32 +510,27 @@ sequenceDiagram
                 bot.ts->>bot.ts: stocke dans pendingMessages["C:U"]
                 bot.ts-->>Discord: ignoré (file)
             else libre
-                bot.ts->>bot.ts: llmBus.on("token", onChunk)<br/>llmBus.once("token", startTyping)
+                bot.ts->>bot.ts: llmBus.on("token", onToken)<br/>llmBus.once("token", startTyping)<br/>llmBus.on("flush", onFlush)
                 bot.ts->>llm-core.ts: askLLM({ username, text })
 
-                llm-core.ts-->>bot.ts: mode cli → stdin<br/>mode server → HTTP POST
+                llm-core.ts-->>bot.ts: mode cli → stdin<br/>mode proxy → HTTP → llm-server
 
-                llama-->>llm-core.ts: stdout stream (CLI)<br/>ou SSE stream (server)
-                llm-core.ts->>llmBus: emit("token", chunk)
+                llama-->>llm-core.ts: stdout stream (CLI)<br/>ou HTTP stream (proxy)
+                llm-core.ts->>llmBus: emit("token", word)  × N mots<br/>llmBus.emit("flush")      → fin de ligne
 
                 bot.ts->>Discord: sendChannelTyping()<br/>(déclenché par once)
                 loop every 8s
                     bot.ts->>Discord: sendChannelTyping()
                 end
-                loop each chunk
-                    llmBus-->>bot.ts: onToken(chunk)
-                    bot.ts->>bot.ts: délai inter-chunk
-                    bot.ts->>bot.ts: typo possible (applyTypo)
-                    bot.ts->>Discord: createMessage(chunk)
+                loop each flush
+                    llmBus-->>bot.ts: onFlush()
+                    bot.ts->>bot.ts: hesitation possible
+                    bot.ts->>Discord: createMessage(buffer)
                     bot.ts->>trigger.ts: markBotActivity()
                     Note over state.ts: stateBus.emit("state:changed")
                 end
-                alt typo corrigé
-                    alt style = "edit"
-                        bot.ts->>Discord: editMessage (2-4s)
-                    else style = "message"
-                        bot.ts->>Discord: createMessage("mot*")
-                    end
+                alt flush résiduel (dernière ligne sans \n)
+                    bot.ts->>Discord: createMessage(buffer)
                 end
                 alt erreur LLM
                     llm-core.ts->>llmBus: emit("error")
@@ -542,7 +538,7 @@ sequenceDiagram
                 end
                 bot.ts->>trigger.ts: trackSpeaker(bot)
                 Note over state.ts: stateBus.emit("state:changed")
-                bot.ts->>bot.ts: llmBus.off("token", onChunk) cleanup
+                bot.ts->>bot.ts: llmBus.off handlers cleanup
                 bot.ts->>bot.ts: pendingMessages["C:U"] ?
                 alt message en attente
                     bot.ts->>bot.ts: triggerLunaReply(msg)
@@ -645,7 +641,7 @@ xychart-beta
 | `[tts]` | Synthèse, upload, voice message |
 | `[persist]` | Sauvegarde/restauration |
 | `[llm-core]` | Spawn, crash, restart, mode CLI/server |
-| `[llmBus]` | Événements LLM (token, done, error, ready) |
+| `[llmBus]` | Événements LLM (token, done, flush, error, ready) |
 
 ---
 
