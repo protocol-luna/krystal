@@ -9,9 +9,8 @@ for f in state-machines/[0-9][0-9]-*.mmd; do
   echo "Exporting $base..."
   bunx mmdc \
     -i "$f" \
-    -o "$OUTDIR/$base.png" \
-    -s 3 -w 4096 \
+    -o "$OUTDIR/$base.svg" \
     -b "#1e1e2e"
 done
 
-echo "Done — $(ls "$OUTDIR"/*.png | wc -l) PNGs exported"
+echo "Done — $(ls "$OUTDIR"/*.svg | wc -l) SVGs exported"

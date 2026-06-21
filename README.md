@@ -76,7 +76,7 @@ src/
 
 > Detailed diagrams (state machines, flowcharts, Gantt) are available in the [`state-machines/`](state-machines/) folder — 22 Mermaid diagrams covering the entire codebase.
 
-[![Message processing overview](state-machines/readme-diagrams/r01.png)](state-machines/readme-diagrams/r01.mmd)
+[![Message processing overview](state-machines/readme-diagrams/r01.svg)](state-machines/readme-diagrams/r01.mmd)
 
 ---
 
@@ -84,7 +84,7 @@ src/
 
 ### State machine — incoming message decision
 
-[![Trigger system — incoming message decision](state-machines/readme-diagrams/r02.png)](state-machines/readme-diagrams/r02.mmd)
+[![Trigger system — incoming message decision](state-machines/readme-diagrams/r02.svg)](state-machines/readme-diagrams/r02.mmd)
 
 ### Trigger priority order
 
@@ -113,7 +113,7 @@ The bot registers itself as `lastSpeaker`. Any subsequent message within 15s tri
 
 ### Variable concentration
 
-[![Variable concentration flowchart](state-machines/readme-diagrams/r03.png)](state-machines/readme-diagrams/r03.mmd)
+[![Variable concentration flowchart](state-machines/readme-diagrams/r03.svg)](state-machines/readme-diagrams/r03.mmd)
 
 | Trigger | Min delay | Max delay | Ignore | Reaction |
 |---|---|---|---|---|
@@ -176,7 +176,7 @@ AZERTY example: `bonjour → bonjpur`, `salut → slaut`, `comment → cpmment`.
 
 Configurable probability (`voice_message_chance`, default 8%). Full pipeline:
 
-[![Voice message pipeline](state-machines/readme-diagrams/r04.png)](state-machines/readme-diagrams/r04.mmd)
+[![Voice message pipeline](state-machines/readme-diagrams/r04.svg)](state-machines/readme-diagrams/r04.mmd)
 
 ### Typing indicator
 
@@ -213,7 +213,7 @@ In DMs, `messageReference` is always `false`.
 
 ### Sleep schedules
 
-[![Sleep schedules flowchart](state-machines/readme-diagrams/r05.png)](state-machines/readme-diagrams/r05.mmd)
+[![Sleep schedules flowchart](state-machines/readme-diagrams/r05.svg)](state-machines/readme-diagrams/r05.mmd)
 
 | Mode | Effect |
 |---|---|
@@ -223,13 +223,13 @@ In DMs, `messageReference` is always `false`.
 
 Timeline example:
 
-[![Sleep schedules timeline](state-machines/readme-diagrams/r06.png)](state-machines/readme-diagrams/r06.mmd)
+[![Sleep schedules timeline](state-machines/readme-diagrams/r06.svg)](state-machines/readme-diagrams/r06.mmd)
 
 ### Spontaneous Messages
 
 Every 5 minutes, 12% chance the bot posts a message on its own initiative.
 
-[![Spontaneous messages flowchart](state-machines/readme-diagrams/r07.png)](state-machines/readme-diagrams/r07.mmd)
+[![Spontaneous messages flowchart](state-machines/readme-diagrams/r07.svg)](state-machines/readme-diagrams/r07.mmd)
 
 **Server selection**: ranking by `lastMessageID` of the most active channel, decreasing linear weight (the most active server has N× more chances than the last).
 
@@ -249,17 +249,17 @@ If the bot has not been active for `inactivity_warmup_minutes` (default 10 min),
 
 The Discord status alternates between several configured presets (`dynamic_status_presets`), rotating every `dynamic_status_interval_minutes` minutes. Supported types: Playing (0), Streaming (1), Listening (2), Watching (3), Custom (4), Competing (5). During sleep hours, the bot switches to `invisible`.
 
-[![Dynamic Discord status rotation](state-machines/readme-diagrams/r08.png)](state-machines/readme-diagrams/r08.mmd)
+[![Dynamic Discord status rotation](state-machines/readme-diagrams/r08.svg)](state-machines/readme-diagrams/r08.mmd)
 
 ### Anti-spam
 
-[![Anti-spam state diagram](state-machines/readme-diagrams/r09.png)](state-machines/readme-diagrams/r09.mmd)
+[![Anti-spam state diagram](state-machines/readme-diagrams/r09.svg)](state-machines/readme-diagrams/r09.mmd)
 
 Key `channelId:userId`. Only one message queued per user per channel. Processed as soon as the current response finishes.
 
 ### Persistence
 
-[![State persistence flowchart](state-machines/readme-diagrams/r10.png)](state-machines/readme-diagrams/r10.mmd)
+[![State persistence flowchart](state-machines/readme-diagrams/r10.svg)](state-machines/readme-diagrams/r10.mmd)
 
 **Persisted:** pendingMessages, paused, cooldowns, timestamps, lastSpeaker, follow-up counters.
 
@@ -269,7 +269,7 @@ Key `channelId:userId`. Only one message queued per user per channel. Processed 
 
 If the llama-cli process crashes (OOM, segfault, etc.), it is automatically restarted:
 
-[![Auto-restart LLM diagram](state-machines/readme-diagrams/r11.png)](state-machines/readme-diagrams/r11.mmd)
+[![Auto-restart LLM diagram](state-machines/readme-diagrams/r11.svg)](state-machines/readme-diagrams/r11.mmd)
 
 Useful for aggressive quantizations (Q2_K) that may crash on complex prompts.
 
@@ -283,7 +283,7 @@ Invisible — no public message, just a ✅ confirmation.
 
 **By reactions** on one of the bot's messages:
 
-[![Reaction commands diagram](state-machines/readme-diagrams/r12.png)](state-machines/readme-diagrams/r12.mmd)
+[![Reaction commands diagram](state-machines/readme-diagrams/r12.svg)](state-machines/readme-diagrams/r12.mmd)
 
 | Emoji | Effect |
 |---|---|
@@ -297,7 +297,7 @@ Internal error → ❌ on the message (no public error message).
 
 ## Detailed response flow
 
-[![Detailed response flow — from message to reply](state-machines/readme-diagrams/r13.png)](state-machines/readme-diagrams/r13.mmd)
+[![Detailed response flow — from message to reply](state-machines/readme-diagrams/r13.svg)](state-machines/readme-diagrams/r13.mmd)
 
 ---
 
@@ -380,13 +380,13 @@ The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams**
 
 All PNGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
 
-![Architecture Overview](state-machines/output/01-architecture-overview.png)
+![Architecture Overview](state-machines/output/01-architecture-overview.svg)
 *Architecture Overview — global system components and data flow*
 
-![Complete Lifecycle](state-machines/output/22-complete-lifecycle.png)
+![Complete Lifecycle](state-machines/output/22-complete-lifecycle.svg)
 *Complete Lifecycle — full bot behavior from message to response, including timers and edge cases*
 
-![Timing Gantt](state-machines/output/21-timing-gantt.png)
+![Timing Gantt](state-machines/output/21-timing-gantt.svg)
 *Timing Gantt — real wait times for delays, reactions, LLM streaming, and corrections*
 
 ---
@@ -405,7 +405,7 @@ All PNGs are available in [`state-machines/output/`](state-machines/output/). Be
 
 <img width="823" height="784" alt="image" src="https://github.com/user-attachments/assets/89493037-37a2-477c-8c7d-4a6a6016f003" />
 
-[![Dataset distribution chart](state-machines/readme-diagrams/r14.png)](state-machines/readme-diagrams/r14.mmd)
+[![Dataset distribution chart](state-machines/readme-diagrams/r14.svg)](state-machines/readme-diagrams/r14.mmd)
 
 ---
 
