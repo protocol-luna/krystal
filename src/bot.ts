@@ -323,35 +323,61 @@ function logAndReact(
 }
 
 let statusIndex = 0;
-let statusInterval: ReturnType<typeof setInterval> | null = null;
+let lastPresetIndex = -1;
+let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+let statusTimerActive = false;
 
-function startDynamicStatus(): void {
-	if (statusInterval) {
-		clearInterval(statusInterval);
+function scheduleNextStatus(baseMs: number): void {
+	if (statusTimerActive) return;
+	statusTimerActive = true;
+	const jitter = 0.5 + Math.random() * 1.0;
+	const delay = Math.max(60000, baseMs * jitter);
+	statusTimeout = setTimeout(() => {
+		statusTimerActive = false;
+		updateStatus();
+	}, delay);
+}
+
+function updateStatus(): void {
+	const presets = config.dynamicStatus;
+	if (presets.length === 0) return;
+
+	const sleep = getSleepBehavior();
+	if (sleep === "sleep") {
+		client.editStatus("invisible");
+		scheduleNextStatus(config.dynamicStatusIntervalMinutes * 60000);
+		return;
 	}
 
-	const update = () => {
-		const presets = config.dynamicStatus;
-		if (presets.length === 0) {
-			return;
-		}
-		const sleep = getSleepBehavior();
-		if (sleep === "sleep") {
-			client.editStatus("invisible");
-			return;
-		}
-		const preset = presets[statusIndex % presets.length];
-		client.editStatus(preset.status, [
-			{ name: preset.text, type: preset.type as 0 | 1 | 2 | 3 | 4 | 5 },
-		]);
-		statusIndex++;
-	};
+	if (Math.random() < 0.1) {
+		scheduleNextStatus(config.dynamicStatusIntervalMinutes * 60000);
+		return;
+	}
 
-	update();
-	statusInterval = setInterval(
-		update,
-		config.dynamicStatusIntervalMinutes * 60000
-	);
+	let idx: number;
+	if (Math.random() < 0.15 && lastPresetIndex >= 0 && presets.length > 1) {
+		idx = lastPresetIndex;
+	} else {
+		idx = statusIndex % presets.length;
+		statusIndex++;
+	}
+	lastPresetIndex = idx;
+
+	const preset = presets[idx];
+	client.editStatus(preset.status, [
+		{ name: preset.text, type: preset.type as 0 | 1 | 2 | 3 | 4 | 5 },
+	]);
+
+	scheduleNextStatus(config.dynamicStatusIntervalMinutes * 60000);
+}
+
+function startDynamicStatus(): void {
+	if (statusTimeout) {
+		clearTimeout(statusTimeout);
+		statusTimeout = null;
+	}
+	statusTimerActive = false;
+	updateStatus();
 }
 
 client.on("ready", () => {
