@@ -44,6 +44,9 @@ let cachedKeywords: string[] | null = null;
 let cachedConcentration: ConcentrationThresholds | null = null;
 let cachedReactions: string[] | null = null;
 let cachedHesitationWords: string[] | null = null;
+let cachedTimeSchedules: TimeScheduleEntry[] | null = null;
+let cachedDynamicStatus: DynamicStatusPreset[] | null = null;
+let cachedReplyStyles: { style: ReplyStyle; weight: number }[] | null = null;
 
 function rebuildCache(): void {
 	cachedNames = null;
@@ -51,6 +54,9 @@ function rebuildCache(): void {
 	cachedConcentration = null;
 	cachedReactions = null;
 	cachedHesitationWords = null;
+	cachedTimeSchedules = null;
+	cachedDynamicStatus = null;
+	cachedReplyStyles = null;
 }
 
 // --- Static exports (require restart) ---
@@ -447,11 +453,14 @@ export const config = {
 		return v<string>("timezone", "Europe/Paris");
 	},
 	get timeSchedules(): TimeScheduleEntry[] {
+		if (cachedTimeSchedules) {
+			return cachedTimeSchedules;
+		}
 		const raw = v<unknown[]>("time_schedules", []);
 		if (!Array.isArray(raw)) {
 			return [];
 		}
-		return raw.map((entry) => {
+		cachedTimeSchedules = raw.map((entry) => {
 			const e = entry as Record<string, unknown>;
 			return {
 				start: String(e?.start ?? "00:00"),
@@ -461,19 +470,24 @@ export const config = {
 					: undefined,
 			};
 		});
+		return cachedTimeSchedules;
 	},
 	get dynamicStatus(): DynamicStatusPreset[] {
+		if (cachedDynamicStatus) {
+			return cachedDynamicStatus;
+		}
 		const raw = v<{ status: string; text: string; type: number }[]>(
 			"dynamic_status_presets",
 			[]
 		);
-		return raw.map((p) => ({
+		cachedDynamicStatus = raw.map((p) => ({
 			status: (["online", "idle", "dnd", "invisible"].includes(p.status)
 				? p.status
 				: "online") as SelfStatus,
 			text: p.text,
 			type: p.type ?? 0,
 		}));
+		return cachedDynamicStatus;
 	},
 	get dynamicStatusIntervalMinutes(): number {
 		return v<number>("dynamic_status_interval_minutes", 15);
@@ -488,19 +502,23 @@ export const config = {
 		return v<number>("session_reset_minutes", 3);
 	},
 	get replyStyles(): { style: ReplyStyle; weight: number }[] {
+		if (cachedReplyStyles) {
+			return cachedReplyStyles;
+		}
 		const raw = v<ReplyStyleEntry[]>("reply_styles", [
 			{ message_reference: true, mention_replied_user: false, weight: 50 },
 			{ message_reference: true, mention_replied_user: true, weight: 15 },
 			{ message_reference: false, mention_replied_user: false, weight: 30 },
 			{ message_reference: false, mention_replied_user: true, weight: 5 },
 		]);
-		return raw.map((s) => ({
+		cachedReplyStyles = raw.map((s) => ({
 			style: {
 				messageReference: s.message_reference,
 				mentionRepliedUser: s.mention_replied_user,
 			},
 			weight: s.weight,
 		}));
+		return cachedReplyStyles;
 	},
 };
 

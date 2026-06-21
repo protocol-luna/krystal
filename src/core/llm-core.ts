@@ -147,25 +147,40 @@ function scheduleRestart(): void {
 	}, delay);
 }
 
+let lastCleanUsername = "";
+let cleanLineRe: RegExp | null = null;
+let cleanFullRe: RegExp | null = null;
+
+function buildCleanRegexes(username: string): void {
+	if (username === lastCleanUsername && cleanLineRe) {
+		return;
+	}
+	lastCleanUsername = username;
+	cleanLineRe = new RegExp(
+		`^\\s*(Luna|Luna\\s*Bot|${username})\\s*:\\s*`,
+		"i"
+	);
+	cleanFullRe = new RegExp(
+		`^\\s*(Luna|Luna\\s*Bot|${username})\\s*:\\s*`,
+		"im"
+	);
+}
+
 function cleanLine(line: string): string {
+	buildCleanRegexes(currentUsername);
 	let cleaned = line;
 	cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
-	cleaned = cleaned.replace(
-		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "i"),
-		""
-	);
+	cleaned = cleaned.replace(cleanLineRe!, "");
 	return cleaned.trim();
 }
 
 function cleanFullResponse(text: string): string {
+	buildCleanRegexes(currentUsername);
 	let cleaned = text;
 	cleaned = cleaned.replace(/\[\s*Prompt:[\s\S]*?\]/g, "");
 	cleaned = cleaned.replace(/\[\s*User:\s*.*?\s*\]/gi, "");
-	cleaned = cleaned.replace(
-		new RegExp(`^\\s*(Luna|Luna\\s*Bot|${currentUsername})\\s*:\\s*`, "im"),
-		""
-	);
+	cleaned = cleaned.replace(cleanFullRe!, "");
 	return cleaned.trim();
 }
 
@@ -330,7 +345,7 @@ async function serverRequest(item: QueueItem): Promise<void> {
 // --- Proxy backend (HTTP → llm-server.ts) ---
 
 function emitWordTokens(chunk: string): void {
-	const words = chunk.split(/\s+/).filter(Boolean);
+	const words = chunk.match(/\S+/g) ?? [];
 	if (words.length === 0) {
 		return;
 	}

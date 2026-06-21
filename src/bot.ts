@@ -11,6 +11,7 @@ import { evaluateMessage, type TriggerResult } from "./state/trigger.js";
 import {
 	isRecentBotActivity,
 	markBotActivity,
+	markReplied,
 	getGlobalInactivityMs,
 	trackSpeaker,
 	canFollowUp,
@@ -140,9 +141,8 @@ async function triggerLunaReply(
 	let onFlush: (() => void) | null = null;
 
 	try {
-		const content = message.content
-			.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "")
-			.trim();
+		const mentionRe = new RegExp(`<@!?${client.user.id}>`, "g");
+		const content = message.content.replace(mentionRe, "").trim();
 
 		const displayName =
 			(message.member as Eris.Member | null)?.nick || message.author.username;
@@ -593,7 +593,6 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		sleepBehavior !== "sleep"
 	) {
 		trackSpeaker(message.channel.id, message.author.id);
-		const { markReplied } = await import("./state/state.js");
 		markReplied(message.channel.id);
 		console.log(`[bot] #${channelName} ${author}: follow-up immédiat`);
 
