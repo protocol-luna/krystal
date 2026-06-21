@@ -36,7 +36,9 @@ let wordQueueSize = 0;
 let pendingDoneText: string | null = null;
 
 function processWordEmitQueue(): void {
-	if (isProcessingWords || wordEmitQueue.length === 0) return;
+	if (isProcessingWords || wordEmitQueue.length === 0) {
+		return;
+	}
 	isProcessingWords = true;
 	wordEmitQueue.shift()!();
 }
@@ -322,7 +324,9 @@ async function serverRequest(item: QueueItem): Promise<void> {
 
 function emitWordTokens(chunk: string): void {
 	const words = chunk.split(/\s+/).filter(Boolean);
-	if (words.length === 0) return;
+	if (words.length === 0) {
+		return;
+	}
 
 	wordQueueSize++;
 
@@ -338,7 +342,8 @@ function emitWordTokens(chunk: string): void {
 			i++;
 
 			if (i < words.length) {
-				const delay = MIN_WORD_DELAY + Math.random() * (MAX_WORD_DELAY - MIN_WORD_DELAY);
+				const delay =
+					MIN_WORD_DELAY + Math.random() * (MAX_WORD_DELAY - MIN_WORD_DELAY);
 				setTimeout(emitNext, delay);
 			} else {
 				wordQueueSize--;

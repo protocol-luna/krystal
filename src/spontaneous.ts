@@ -133,7 +133,9 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 				`[spontaneous] #${picked.channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`
 			);
 		} catch {
-			console.log(`[spontaneous] #${picked.channel.name} : échec envoi (permissions ?)`);
+			console.log(
+				`[spontaneous] #${picked.channel.name} : échec envoi (permissions ?)`
+			);
 		}
 	} else {
 		console.log(`[spontaneous] #${picked.channel.name} : réponse vide`);

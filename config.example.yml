@@ -206,7 +206,7 @@ time_schedules:
     behavior: "sleep"
 
 # --- TTS / Voice messages ---
-voice_message_chance: 0.08
+voice_message_chance: 0.12
 # Probabilité qu'une réponse soit envoyée sous forme de message vocal (fichier audio)
 # plutôt que de texte. Nécessite Piper TTS et un modèle vocal configurés.
 

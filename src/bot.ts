@@ -106,7 +106,9 @@ async function triggerLunaReply(
 
 		onToken = (word: string) => {
 			chunks.push(word);
-			if (messageBuffer) messageBuffer += " ";
+			if (messageBuffer) {
+				messageBuffer += " ";
+			}
 			messageBuffer += word;
 		};
 		llmBus.on("token", onToken);
@@ -118,31 +120,39 @@ async function triggerLunaReply(
 		const hasHesitation = Math.random() < config.hesitationChance;
 		let hesitationWord = "";
 		if (hasHesitation) {
-			hesitationWord = config.hesitationWords[
-				Math.floor(Math.random() * config.hesitationWords.length)
-			];
+			hesitationWord =
+				config.hesitationWords[
+					Math.floor(Math.random() * config.hesitationWords.length)
+				];
 		}
 
 		if (!isVoice) {
 			onFlush = () => {
-				if (!messageBuffer) return;
-				const content = hesitationWord ? `${hesitationWord} ${messageBuffer}` : messageBuffer;
+				if (!messageBuffer) {
+					return;
+				}
+				const content = hesitationWord
+					? `${hesitationWord} ${messageBuffer}`
+					: messageBuffer;
 				hesitationWord = "";
 				messageBuffer = "";
-				client.createMessage(message.channel.id, {
-					content,
-					...(isFirstChunk && refStyle.messageReference
-						? {
-								messageReference: { messageID: message.id },
-								allowedMentions: {
-									repliedUser: refStyle.mentionRepliedUser,
-								},
-							}
-						: {}),
-				}).then((sent) => {
-					isFirstChunk = false;
-					markBotActivity(message.channel.id);
-				}).catch(() => {});
+				client
+					.createMessage(message.channel.id, {
+						content,
+						...(isFirstChunk && refStyle.messageReference
+							? {
+									messageReference: { messageID: message.id },
+									allowedMentions: {
+										repliedUser: refStyle.mentionRepliedUser,
+									},
+								}
+							: {}),
+					})
+					.then((_sent) => {
+						isFirstChunk = false;
+						markBotActivity(message.channel.id);
+					})
+					.catch(() => {});
 			};
 			llmBus.on("flush", onFlush);
 		}
@@ -328,7 +338,9 @@ let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 let statusTimerActive = false;
 
 function scheduleNextStatus(baseMs: number): void {
-	if (statusTimerActive) return;
+	if (statusTimerActive) {
+		return;
+	}
 	statusTimerActive = true;
 	const jitter = 0.5 + Math.random() * 1.0;
 	const delay = Math.max(60000, baseMs * jitter);
@@ -340,7 +352,9 @@ function scheduleNextStatus(baseMs: number): void {
 
 function updateStatus(): void {
 	const presets = config.dynamicStatus;
-	if (presets.length === 0) return;
+	if (presets.length === 0) {
+		return;
+	}
 
 	const sleep = getSleepBehavior();
 	if (sleep === "sleep") {

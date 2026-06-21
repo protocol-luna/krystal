@@ -375,7 +375,9 @@ export const config = {
 	},
 	get timeSchedules(): TimeScheduleEntry[] {
 		const raw = v<unknown[]>("time_schedules", []);
-		if (!Array.isArray(raw)) { return []; }
+		if (!Array.isArray(raw)) {
+			return [];
+		}
 		return raw.map((entry) => {
 			const e = entry as Record<string, unknown>;
 			return {

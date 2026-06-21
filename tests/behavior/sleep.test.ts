@@ -89,8 +89,8 @@ describe("getSleepBehavior multiple windows", () => {
 		mockConfig({
 			timezone: "UTC",
 			timeSchedules: [
-				{ start: "10:00", end: "11:00", behavior: "short" },
-				{ start: "22:00", end: "08:00", behavior: "sleep" },
+				{ start: "00:00", end: "23:59", behavior: "short" },
+				{ start: "00:00", end: "23:59", behavior: "sleep" },
 			],
 		});
 	});
@@ -100,8 +100,7 @@ describe("getSleepBehavior multiple windows", () => {
 
 	it("picks the first matching window", async () => {
 		const { getSleepBehavior } = await import("../../src/behavior/sleep.js");
-		// Current time is not in any of the windows above
-		expect(getSleepBehavior()).toBeNull();
+		expect(getSleepBehavior()).toBe("short");
 	});
 });
 

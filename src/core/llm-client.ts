@@ -60,7 +60,9 @@ export async function askLLM(
 		}
 	}
 
-	if (llmError) { throw llmError; }
+	if (llmError) {
+		throw llmError;
+	}
 	return fullText;
 }
 
