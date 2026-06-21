@@ -197,23 +197,20 @@ function handleStdout(data: Buffer): void {
 		return;
 	}
 
-	let newlineIdx = stdoutBuffer.indexOf("\n");
-	if (newlineIdx === -1) {
+	if (!stdoutBuffer.includes("\n")) {
 		return;
 	}
 
-	do {
-		const chunk = stdoutBuffer.slice(0, newlineIdx);
-		stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
+	const lines = stdoutBuffer.split("\n");
+	stdoutBuffer = lines.pop() ?? "";
 
-		const cleaned = cleanLine(chunk);
+	for (const line of lines) {
+		const cleaned = cleanLine(line);
 		if (cleaned) {
 			emitWordTokens(cleaned);
 			currentItem?.onChunk?.(cleaned);
 		}
-
-		newlineIdx = stdoutBuffer.indexOf("\n");
-	} while (newlineIdx !== -1);
+	}
 }
 
 function cliRequest(item: QueueItem): void {
