@@ -27,6 +27,28 @@ let isProcessing = false;
 let currentItem: QueueItem | null = null;
 let hasSentFirstToken = false;
 
+const MIN_WORD_DELAY = 20;
+const MAX_WORD_DELAY = 80;
+
+let isProcessingWords = false;
+const wordEmitQueue: Array<() => void> = [];
+let wordQueueSize = 0;
+let pendingDoneText: string | null = null;
+
+function processWordEmitQueue(): void {
+	if (isProcessingWords || wordEmitQueue.length === 0) return;
+	isProcessingWords = true;
+	wordEmitQueue.shift()!();
+}
+
+function signalDone(text: string): void {
+	if (wordQueueSize === 0) {
+		llmBus.emit("done", text);
+	} else {
+		pendingDoneText = text;
+	}
+}
+
 // --- CLI mode state ---
 let initialized = false;
 let isModelReady = false;
@@ -164,9 +186,8 @@ function handleStdout(data: Buffer): void {
 		for (const l of lines) {
 			emitWordTokens(l);
 			currentItem?.onChunk?.(l);
-			llmBus.emit("flush");
 		}
-		llmBus.emit("done", cleaned);
+		signalDone(cleaned);
 		return;
 	}
 
@@ -187,7 +208,6 @@ function handleStdout(data: Buffer): void {
 		if (cleaned) {
 			emitWordTokens(cleaned);
 			currentItem?.onChunk?.(cleaned);
-			llmBus.emit("flush");
 		}
 
 		newlineIdx = stdoutBuffer.indexOf("\n");
@@ -281,7 +301,7 @@ async function serverRequest(item: QueueItem): Promise<void> {
 						currentItem?.onChunk?.(content);
 					}
 					if (data.stop) {
-						llmBus.emit("done", fullText);
+						signalDone(fullText);
 						return;
 					}
 				} catch {
@@ -291,7 +311,7 @@ async function serverRequest(item: QueueItem): Promise<void> {
 		}
 
 		// stream ended without stop signal
-		llmBus.emit("done", fullText);
+		signalDone(fullText);
 	} catch (err) {
 		llmBus.emit("error", err as Error);
 		throw err;
@@ -302,13 +322,39 @@ async function serverRequest(item: QueueItem): Promise<void> {
 
 function emitWordTokens(chunk: string): void {
 	const words = chunk.split(/\s+/).filter(Boolean);
-	for (const word of words) {
-		if (!hasSentFirstToken) {
-			hasSentFirstToken = true;
-			currentItem?.onFirstToken?.();
-		}
-		llmBus.emit("token", word);
-	}
+	if (words.length === 0) return;
+
+	wordQueueSize++;
+
+	wordEmitQueue.push(() => {
+		let i = 0;
+		const emitNext = () => {
+			const word = words[i];
+			if (i === 0 && !hasSentFirstToken) {
+				hasSentFirstToken = true;
+				currentItem?.onFirstToken?.();
+			}
+			llmBus.emit("token", word);
+			i++;
+
+			if (i < words.length) {
+				const delay = MIN_WORD_DELAY + Math.random() * (MAX_WORD_DELAY - MIN_WORD_DELAY);
+				setTimeout(emitNext, delay);
+			} else {
+				wordQueueSize--;
+				llmBus.emit("flush");
+				if (wordQueueSize === 0 && pendingDoneText !== null) {
+					llmBus.emit("done", pendingDoneText);
+					pendingDoneText = null;
+				}
+				isProcessingWords = false;
+				processWordEmitQueue();
+			}
+		};
+		emitNext();
+	});
+
+	processWordEmitQueue();
 }
 
 async function proxyRequest(item: QueueItem): Promise<void> {
@@ -324,10 +370,9 @@ async function proxyRequest(item: QueueItem): Promise<void> {
 			onChunk: (chunk: string) => {
 				emitWordTokens(chunk);
 				currentItem?.onChunk?.(chunk);
-				llmBus.emit("flush");
 			},
 		});
-		llmBus.emit("done", text);
+		signalDone(text);
 	} catch (err) {
 		llmBus.emit("error", err as Error);
 		throw err;
@@ -355,6 +400,10 @@ function processQueue(): void {
 
 	currentItem = item;
 	hasSentFirstToken = false;
+	wordEmitQueue.length = 0;
+	isProcessingWords = false;
+	wordQueueSize = 0;
+	pendingDoneText = null;
 
 	const finish = (text: string) => {
 		currentItem = null;
