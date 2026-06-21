@@ -87,14 +87,6 @@ export function getFatigueIgnoreBonus(channelId: string): number {
 	return config.topicFatigueIgnoreBonus;
 }
 
-export function isChannelFatigued(channelId: string): boolean {
-	if (!config.topicFatigueEnabled) {
-		return false;
-	}
-	const freq = countFrequency(channelId);
-	return freq !== null && freq.count >= config.topicFatigueThreshold;
-}
-
 export function dumpTopicFatigue(): {
 	logs: [string, string[]][];
 	lastActivity: [string, number][];
