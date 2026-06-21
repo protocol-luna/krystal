@@ -57,13 +57,15 @@ function pickWeightedGuild(
 			(entry): entry is { guild: Eris.Guild; channel: Eris.TextChannel } =>
 				entry.channel !== undefined
 		)
+		.map((entry) => ({
+			...entry,
+			lastId: BigInt(entry.channel.lastMessageID ?? "0"),
+		}))
 		.sort((a, b) => {
-			const aId = BigInt(a.channel.lastMessageID ?? "0");
-			const bId = BigInt(b.channel.lastMessageID ?? "0");
-			if (bId > aId) {
+			if (b.lastId > a.lastId) {
 				return 1;
 			}
-			if (bId < aId) {
+			if (b.lastId < a.lastId) {
 				return -1;
 			}
 			return 0;
