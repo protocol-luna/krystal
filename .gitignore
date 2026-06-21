@@ -5,5 +5,3 @@ config.yml
 prompt.txt
 *.tsbuildinfo
 state.json
-llm-server.js
-self-cli.js
