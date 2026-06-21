@@ -50,6 +50,21 @@ import { handleReactionCommand } from "./bot/reactions.js";
 const sessionCounts = new Map<string, number>();
 const sessionPaused = new Set<string>();
 const sessionLastMessage = new Map<string, number>();
+const sessionQueue = new Map<string, { message: Eris.Message; isDM: boolean; reason: string }[]>();
+
+function drainSessionQueue(channelId: string): void {
+	const queued = sessionQueue.get(channelId);
+	if (!queued || queued.length === 0) return;
+	sessionQueue.delete(channelId);
+	const next = queued.shift()!;
+	if (queued.length > 0) sessionQueue.set(channelId, queued);
+	console.log(
+		`[bot] session queue: reprise du message en attente dans #${channelId}`
+	);
+	void triggerLunaReply(next.message, next.isDM, next.reason).then(() => {
+		if (!sessionPaused.has(channelId)) drainSessionQueue(channelId);
+	});
+}
 
 // --- Session limit (after replying) ---
 function checkSessionLimit(channelId: string, callback: () => void): void {
@@ -65,6 +80,7 @@ function checkSessionLimit(channelId: string, callback: () => void): void {
 			sessionCounts.delete(channelId);
 			callback();
 			console.log("[bot] session reprise, contexte vidé");
+			drainSessionQueue(channelId);
 		}, config.sessionPauseSeconds * 1000);
 	}
 }
@@ -465,7 +481,10 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	const cid = message.channel.id;
 
 	if (sessionPaused.has(cid)) {
-		console.log(`[bot] #${channelName} ${author}: ignoré (session pause)`);
+		const q = sessionQueue.get(cid) ?? [];
+		q.push({ message, isDM, reason: result.reason ?? "mention" });
+		sessionQueue.set(cid, q);
+		console.log(`[bot] #${channelName} ${author}: mis en queue (session pause)`);
 		return;
 	}
 
