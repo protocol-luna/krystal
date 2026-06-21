@@ -1,0 +1,42 @@
+flowchart TD
+    START(["LLM response reçue"]) --> TYPO_ROLL{"Math.random() <\ntypoChance (6%) ?"}
+    TYPO_ROLL -->|"non (94%)"| NO_TYPO(["✅ Pas de typo"])
+    TYPO_ROLL -->|"oui (6%)"| PICK_WORD["Choisir un mot aléatoire\nparmi les chunks émis"]
+    
+    PICK_WORD --> APPLY["applyTypo(word, layout)\n→ AZERTY ou QWERTY"]
+    
+    APPLY --> PICK_LETTER["pickLetter(text)\n→ index d'une lettre\nparmi [a-zA-Z]"]
+    PICK_LETTER --> NO_LETTER{"idx === null ?\n(que des chiffres/symboles)"}
+    NO_LETTER -->|"oui"| FAIL_TYPO(["❌ Impossible de corriger"])
+    NO_LETTER -->|"non"| FIND_ADJACENT{"adjacent[originalChar]\nexiste ?"}
+    
+    FIND_ADJACENT -->|"non"| FAIL_TYPO
+    FIND_ADJACENT -->|"oui"| REPLACE["Remplacer par une\ntouche adjacente aléatoire"]
+    
+    REPLACE --> BUILD_RESULT["Construire TypoResult:\n- originalWord\n- correctedWord\n- charIndex"]
+    BUILD_RESULT --> CORRECTION_DELAY["Attendre 2-4s\n(typoCorrectionDelay)"]
+    
+    CORRECTION_DELAY --> RESOLVE_STYLE["resolveStyle()\n→ 'edit' / 'message' / 'mixed'"]
+    
+    RESOLVE_STYLE --> IS_MIXED{"style == 'mixed' ?"}
+    IS_MIXED -->|"oui"| MIXED_ROLL{"Math.random() < 0.5 ?"}
+    MIXED_ROLL -->|"oui"| DO_EDIT
+    MIXED_ROLL -->|"non"| DO_MESSAGE
+    IS_MIXED -->|"non, edit"| DO_EDIT["editMessage(channelId,\n  msgId, {content})"]
+    IS_MIXED -->|"non, message"| DO_MESSAGE["createMessage(channelId,\n  {content: 'word*'})"]
+    
+    DO_EDIT --> LOG_EDIT["log: 'typo corrigé par edit'"]
+    DO_MESSAGE --> LOG_MSG["log: 'typo corrigé par message'"]
+    
+    subgraph "AZERTY Adjacent Keys"
+        A["a→z,q,w"] Z["z→a,e,s,x"]
+        E["e→z,r,d,s"] R["r→e,t,f,d"]
+    end
+    
+    subgraph "QWERTY Adjacent Keys"
+        Q["q→w,a"] W["w→q,e,a,s"]
+        E2["e→w,r,s,d"] R2["r→e,t,d,f"]
+    end
+    
+    note right of PICK_WORD: Le mot est choisi aléatoirement\nparmi tous les chunks émis\npar le LLM
+    note right of CORRECTION_DELAY: typoCorrectionDelay = 2s\ntypoCorrectionDelayMax = 4s\nconfigurable dans config.yml

@@ -1,0 +1,29 @@
+flowchart TD
+    START(["triggerLunaReply(key)\nchannelId:userId"]) --> processing_has{"processing.has(key) ?"}
+    
+    processing_has -->|"non, libre"| MARK["markProcessing(key)\n→ Set.add(key)"]
+    processing_has -->|"oui, déjà en cours"| QUEUE["queuePending(key, msg, reason)\n→ Map.set(key, {msg, reason})\n→ saveAllState()"]
+    QUEUE --> EXIT_QUEUED(["Attente du prochain appel"])
+    
+    MARK --> EXECUTE["Exécution de la requête LLM\nstreaming, typo, TTS..."]
+    EXECUTE --> DONE["doneProcessing(key)\n→ Set.delete(key)"]
+    
+    DONE --> DRAIN["drainPending(key)\n→ Map.get(key) → Map.delete(key)\n→ saveAllState()"]
+    
+    DRAIN --> EXISTS{"queued !== null ?"}
+    EXISTS -->|"oui"| RECURSE["triggerLunaReply(\n  queued.message,\n  queued.isDM,\n  queued.reason\n)"]
+    EXISTS -->|"non"| NORMAL_EXIT(["✅ Terminé"])
+    RECURSE --> processing_has
+    
+    subgraph "État de la Map pendingMessages"
+        MAP_DEF["Map<channelId:userId, {message, reason}>"]
+    end
+    
+    subgraph "Restauration (restart)"
+        RESTORE["restorePending(entries, client)\n→ getMessage(channelId, msgId)\n→ Map.set(key, msg)"]
+        STATE["state.json chargé"]
+        STATE --> RESTORE
+    end
+    
+    note right of QUEUE: Un seul message en attente\npar (channel:user)\nLe précédent est écrasé
+    note right of RECURSE: Boucle récursive sécurisée :\nsi le nouveau tour est aussi busy,\nil re-queue à nouveau

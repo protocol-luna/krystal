@@ -1,0 +1,75 @@
+flowchart LR
+    subgraph "Hesitation"
+        H1["triggerLunaReply() start"]
+        H2{"Math.random() <\nhesitationChance (15%) ?"}
+        H3["Choisir mot:\nuh..., um..., well...\ni mean..., hmm..., so..."]
+        H4["Préfixer le premier\nflush avec le mot"]
+        H5["✅ Message normal"]
+        
+        H1 --> H2
+        H2 -->|"oui"| H3
+        H2 -->|"non"| H5
+        H3 --> H4
+        H4 --> FLUSH
+    end
+
+    subgraph "Forget"
+        F1["Après shouldIgnore()\nmais avant logAndReact()"]
+        F2{"Math.random() <\nforgetChance (3%) ?"}
+        F3["✅ Oublié\n(ne répond pas)"]
+        F4["Continue vers\nlogAndReact()"]
+        
+        F1 --> F2
+        F2 -->|"oui"| F3
+        F2 -->|"non"| F4
+    end
+
+    subgraph "Ignore"
+        G1["evaluateMessage() = respond"]
+        G2["getThresholds(reason)\n→ ignore_chance"]
+        G3{"sleepBehavior == 'short' ?"}
+        G4["chance += 0.3\n(capped à 0.9)"]
+        G5{"Math.random() < chance ?"}
+        G6["✅ Ignoré"]
+        G7["Continue vers forget"]
+        
+        G1 --> G2
+        G2 --> G3
+        G3 -->|"oui"| G4
+        G3 -->|"non"| G5
+        G4 --> G5
+        G5 -->|"oui"| G6
+        G5 -->|"non"| G7
+        G7 --> F1
+    end
+
+    subgraph "Reaction"
+        R1["logAndReact() setTimeout"]
+        R2{"shouldReact(reason,\n  sleepBehavior) ?"}
+        R3{"sleepBehavior == 'slow'\n|| 'short' ?"}
+        R4["chance = min(chance, 0.02)"]
+        R5{"Math.random() < chance ?"}
+        R6{"Custom emoji roll:\nMath.random() < 0.3 ?"}
+        R7["Choisir emoji serveur"]
+        R8["Choisir emoji unicode\n(parmi 14)"]
+        R9["message.addReaction()"]
+        R10["❌ Pas de réaction"]
+        
+        R1 --> R2
+        R2 --> R3
+        R3 -->|"oui"| R4
+        R3 -->|"non"| R5
+        R4 --> R5
+        R5 -->|"oui"| R6
+        R5 -->|"non"| R10
+        R6 -->|"30%"| R7
+        R6 -->|"70%"| R8
+        R7 --> R9
+        R8 --> R9
+    end
+
+    FLUSH["Premier message\nenvoyé à Discord"]
+
+    note right of H4: L'hésitation est préfixée\nseulement au premier message\nsi plusieurs flushes
+    note right of G4: En mode 'short':\nla probabilité d'ignorer\naugmente de 30%
+    note right of R5: reaction_chance par type:\nmention 8%, dm 5%, name 6%\nkeyword 4%, follow-up 3%, random 2%

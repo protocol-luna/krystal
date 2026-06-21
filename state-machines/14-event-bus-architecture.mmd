@@ -1,0 +1,82 @@
+graph TB
+    subgraph "TypedBus<LLMEvents> — llmBus"
+        LLMBUS[("llmBus\n(new TypedBus<LLMEvents>)")]
+        
+        subgraph "Émetteurs"
+            CORE["llm-core.ts"]
+            CORE_WORD["emitWordTokens()"]
+            CORE_CRASH["scheduleRestart()"]
+            CORE_BACKEND["serverRequest()\nproxyRequest()"]
+        end
+        
+        subgraph "Événements"
+            TOKEN["token → (chunk: string)\nMot individuel émis"]
+            FLUSH["flush → ()\nFin d'un chunk de mots"]
+            DONE["done → (fullText: string)\nTexte complet généré"]
+            ERROR["error → (err: Error)\nErreur LLM"]
+            CRASH["crash → (code: number|null)\nllama-cli crashé"]
+            READY["ready → ()\nModèle LLM prêt"]
+            RESET["reset → ()\nContexte LLM vidé"]
+        end
+        
+        subgraph "Souscripteurs"
+            BOT_TOKEN["bot.ts → on('token')\n→ accumulate chunks"]
+            BOT_FLUSH["bot.ts → on('flush')\n→ createMessage()"]
+            BOT_ONCE["bot.ts → once('token')\n→ startTyping()"]
+            CORE_DONE["llm-core.ts → on('done')\n→ item.resolve()"]
+        end
+    end
+
+    subgraph "TypedBus<StateEvents> — stateBus"
+        STATEBUS[("stateBus\n(new TypedBus<StateEvents>)")]
+        
+        subgraph "Émetteurs State"
+            ST_SET["state.ts → setPaused()"]
+            ST_MARK["state.ts → markReplied()"]
+            ST_ACT["state.ts → markBotActivity()"]
+            ST_TRACK["state.ts → trackSpeaker()"]
+            ST_CLEAR["state.ts → clearCooldown()"]
+        end
+        
+        subgraph "Événements State"
+            STATE_CH["state:changed → ()"]
+        end
+        
+        subgraph "Souscripteurs State"
+            PERSIST["persistence.ts → on('state:changed')\n→ scheduleSave()"]
+        end
+    end
+
+    CORE_WORD --> TOKEN
+    CORE_WORD --> FLUSH
+    CORE_BACKEND --> DONE
+    CORE_CRASH --> CRASH
+    CORE --> READY
+    CORE --> RESET
+    CORE --> ERROR
+
+    TOKEN --> BOT_TOKEN
+    FLUSH --> BOT_FLUSH
+    TOKEN --> BOT_ONCE
+    DONE --> CORE_DONE
+
+    ST_SET --> STATE_CH
+    ST_MARK --> STATE_CH
+    ST_ACT --> STATE_CH
+    ST_TRACK --> STATE_CH
+    ST_CLEAR --> STATE_CH
+
+    STATE_CH --> PERSIST
+
+    subgraph "TypedBus Implementation"
+        BUS_CLASS["class TypedBus<Events>"]
+        BUS_CLASS --> ON["on(event, listener)\n→ add to Set"]
+        BUS_CLASS --> OFF["off(event, listener)\n→ delete from Set"]
+        BUS_CLASS --> ONCE["once(event, listener)\n→ wrapper that auto-off"]
+        BUS_CLASS --> EMIT["emit(event, ...args)\n→ iterate Set\n→ call all listeners"]
+    end
+
+    note right of TOKEN: Émission mot par mot\navec délai 20-80ms\nsimulant la frappe humaine
+    note right of FLUSH: Déclenché après chaque\nligne de texte complète\ndu LLM
+    note right of STATE_CH: Un seul événement\npour signaler\nn'importe quel changement d'état
+    note right of BUS_CLASS: TypedBus est générique\nUtilise Map<event, Set<listeners>>\nThread-safe pour Node.js

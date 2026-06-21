@@ -1,0 +1,49 @@
+flowchart TD
+    START(["getSleepBehavior()"]) --> CHECK_SCHED{"timeSchedules\nexiste et non-vide ?"}
+    CHECK_SCHED -->|"non"| NULL_RETURN["return null\n(toujours éveillé)"]
+    
+    CHECK_SCHED -->|"oui"| GET_TZ["Récupérer timezone\n(config.yml)"]
+    GET_TZ --> COMPUTE_NOW["now = new Date()\nlocalNow = toLocaleString('en-US',\n  {timeZone: tz})\ncurrentMinutes = HH*60 + MM"]
+    
+    COMPUTE_NOW --> FOR_EACH["Pour chaque entrée\ndans timeSchedules"]
+    
+    FOR_EACH --> PARSE["startMinutes = parseTime(start)\nendMinutes = parseTime(end)"]
+    PARSE --> IS_IN_WINDOW{"isInWindow(currentMinutes,\n  startMinutes, endMinutes) ?"}
+    
+    IS_IN_WINDOW -->|"oui"| RETURN_BEHAVIOR["return entry.behavior\n→ 'sleep' | 'slow' | 'short'"]
+    IS_IN_WINDOW -->|"non"| NEXT_ENTRY["Entrée suivante\n(loop)"]
+    
+    NEXT_ENTRY --> PARSE
+    NEXT_ENTRY -->|"plus d'entrées"| NULL_RETURN2["return null"]
+    
+    subgraph "isInWindow(now, start, end)"
+        CHECK_OVERFLOW{"start ≤ end ?"}
+        CHECK_OVERFLOW -->|"oui (même jour)"| SIMPLE{"now ≥ start\nET now < end ?"}
+        CHECK_OVERFLOW -->|"non (minuit+)"| OVERFLOW{"now ≥ start\nOU now < end ?"}
+        SIMPLE -->|"oui"| TRUE_RET["✅ true"]
+        SIMPLE -->|"non"| FALSE_RET["❌ false"]
+        OVERFLOW -->|"oui"| TRUE_RET2["✅ true"]
+        OVERFLOW -->|"non"| FALSE_RET2["❌ false"]
+    end
+    
+    subgraph "Exemple de planning"
+        S1["22:00-07:00 → sleep\n(Nuit, sommeil profond)"]
+        S2["07:00-09:00 → slow\n(Matin, réveil lent)"]
+        S3["13:00-14:00 → short\n(Pause déjeuner, court)"]
+    end
+    
+    subgraph "Comportements"
+        B1["sleep →\n- Ne répond qu'aux mentions/DM\n- Status invisible\n- Tout ignoré"]
+        B2["slow →\n- Délai ×3-5\n- Reactions plafonnées à 2%\n- Simule l'endormissement"]
+        B3["short →\n- Ignore chance +30%\n- Reactions plafonnées à 2%\n- Réponses courtes/lentes"]
+        B4["null →\n- Comportement normal\n- Toutes les features actives"]
+    end
+    
+    RETURN_BEHAVIOR -->|"sleep"| B1
+    RETURN_BEHAVIOR -->|"slow"| B2
+    RETURN_BEHAVIOR -->|"short"| B3
+    NULL_RETURN --> B4
+    NULL_RETURN2 --> B4
+    
+    note right of COMPUTE_NOW: Le calcul utilise le fuseau\nhoraire configuré (Europe/Paris)\nvia toLocaleString()
+    note right of CHECK_OVERFLOW: Les plages qui traversent\nminuit (22:00-07:00)\nsont gérées par l'overflow

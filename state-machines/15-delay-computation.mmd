@@ -1,0 +1,49 @@
+flowchart TD
+    START(["computeDelay(reason,\n  sleepBehavior,\n  msgLength,\n  inactivityMs)"])
+    
+    START --> GET_THRESHOLDS["obtenir ConcentrationEntry\nselon le trigger type"]
+    
+    GET_THRESHOLDS --> BASE_DELAY["delay = delay_min + Math.random()\n  × (delay_max - delay_min)"]
+    
+    BASE_DELAY --> READING_CHECK{"msgLength > 0 ?"}
+    READING_CHECK -->|"oui"| READING_FACTOR["readingFactor =\n  min(msgLength / 500, 3)"]
+    READING_FACTOR --> READING_MULT["delay *= 1 + readingFactor\n  × (0.3 + Math.random() × 0.7)"]
+    READING_CHECK -->|"non"| INACTIVITY_CHECK
+    
+    READING_MULT --> INACTIVITY_CHECK
+    
+    INACTIVITY_CHECK{"inactivityMs !== undefined\nET > inactivityWarmupMinutes ?"}
+    INACTIVITY_CHECK -->|"oui"| WARMUP["inactivityRatio =\n  min(inactivityMs / warmupMs, 5)\ndelay *= 1 + (inactivityRatio × multiplier - 1)\n  × (0.5 + Math.random() × 0.5)"]
+    INACTIVITY_CHECK -->|"non"| SLEEP_CHECK
+    
+    WARMUP --> SLEEP_CHECK
+    
+    SLEEP_CHECK{"sleepBehavior == 'slow' ?"}
+    SLEEP_CHECK -->|"oui"| SLOW_MULT["delay *= 3 + Math.random() × 2\n(×3 à ×5)"]
+    SLEEP_CHECK -->|"non"| JITTER
+    
+    SLOW_MULT --> JITTER
+    
+    JITTER["delay *= 0.5 + Math.random() × 1.5\njitter agressif ×0.5 à ×1.5"]
+    
+    JITTER --> RETURN["return delay (ms)"]
+    
+    subgraph "Exemples de délais"
+        EX1["Mention rapide:\n300-1500ms\n+ jitter → 150-2250ms"]
+        EX2["Nom long message:\n800-4000ms × 2 (lecture)\n× 2.5 (inactivité)\n= 4000-20000ms"]
+        EX3["Follow-up endormi:\n500-2000ms × 4 (slow)\n× jitter\n= 1000-12000ms"]
+    end
+    
+    subgraph "Concentration Thresholds (config)"
+        TYPES["Type        delay_min  delay_max  ignore_chance"]
+        MENTION["mention     300       1500       0%"]
+        DM["dm           400       1800       0%"]
+        NAME["name         800       4000       5%"]
+        KEYW["keyword     1000       3500       8%"]
+        FUP["follow-up    500       2000       0%"]
+        RANDOM["random      1500       5000      15%"]
+    end
+    
+    note right of READING_FACTOR: Simulation de lecture :\n500 caractères = +30-100%\n1000+ = facteur 3 max
+    note right of WARMUP: Inactivité >10min (config) :\ndélai ×2\njusqu'à ×10 pour très longue inactivité
+    note right of SLEEP_CHECK: Mode 'slow' : délai ×3-5\n(simule la lenteur du réveil)

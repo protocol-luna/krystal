@@ -1,0 +1,64 @@
+flowchart TD
+    START(["Message reçu"]) --> BOT_AUTHOR{"author.bot ?"}
+    BOT_AUTHOR -->|"oui"| SKIP["❌ shouldRespond=false\nreason=null"]
+    
+    BOT_AUTHOR -->|"non"| TEXT_STOP{"message.content\n== '-stop' ?"}
+    TEXT_STOP -->|"oui"| STOP["✅ shouldRespond=true\nreason='stop'"]
+    
+    TEXT_STOP -->|"non"| TEXT_START{"message.content\n== '-start' ?"}
+    TEXT_START -->|"oui"| START_CMD["✅ shouldRespond=true\nreason='start'"]
+    
+    TEXT_START -->|"non"| TEXT_CLEAR{"message.content\n== '-clear' ?"}
+    TEXT_CLEAR -->|"oui"| CLEAR_CMD["✅ shouldRespond=true\nreason='clear'"]
+    
+    TEXT_CLEAR -->|"non"| IS_BOT{"botId === message.author.id\n(soi-même) ?"}
+    IS_BOT -->|"oui"| SKIP_SELF["❌ shouldRespond=false\nreason=null"]
+    
+    IS_BOT -->|"non"| IS_MENTIONED{"message.mentions\ncontient botId ?"}
+    IS_MENTIONED -->|"oui"| MENTION["✅ shouldRespond=true\nreason='mention'\nsetPaused(false)"]
+    
+    IS_MENTIONED -->|"non"| IS_DM{"DM &&\nreplyInDM ?"}
+    IS_DM -->|"oui"| DM["✅ shouldRespond=true\nreason='dm'"]
+    
+    IS_DM -->|"non"| STILL_DM{"DM mais\n!replyInDM ?"}
+    STILL_DM -->|"oui"| DM_IGNORE["❌ shouldRespond=false\nDM ignoré"]
+    
+    STILL_DM -->|"non"| IS_PAUSED{"isPaused() ?"}
+    IS_PAUSED -->|"oui"| PAUSED["❌ shouldRespond=false\nraison: paused"]
+    
+    IS_PAUSED -->|"non"| ON_COOLDOWN{"isOnCooldown() &&\n!mention && !followUp ?"}
+    ON_COOLDOWN -->|"oui"| COOLDOWN["❌ shouldRespond=false\nraison: cooldown"]
+    
+    ON_COOLDOWN -->|"non"| HAS_BOT_NAME{"hasWord(content,\nbotName.toLowerCase()) ?"}
+    HAS_BOT_NAME -->|"oui"| NAME1["✅ shouldRespond=true\nreason='name'\nmarkReplied()"]
+    
+    HAS_BOT_NAME -->|"non"| HAS_CUSTOM_NAME{"hasWord(content,\nconfig.names[i]) ?"}
+    HAS_CUSTOM_NAME -->|"oui"| NAME2["✅ shouldRespond=true\nreason='name'\nmarkReplied()"]
+    
+    HAS_CUSTOM_NAME -->|"non"| HAS_KEYWORD{"hasWord(content,\nconfig.keywords[i]) ?"}
+    HAS_KEYWORD -->|"oui"| KEYWORD["✅ shouldRespond=true\nreason='keyword'\nmarkReplied()"]
+    
+    HAS_KEYWORD -->|"non"| IS_FOLLOWUP{"isFollowUp\n(flag) ?"}
+    IS_FOLLOWUP -->|"oui"| FOLLOWUP["✅ shouldRespond=true\nreason='follow-up'"]
+    
+    IS_FOLLOWUP -->|"non"| RANDOM_ROLL{"randomChance > 0 &&\nMath.random() < randomChance ?"}
+    RANDOM_ROLL -->|"oui (1.5%)"| RANDOM["✅ shouldRespond=true\nreason='random'\nmarkReplied()"]
+    
+    RANDOM_ROLL -->|"non (98.5%)"| NOTHING["❌ shouldRespond=false\nreason=null"]
+    
+    style SKIP fill:#f88,stroke:#333
+    style STOP fill:#8f8,stroke:#333
+    style START_CMD fill:#8f8,stroke:#333
+    style CLEAR_CMD fill:#8f8,stroke:#333
+    style SKIP_SELF fill:#f88,stroke:#333
+    style MENTION fill:#8f8,stroke:#333
+    style DM fill:#8f8,stroke:#333
+    style DM_IGNORE fill:#f88,stroke:#333
+    style PAUSED fill:#f88,stroke:#333
+    style COOLDOWN fill:#f88,stroke:#333
+    style NAME1 fill:#8f8,stroke:#333
+    style NAME2 fill:#8f8,stroke:#333
+    style KEYWORD fill:#8f8,stroke:#333
+    style FOLLOWUP fill:#8f8,stroke:#333
+    style RANDOM fill:#8f8,stroke:#333
+    style NOTHING fill:#f88,stroke:#333

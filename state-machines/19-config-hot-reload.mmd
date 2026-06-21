@@ -1,0 +1,45 @@
+flowchart TD
+    START(["watchConfig()"]) --> CHECK_EXISTS{"config.yml\nexiste ?"}
+    CHECK_EXISTS -->|"non"| EXIT(["✅ Pas de watch"])
+    CHECK_EXISTS -->|"oui"| FS_WATCH["fs.watch(configPath,\n  (event) => ...)"]
+    
+    FS_WATCH --> WAIT_CHANGE["Attente modification..."]
+    WAIT_CHANGE --> EVENT_FIRED{"event === 'change' ?"}
+    EVENT_FIRED -->|"rename / delete"| IGNORE(["Ignorer"])
+    EVENT_FIRED -->|"change"| TRY_PARSE["Tenter de parser\nle nouveau YAML"]
+    
+    TRY_PARSE --> PARSE_OK["yaml.load()\n→ rawCfg mis à jour"]
+    TRY_PARSE --> PARSE_ERR{"Erreur de\nparse YAML ?"}
+    PARSE_ERR -->|"oui"| LOG_ERROR["console.error(err)\nl'ancienne config reste active"]
+    PARSE_ERR -->|"non"| LOG_OK["console.log: hot-reloaded"]
+    PARSE_OK --> LOG_OK
+    
+    LOG_OK --> UPDATE_LIVE["Les getters du 'config' object\nutilisent rawCfg → valeurs à jour"]
+    
+    subgraph "Ce qui change en direct"
+        HOT1["names, keywords,\nrandomChance,\ncooldownSeconds"]
+        HOT2["concentration thresholds\n(delays, ignore, reaction)"]
+        HOT3["typoChance, hesitationChance,\nforgetChance"]
+        HOT4["voiceMessageChance,\nserverEmojiChance"]
+        HOT5["timeSchedules,\ndynamicStatus"]
+        HOT6["sessionMessageLimit,\nreplyStyles"]
+    end
+    
+    subgraph "Ce qui nécessite un restart"
+        COLD1["DISCORD_TOKEN"]
+        COLD2["LLAMA_CLI_PATH,\nLLAMA_MODEL_PATH"]
+        COLD3["LLM_HOST, LLM_PORT,\nLLM_MODE"]
+        COLD4["SYSTEM_PROMPT"]
+        COLD5["llamaArgs\n(tous les flags)"]
+        COLD6["ttsModelPath,\nffmpegPath, ..."]
+    end
+    
+    UPDATE_LIVE --> HOT1
+    UPDATE_LIVE --> HOT2
+    UPDATE_LIVE --> HOT3
+    UPDATE_LIVE --> HOT4
+    UPDATE_LIVE --> HOT5
+    UPDATE_LIVE --> HOT6
+    
+    note right of UPDATE_LIVE: Les getters JS sont évalués\nà chaque accès → pas de délai\nentre le save et l'utilisation
+    note right of PARSE_ERR: Si le YAML est invalide,\nla config précédente reste\nactive → pas de crash

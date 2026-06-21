@@ -1,0 +1,38 @@
+stateDiagram-v2
+    [*] --> NORMAL: channel actif
+
+    NORMAL --> MESSAGE_REPLIED: triggerLunaReply completes
+    MESSAGE_REPLIED --> INCREMENT_COUNT: sessionCounts.get(cid)+1
+    INCREMENT_COUNT --> CHECK_LIMIT: count >= sessionMessageLimit (8)?
+    
+    CHECK_LIMIT --> PAUSED: YES
+    CHECK_LIMIT --> NORMAL: NO
+
+    PAUSED --> sessionPaused.add(cid)
+    PAUSED --> LOG_PAUSE: "session limit reached"
+    PAUSED --> START_TIMER: setTimeout(sessionPauseSeconds * 1000)
+    PAUSED --> QUEUE_INCOMING: messages mis en file d'attente
+
+    START_TIMER --> TIMER_EXPIRED: sessionPauseSeconds (30s) elapsed
+    TIMER_EXPIRED --> sessionPaused.delete(cid)
+    TIMER_EXPIRED --> sessionCounts.delete(cid)
+    TIMER_EXPIRED --> RESET_LLM: void resetLLM()
+    TIMER_EXPIRED --> LOG_RESUME: "session resumed, context cleared"
+    TIMER_EXPIRED --> DRAIN_QUEUE: drainSessionQueue(cid)
+    
+    DRAIN_QUEUE --> PROCESS_NEXT: shift() → triggerLunaReply()
+    PROCESS_NEXT --> CHECK_STILL_PAUSED: after reply...
+    CHECK_STILL_PAUSED --> DRAIN_QUEUE: still not paused → continue draining
+    CHECK_STILL_PAUSED --> NORMAL: queue empty
+
+    QUEUE_INCOMING --> PAUSED: stays paused
+
+    NORMAL --> CHECK_EXPIRY: sessionLastMessage check
+    CHECK_EXPIRY --> EXPIRED: Date.now() - lastMsg > sessionResetMinutes (3min)
+    CHECK_EXPIRY --> CURRENT: still within window
+    EXPIRED --> sessionCounts.delete(cid): counter reset
+    CURRENT --> NORMAL
+
+    note right of PAUSED: Pendant la pause:\n- Les messages sont mis en queue\n- Le bot ne répond pas\n- La session accumule les messages
+    note right of DRAIN_QUEUE: Les messages en attente sont\ntraités un par un\njusqu'à épuisement de la queue
+    note right of START_TIMER: sessionPauseSeconds = 30s\nconfigurable dans config.yml

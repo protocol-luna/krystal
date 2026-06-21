@@ -1,0 +1,134 @@
+stateDiagram-v2
+    [*] --> READY: startBot()
+    READY --> LISTENING: client.connect()
+    
+    LISTENING --> MESSAGE_EVENT: "messageCreate" event
+    LISTENING --> STATUS_UPDATE: "dynamic status" timer (15min)
+    LISTENING --> SPONTANEOUS: spontaneous timer (5min)
+    
+    STATUS_UPDATE --> ROTATE_STATUS: updateStatus()
+    ROTATE_STATUS --> STATUS_SET: editStatus()
+    STATUS_SET --> LISTENING: scheduleNext()
+    
+    SPONTANEOUS --> ROLL_CHANCE: Math.random() < 12%?
+    ROLL_CHANCE --> LISTENING: no
+    ROLL_CHANCE --> PICK_GUILD: pickWeightedGuild()
+    PICK_GUILD --> FETCH_CONTEXT: getMessages()
+    FETCH_CONTEXT --> SPONT_RESET: resetLLM()
+    SPONT_RESET --> SPONT_ASK: askLLM("join conversation")
+    SPONT_ASK --> SEND_SPONT: createMessage()
+    SEND_SPONT --> LISTENING: resetLLM() again
+    
+    MESSAGE_EVENT --> TRIGGER_CHAIN: evaluateMessage()
+    
+    state TRIGGER_CHAIN {
+        [*] --> CHECK_BOT_CMD: text commands
+        CHECK_BOT_CMD -->|"-stop"| STOP
+        CHECK_BOT_CMD -->|"-start"| START
+        CHECK_BOT_CMD -->|"-clear"| CLEAR
+        CHECK_BOT_CMD -->|"none"| CHECK_AUTO: auto triggers
+        
+        CHECK_AUTO -->|"mention"| TRIGGERED: reason=mention
+        CHECK_AUTO -->|"dm"| TRIGGERED: reason=dm
+        CHECK_AUTO -->|"name"| TRIGGERED: reason=name
+        CHECK_AUTO -->|"keyword"| TRIGGERED: reason=keyword
+        CHECK_AUTO -->|"follow-up"| TRIGGERED: reason=follow-up
+        CHECK_AUTO -->|"random"| TRIGGERED: reason=random
+        CHECK_AUTO -->|"none"| NOT_TRIGGERED
+    }
+    
+    STOP --> EXECUTE_STOP: setPaused(true), resetLLM()
+    START --> EXECUTE_START: setPaused(false)
+    CLEAR --> EXECUTE_CLEAR: resetLLM(), clearCooldown()
+    EXECUTE_STOP --> LISTENING: ✅ reaction
+    EXECUTE_START --> LISTENING: ✅ reaction
+    EXECUTE_CLEAR --> LISTENING: ✅ reaction
+    
+    NOT_TRIGGERED --> CHECK_FOLLOWUP_STATE: canFollowUp()?
+    CHECK_FOLLOWUP_STATE --> LISTENING: no (end)
+    CHECK_FOLLOWUP_STATE --> FOLLOWUP_FLOW: yes
+    
+    state FOLLOWUP_FLOW {
+        [*] --> FUP_DELAY: computeDelay("follow-up")
+        FUP_DELAY --> FUP_REACT: setTimeout done
+        FUP_REACT --> FUP_EXEC: maybe addReaction
+        FUP_EXEC --> FUP_REPLY: triggerLunaReply()
+        FUP_REPLY --> [*]
+    }
+    
+    TRIGGERED --> SLEEP_GATE: check sleep behavior
+    SLEEP_GATE --> LISTENING: sleep mode, not mention/dm
+    SLEEP_GATE --> SESSION_GATE: awake
+    
+    SESSION_GATE --> IGNORE_CHECK: session not paused
+    SESSION_GATE --> QUEUE_SESSION: session paused → queue
+    QUEUE_SESSION --> LISTENING
+    
+    IGNORE_CHECK --> LISTENING: shouldIgnore() → true
+    IGNORE_CHECK --> FORGET_CHECK: false
+    
+    FORGET_CHECK --> LISTENING: forgetChance roll → true
+    FORGET_CHECK --> DELAY_PHASE: false
+
+    state DELAY_PHASE {
+        [*] --> COMPUTE: computeDelay(reason, sleep, length, inactivity)
+        COMPUTE --> LOG_DELAY: console log
+        LOG_DELAY --> SET_REACTION: setTimeout(delay)
+        SET_REACTION --> MAYBE_REACT_AFTER: shouldReact()?
+        MAYBE_REACT_AFTER --> ADD_REACTION_EMOJI: yes → addReaction
+        MAYBE_REACT_AFTER --> WAIT_DONE: no
+        ADD_REACTION_EMOJI --> WAIT_DONE
+        WAIT_DONE --> [*]: delay elapsed
+    }
+    
+    DELAY_PHASE --> ANTI_SPAM_GATE: triggerLunaReply()
+    
+    state RESPONSE_FLOW {
+        [*] --> CHECK_PROCESSING: processing.has(key)?
+        CHECK_PROCESSING --> QUEUE_ANTI_SPAM: yes → queuePending(), exit
+        CHECK_PROCESSING --> MARK_PROCESSING: no
+        
+        MARK_PROCESSING --> SETUP_LISTENERS: register onToken/onFlush
+        SETUP_LISTENERS --> HESITATION_ROLL: maybe hesitation word
+        HESITATION_ROLL --> ASK_LLM_AWAIT: await askLLM()
+        
+        ASK_LLM_AWAIT --> WAITING_LLM_QUEUE: queued in llm-core
+        WAITING_LLM_QUEUE --> LLM_PROCESS: dequeued
+        LLM_PROCESS --> STREAMING: tokens arrive
+        
+        STREAMING --> FIRST_TOKEN: llmBus.once("token")
+        FIRST_TOKEN --> START_TYPING: send typing indicator
+        STREAMING --> FLUSH_ON_NEWLINE: llmBus.on("flush")
+        FLUSH_ON_NEWLINE --> SEND_CHUNK: createMessage()
+        STREAMING --> RESPONSE_DONE: llmBus.on("done")
+        
+        RESPONSE_DONE --> RESIDUAL_FLUSH: any remaining buffer?
+        RESIDUAL_FLUSH --> SEND_LAST: createMessage() if needed
+        RESIDUAL_FLUSH --> VOICE_ROLL: check shouldSendVoice()
+        
+        VOICE_ROLL --> VOICE_PATH: yes → sendTextAsVoiceMessage()
+        VOICE_ROLL --> TYPO_ROLL_C: no
+        
+        VOICE_PATH --> TYPO_ROLL_C: done
+        TYPO_ROLL_C --> APPLY_TYPO: typo chance → correction
+        APPLY_TYPO --> CORRECTION_MSG: send "word*" correction
+        APPLY_TYPO --> TRACKING: no typo
+        
+        CORRECTION_MSG --> TRACKING
+        TRACKING --> trackSpeaker()
+        TRACKING --> CLEANUP: doneProcessing() + off listeners
+        CLEANUP --> DRAIN: drainPending()
+        DRAIN --> HAS_MORE: any queued?
+        HAS_MORE --> TRIGGER_CHAIN: yes → recurse
+        HAS_MORE --> SESSION_CHECK: no
+    }
+    
+    RESPONSE_FLOW --> SESSION_CHECK: checkSessionLimit()
+    SESSION_CHECK --> LISTENING: under limit
+    SESSION_CHECK --> PAUSE_SESSION: limit hit
+    PAUSE_SESSION --> TIMER_SESSION: setTimeout 30s
+    TIMER_SESSION --> RESUME_SESSION: resetLLM() + drain queue
+    RESUME_SESSION --> LISTENING
+    
+    note right of DELAY_PHASE: Le délai est la somme de:\n- Base delay (type-dépendant)\n- Lecture du message\n- Warmup d'inactivité\n- Mode sommeil\n- Jitter agressif
+    note right of RESPONSE_FLOW: Tout le streaming est mot-par-mot\navec 20-80ms entre chaque mot\npour simuler la frappe humaine

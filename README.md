@@ -74,30 +74,44 @@ src/
 
 ## Vue d'ensemble
 
+> Les diagrammes détaillés (state machines, flowcharts, Gantt) sont disponibles dans le dossier [`state-machines/`](state-machines/) — 22 diagrammes Mermaid couvrant l'intégralité du code.
+
 ```mermaid
 flowchart TD
-    A["💬 Quelqu'un envoie\nun message"] --> B{"📋 C'est une\ncommande ?"}
-    B -- "❌ ▶️ 🗑️" --> C["✅ Hop, exécuté\nen silence"]
-    B -- "non" --> D{"😴 Le bot\ndort ?"}
-    D -- "oui 🌙" --> E["🙈 Ignoré\n(sauf mention)"]
-    D -- "non" --> F{"🎯 Le bot est\nconcerné ?"}
-    F -- "non" --> G["👋 Pas répondu\n(pas pour lui)"]
-    F -- "oui" --> H{"🤷 Oublié ?\n(forget_chance)"}
-    H -- "oui 3%" --> I["🙈 Ignoré\n(silence)"]
-    H -- "non" --> J["⏳ Attend\n(délai + réaction)"]
-    J --> K{"📈 Inactif\ndepuis 10min+ ?"}
-    K -- "oui" --> L["×2 warmup"]
-    L --> M
-    K -- "non" --> M["✍️ Hésite ?\n(hesitation_chance)"]
-    M -- "15%" --> N["uh... bien sûr\nque oui"]
-    M -- "non" --> O["réponse\ndirecte"]
-    N --> P["✍️ Tape en WPM\n(1 chunk = 1 msg)"]
-    O --> P
-    P --> Q{"🗣️ Réponse\nvocale ?"}
-    Q -- "oui" --> R["🎵 Envoie un\nmessage vocal"]
-    Q -- "non" --> S["💬 Continue\n(avec fautes, délais...)"]
-    R --> T["✔️ Fini !"]
-    S --> T
+    A["💬 Message reçu"] --> CMD{"Commande ?\n-stop / -start / -clear"}
+    CMD -->|"oui"| CMD_OK["✅ Exécuté en silence"]
+
+    CMD -->|"non"| TRIG{"Trigger ?\nmention / dm / name\nkeyword / random"}
+    TRIG -->|"non"| FUP{"canFollowUp ?\n<15s, <3/60s"}
+    FUP -->|"non"| END["👋 Ignoré"]
+
+    TRIG -->|"oui"| SLEEP{"Sommeil ?"}
+    SLEEP -->|"sleep + pas mention"| IGNORE_SLP["😴 Ignoré"]
+    SLEEP -->|"slow / short"| IGNORE_ROLL{"shouldIgnore ?\n+30% en short"}
+    IGNORE_ROLL -->|"oui"| IGNORED["🙈 Ignoré"]
+    IGNORE_ROLL -->|"non"| FORGET{"Oubli ?\n3%"}
+    FORGET -->|"oui"| FORGOT["💀 Oublié"]
+    FORGET -->|"non"| IGNORE_SLP
+
+    SLEEP -->|"éveillé"| FILTERS["Filtres :\n- session limit (8 msgs)\n- anti-spam (processing)"]
+    FILTERS --> DELAY["⏳ Délai\ncomputeDelay()"]
+
+    DELAY --> REACT["Réaction ?\n2-8% selon type"]
+    REACT --> LLM["🤖 askLLM()\n3 backends possibles"]
+
+    LLM --> STREAM["Émission mot-par-mot\n20-80ms entre mots"]
+    STREAM --> FLUSH["Envoi par lots\n(1 newline = 1 message)"]
+    FLUSH --> TTS["🗣️ Message vocal ?\n(8-12%)"]
+    TTS --> TYPO["✍️ Faute de frappe ?\n(6%)"]
+    TYPO --> DONE["✔️ Réponse envoyée"]
+
+    FUP -->|"oui"| DELAY
+
+    style CMD_OK fill:#8f8
+    style END fill:#f88
+    style IGNORE_SLP fill:#f88
+    style IGNORED fill:#f88
+    style FORGOT fill:#f88
 ```
 
 ---
@@ -107,70 +121,89 @@ flowchart TD
 ### State machine — décision message entrant
 
 ```mermaid
-stateDiagram-v2
-    state "Message reçu" as received
-    state "Skip bot" as skipbot
-    state "Commande texte ?" as cmd_txt
-    state "Réaction commande ?" as cmd_rct
-    state "Évaluation" as eval
-    state "Sommeil ?" as sleep
-    state "Ignore ?" as ignore
-    state "Oubli ?" as forget
-    state "Délai + Réaction" as prereply
-    state "Réponse LLM" as reply
-    state "Follow-up ?" as followup
-    state "Track speaker" as track
+flowchart TD
+    START(["Message Discord reçu"]) --> BOT_AUTHOR{"author.bot ?"}
+    BOT_AUTHOR -->|"oui"| SKIP["❌ Ignoré (autre bot)"]
 
-    received --> skipbot : author = bot ?
-    skipbot --> [*] : oui (return)
+    BOT_AUTHOR -->|"non"| TEXT_CMD{"Message texte ?"}
+    TEXT_CMD -->|"-stop"| STOPCMD["setPaused(true)\nresetLLM()\n✅"]
+    TEXT_CMD -->|"-start"| STARTCMD["setPaused(false)\n✅"]
+    TEXT_CMD -->|"-clear"| CLEARCMD["resetLLM()\nclearCooldown()\n✅"]
+    TEXT_CMD -->|"autre"| MENTION{"@mentions\nbotId ?"}
 
-    skipbot --> cmd_txt : non
-    cmd_txt --> stop : "-stop"
-    cmd_txt --> start : "-start"
-    cmd_txt --> clear : "-clear"
-    cmd_txt --> cmd_rct : autre
+    MENTION -->|"oui"| SET_PAUSED_OFF["setPaused(false)"]
+    SET_PAUSED_OFF --> RESPOND["✅ reason=mention"]
 
-    cmd_rct --> stop : ❌ réaction
-    cmd_rct --> start : ▶️ réaction
-    cmd_rct --> clear : 🗑️ réaction
-    cmd_rct --> eval : autre / pas une réaction
+    MENTION -->|"non"| DM_CHECK{"DM ?"}
+    DM_CHECK -->|"DM + replyInDM"| RESPOND_DM["✅ reason=dm"]
+    DM_CHECK -->|"DM sans reply"| DM_IGNORE["❌ DM ignoré"]
 
-    stop --> [*] : ✅ silencieux
-    start --> [*]
-    clear --> [*]
+    DM_CHECK -->|"non"| PAUSED_CHECK{"isPaused() ?"}
+    PAUSED_CHECK -->|"oui"| PAUSED_IGN["❌ Bot en pause"]
 
-    eval --> mention : @bot
-    eval --> dm : DM + replyInDM
-    eval --> paused : bot en pause
-    eval --> cooldown : cooldown actif
-    eval --> name : nom du bot détecté
-    eval --> keyword : mot-clé détecté
-    eval --> followup : follow-up actif
-    eval --> random : 1.5% chance
-    eval --> track : aucun trigger
+    PAUSED_CHECK -->|"non"| COOLDOWN{"isOnCooldown() ?"}
+    COOLDOWN -->|"oui"| CD_IGN["❌ Cooldown actif"]
 
-    mention --> sleep
-    dm --> sleep
-    name --> sleep
-    keyword --> sleep
-    random --> prereply
+    COOLDOWN -->|"non"| NAME_CHECK{"Nom du bot\ndans le message ?"}
+    NAME_CHECK -->|"oui"| MARK_REPLIED["markReplied()"]
+    MARK_REPLIED --> RESPOND_NAME["✅ reason=name"]
 
-    sleep --> prereply : sleep=off\nou sleep=slow\nou mention/dm
-    sleep --> [*] : sleep mode + pas mention/dm
+    NAME_CHECK -->|"non"| KW_CHECK{"Mot-clé\ndétecté ?"}
+    KW_CHECK -->|"oui"| MARK_KW["markReplied()"]
+    MARK_KW --> RESPOND_KW["✅ reason=keyword"]
 
-    prereply --> ignore : roll < chance
-    ignore --> [*] : ignoré
-    prereply --> forget : roll < forget_chance
-    forget --> [*] : oublié
-    prereply --> reply : pas ignoré
+    KW_CHECK -->|"non"| RANDOM_ROLL{"1.5% chance\naléatoire ?"}
+    RANDOM_ROLL -->|"oui"| MARK_RANDOM["markReplied()"]
+    MARK_RANDOM --> RESPOND_RANDOM["✅ reason=random"]
 
-    reply --> track
-    reply --> [*]
+    RANDOM_ROLL -->|"non (98.5%)"| TRACK_USER["trackSpeaker(user)\nsans répondre"]
 
-    track --> canFollowup : bot dernier speaker + actif < 15s ?
-    canFollowup --> prereply : oui → follow-up immédiat
-    canFollowup --> track : non
-    track --> [*]
+    RESPOND --> SLEEP_GATE
+    RESPOND_DM --> SLEEP_GATE
+    RESPOND_NAME --> SLEEP_GATE
+    RESPOND_KW --> SLEEP_GATE
+    RESPOND_RANDOM --> SLEEP_GATE
+
+    SLEEP_GATE --> CHECK_SLEEP_BEH{getSleepBehavior()}
+    CHECK_SLEEP_BEH -->|"sleep + pas mention/dm"| SLEEP_IGNORE["😴 Ignoré (sommeil)"]
+    CHECK_SLEEP_BEH -->|"slow / short / null"| SESSION_CHECK
+
+    SESSION_CHECK --> SESSION_PAUSED{"sessionPaused\nsur ce channel ?"}
+    SESSION_PAUSED -->|"oui"| QUEUE_MSG["📥 Mis en file\n(30s de pause session)"]
+    SESSION_PAUSED -->|"non"| EXPIRE_CHECK{"sessionResetMinutes\nexpiré ?"}
+    EXPIRE_CHECK -->|"oui"| RESET_COUNTER["sessionCounts.delete(cid)"]
+    EXPIRE_CHECK -->|"non"| IGNORE_ROLL
+    RESET_COUNTER --> IGNORE_ROLL
+
+    IGNORE_ROLL -->|"shouldIgnore()\n+30% en short"| IGNORED["🙈 Ignoré"]
+    IGNORE_ROLL --> FORGET_ROLL{"forgetChance\n3% ?"}
+    FORGET_ROLL -->|"oui"| FORGOTTEN["💀 Oublié"]
+    FORGET_ROLL -->|"non"| LOG_REACT
+
+    LOG_REACT["logAndReact()\nsetTimeout + reaction"] --> WAIT_DELAY["⏳ computeDelay()\nattente réelle"]
+    WAIT_DELAY --> TRIGGER_REPLY["triggerLunaReply()"]
+
+    TRIGGER_REPLY --> PROCESSING_CHECK{"processing.has(key) ?"}
+    PROCESSING_CHECK -->|"oui"| QUEUE_PENDING["📥 Mis en attente\n(déjà en cours)"]
+    PROCESSING_CHECK -->|"non"| MARK_P["markProcessing()"]
+
+    MARK_P --> LLM_FLOW["🤖 askLLM()\nstreaming tokens..."]
+
+    LLM_FLOW --> CHECK_SESSION_LIMIT["checkSessionLimit()"]
+    CHECK_SESSION_LIMIT --> UNDER_LIMIT["✅ Session OK"]
+    CHECK_SESSION_LIMIT --> PAUSE_SESSION["⏸️ Pause 30s\npuis drainSessionQueue()"]
+    UNDER_LIMIT --> DRAIN_PENDING["drainPending() →\nprochain message ?"]
+    DRAIN_PENDING -->|"oui"| TRIGGER_REPLY
+    DRAIN_PENDING -->|"non"| DONE["✅ Terminé"]
+
+    style SKIP fill:#f88
+    style STOPCMD fill:#8f8
+    style STARTCMD fill:#8f8
+    style CLEARCMD fill:#8f8
+    style SLEEP_IGNORE fill:#f88
+    style IGNORED fill:#f88
+    style FORGOTTEN fill:#f88
+    style DONE fill:#8f8
 ```
 
 ### Ordre de priorité des déclencheurs
@@ -271,9 +304,31 @@ Exemple AZERTY : `bonjour → bonjpur`, `salut → slaut`, `comment → cpmment`
 
 ### Messages vocaux (TTS)
 
-Probabilité configurable (`voice_message_chance`, défaut 8%). Pipeline : Piper TTS → WAV → OGG (ffmpeg) → mesure durée (ffprobe) → upload CDN Discord (3 étapes : création d'attachment, PUT du fichier, POST du message vocal).
+Probabilité configurable (`voice_message_chance`, défaut 8%). Pipeline complet :
 
-Le texte est nettoyé avant synthèse : mentions → `@utilisateur`, URLs supprimées, tronqué à 500 caractères. Si le texte contient des emoji, envoi en texte brut (évite les crashs Piper).
+```mermaid
+flowchart TD
+    START(["sendTextAsVoiceMessage()"]) --> READY{"isTTSReady() ?"}
+    READY -->|"non"| WARN["⚠️ Piper non prêt\nskip"]
+    READY -->|"oui"| SANITIZE["sanitizeForTTS()\nmentions→@utilisateur, URLs supprimées\nemoji supprimés, tronqué 500 car."]
+    SANITIZE --> UNSAFE{"hasUnsafeTTSText ?\n(ranges Unicode)"}
+    UNSAFE -->|"oui"| BRUTE["Envoi en texte brut"]
+    UNSAFE -->|"non"| SYNTH["Piper TTS synthesize()\n→ Buffer WAV"]
+    SYNTH --> OGG["ffmpeg WAV→OGG\nlibopus, 32k, 24kHz, mono"]
+
+    OGG --> DURATION["ffprobe → durée\n(secondes)"]
+    DURATION --> WAVEFORM["buildWaveformBase64()\nsinus 256 points"]
+
+    WAVEFORM --> UPLOAD_1["1. POST /attachments\n→ upload_url + filename"]
+    UPLOAD_1 --> UPLOAD_2["2. PUT ogg → CDN URL"]
+    UPLOAD_2 --> UPLOAD_3["3. POST message\nflags=8192 (voice)"]
+
+    UPLOAD_3 --> DONE_TTS["✅ Voice message envoyé"]
+
+    style DONE_TTS fill:#8f8
+    style WARN fill:#f88
+    style BRUTE fill:#ff8
+```
 
 ### Typing indicator
 
@@ -311,19 +366,31 @@ En DM, `messageReference` toujours `false`.
 ### Plages de sommeil
 
 ```mermaid
-flowchart LR
-    A[Message reçu] --> B{Sleep schedule\nenabled ?}
-    B -- non --> C[Comportement normal]
-    B -- oui --> D{Heure de sommeil ?}
-    D -- non --> C
-    D -- oui --> E{Sleep behavior ?}
-    E -- sleep --> F{Mention ou DM ?}
-    F -- oui --> C
-    F -- non --> G[Ignoré]
-    E -- slow --> H[Délai x3-5\nreact↓]
-    E -- short --> I[Ignore chance +30%\nreact↓]
-    H --> C
-    I --> C
+flowchart TD
+    START(["getSleepBehavior()"]) --> SCHED{"timeSchedules\nexiste ?"}
+    SCHED -->|"non"| AWAKE["return null\n(éveillé permanent)"]
+
+    SCHED -->|"oui"| TZ["Récupérer timezone\n(ex: Europe/Paris)"]
+    TZ --> NOW["currentMinutes =\nHH*60 + MM\n(heure locale)"]
+
+    NOW --> LOOP["Pour chaque entrée\ndans timeSchedules"]
+    LOOP --> PARSE["startMin = parseTime(start)\nendMin = parseTime(end)"]
+    PARSE --> WINDOW{"isInWindow(now,\nstartMin, endMin) ?"}
+
+    WINDOW -->|"oui"| BEHAVIOR{"entry.behavior ?"}
+    BEHAVIOR -->|"sleep"| SLEEP["😴 Sommeil :\nseules mentions/DM\npassent"]
+    BEHAVIOR -->|"slow"| SLOW["🐢 Lent :\ndélai ×3-5\nréactions ≤2%"]
+    BEHAVIOR -->|"short"| SHORT["⏳ Court :\nignore +30%\nréactions ≤2%"]
+    SLEEP --> RETURN
+    SLOW --> RETURN
+    SHORT --> RETURN
+
+    WINDOW -->|"non"| NEXT["Entrée suivante"]
+    NEXT --> LOOP
+    NEXT -->|"plus d'entrées"| AWAKE
+
+    note right of WINDOW: Gère les plages minuit+\n(22:00-07:00) correctement
+    note right of BEHAVIOR: Chaque mode affecte\ndélai, ignore_chance,\net reaction_chance
 ```
 
 | Mode | Effet |
@@ -355,21 +422,34 @@ gantt
 Toutes les 5 minutes, 12% de chance que le bot poste un message de son propre chef.
 
 ```mermaid
-flowchart LR
-    A[Timer 5min] --> B{12% ?}
-    B -- non --> A
-    B -- oui --> C{LLM busy ?}
-    C -- oui --> A
-    C -- non --> D[Pick weighted guild]
-    D --> E[Find most active channel]
-    E --> F[Fetch recent context]
-    F --> G[Reset LLM context]
-    G --> H[Ask LLM: join conversation]
-    H --> I{Send ?}
-    I -- vide --> A
-    I -- message --> J[markBotActivity]
-    J --> K[Reset LLM context]
-    K --> A
+flowchart TD
+    START(["Timer 5min"]) --> CHANCE{"Math.random() <\nspontaneousChance (12%) ?"}
+    CHANCE -->|"non"| WAIT(["Prochain cycle"])
+    CHANCE -->|"oui"| BUSY{"isLLMBusy() ?"}
+    BUSY -->|"oui"| WAIT
+
+    BUSY -->|"non"| PICK["pickWeightedGuild(client)\nFiltre whitelist\nClasse par lastMessageID\nPoids linéaire décroissant"]
+
+    PICK --> SELECTED{"Channel trouvé ?"}
+    SELECTED -->|"non"| WAIT
+    SELECTED -->|"oui"| FETCH["fetchContext(channel, N)\ngetMessages({limit: 5})\n→ username: content"]
+
+    FETCH --> RESET["resetLLM() → /clear"]
+    RESET --> PROMPT["Construction du prompt :\n'Join the conversation...'"]
+
+    PROMPT --> ASK["askLLM({username: 'system', text})"]
+    ASK --> REPLY{"reply.trim()\nnon-vide ?"}
+    REPLY -->|"non"| EMPTY["log: réponse vide"]
+    REPLY -->|"oui"| SEND["createMessage(channel, reply)"]
+    SEND --> MARK["markBotActivity(channel.id)"]
+    SEND --> ERR{"Erreur ?"}
+    ERR -->|"oui"| PERM["log: échec permissions"]
+    MARK --> RESET_AGAIN["resetLLM()"]
+    PERM --> RESET_AGAIN
+    EMPTY --> RESET_AGAIN
+    RESET_AGAIN --> WAIT
+
+    note right of PICK: Les serveurs les plus actifs\nont plus de chances d'être choisis\n(sélection pondérée linéaire)
 ```
 
 **Sélection du serveur** : classement par `lastMessageID` du salon le plus actif, poids linéaire décroissant (le serveur le plus actif a N× plus de chances que le dernier).
@@ -390,29 +470,55 @@ Si le bot n'a pas été actif depuis `inactivity_warmup_minutes` (défaut 10 min
 
 Le statut Discord alterne entre plusieurs presets configurés (`dynamic_status_presets`), avec une rotation toutes les `dynamic_status_interval_minutes` minutes. Types supportés : Playing (0), Streaming (1), Listening (2), Watching (3), Custom (4), Competing (5). Pendant les heures de sommeil, le bot passe en `invisible`.
 
+```mermaid
+stateDiagram-v2
+    [*] --> SCHEDULE: startDynamicStatus()
+    SCHEDULE --> SLEEP_CHECK: updateStatus() timer
+    SLEEP_CHECK --> INVISIBLE: sleep → editStatus("invisible")
+    SLEEP_CHECK --> SKIP_ROLL: éveillé
+
+    INVISIBLE --> RESCHEDULE: scheduleNext()
+    RESCHEDULE --> SLEEP_CHECK: jitter 0.5-1.5x
+
+    SKIP_ROLL --> RESCHEDULE: 10% chance → garder status
+    SKIP_ROLL --> REPEAT_ROLL: 90%
+
+    REPEAT_ROLL --> USE_LAST: 15% → répéter dernier preset
+    REPEAT_ROLL --> NEXT_PRESET: 85% → round-robin
+
+    NEXT_PRESET --> APPLY: statusIndex++
+    USE_LAST --> APPLY: lastPresetIndex
+    APPLY --> editStatus(preset.status, [{name, type}])
+    APPLY --> RESCHEDULE
+```
+
 ### Anti-spam
 
 ```mermaid
 stateDiagram-v2
-    state "Message reçu\n(trigger match)" as msg
-    state "Clé processing[C:U] ?" as check
-    state "En cours" as busy
-    state "Disponible" as free
-    state "Stocké dans\npendingMessages[C:U]" as queue
-    state "Réponse LLM" as reply
-    state "Après réponse" as done
-    state "pendingMessages[C:U] ?" as drain
+    [*] --> TRIGGER_REPLY: triggerLunaReply(key)\nkey = "channelId:userId"
 
-    msg --> check
-    check --> busy : oui (déjà en cours)
-    check --> free : non
-    busy --> queue : mis en attente
-    queue --> [*]
-    free --> reply
-    reply --> done
-    done --> drain
-    drain --> reply : message en attente
-    drain --> [*] : rien en attente
+    TRIGGER_REPLY --> PROCESSING_CHECK
+    PROCESSING_CHECK --> QUEUED: processing.has(key) == true
+    PROCESSING_CHECK --> MARK_PROCESSING: libre
+
+    QUEUED --> queuePending(): Map.set(key, {msg, reason})
+    QUEUED --> [*]: en attente
+
+    MARK_PROCESSING --> processing.add(key)
+    MARK_PROCESSING --> LLM_REPLY: askLLM() streaming
+
+    LLM_REPLY --> CLEANUP: doneProcessing() + cleanup handlers
+    CLEANUP --> DRAIN: drainPending(key)
+
+    DRAIN --> PENDING_EXISTS: queued !== null
+    DRAIN --> [*]: rien en attente
+
+    PENDING_EXISTS --> RECURSE: triggerLunaReply(msg)
+    RECURSE --> PROCESSING_CHECK: récursion sécurisée
+
+    note right of QUEUED: Un seul message en attente\npar (channel:user)\nle précédent est écrasé
+    note right of RECURSE: Si le nouveau tour est busy,\nre-queue automatiquement
 ```
 
 Clé `channelId:userId`. Un seul message en attente par utilisateur par salon. Traité dès la fin de la réponse en cours.
@@ -421,13 +527,50 @@ Clé `channelId:userId`. Un seul message en attente par utilisateur par salon. T
 
 ```mermaid
 flowchart LR
-    A[Mutation d'état\nsetPaused / markReplied\nmarkBotActivity / etc.] --> B[stateBus.emit\nstate:changed]
-    B --> C[persistence.ts\nécoute le bus]
-    C --> D[scheduleSave\ndebounce 500ms]
-    D --> E[async writeFile\nstate.json]
-    F[Démarrage] --> G[loadState async]
-    G --> H[restoreState]
-    G --> I[récupère messages\nen attente via API]
+    subgraph "Émetteurs (state.ts)"
+        PAUSE["setPaused()"]
+        MARK["markReplied()"]
+        ACT["markBotActivity()"]
+        TRACK["trackSpeaker()"]
+        CLEAR["clearCooldown()"]
+    end
+
+    subgraph "pending.ts (legacy)"
+        SAVE_ALL["saveAllState()"]
+        QP["queuePending()"]
+        DP["drainPending()"]
+    end
+
+    subgraph "Event Bus"
+        BUS["stateBus\nTypedBus<StateEvents>\n'state:changed'"]
+    end
+
+    subgraph "Persistance"
+        SCHED["scheduleSave()\ndebounce 500ms"]
+        WRITE["persistState()\n→ state.json"]
+        LOAD["loadState()\n→ state.json"]
+    end
+
+    subgraph "Démarrage"
+        RESTORE["restoreState()\n→ remplir Maps"]
+        RESTORE_PEND["restorePending()\n→ API getMessage()"]
+    end
+
+    PAUSE --> BUS
+    MARK --> BUS
+    ACT --> BUS
+    TRACK --> BUS
+    CLEAR --> BUS
+
+    QP --> SAVE_ALL
+    DP --> SAVE_ALL
+    SAVE_ALL --> SCHED
+
+    BUS -->|"state:changed"| SCHED
+    SCHED -->|"setTimeout 500ms"| WRITE
+
+    LOAD --> RESTORE
+    LOAD --> RESTORE_PEND
 ```
 
 **Persisté :** pendingMessages, paused, cooldowns, timestamps, lastSpeaker, follow-up counters.
@@ -438,10 +581,30 @@ flowchart LR
 
 Si le processus llama-cli crash (OOM, segfault, etc.), il est automatiquement relancé :
 
-1. Réinitialisation des flags internes (`isModelReady`, `isProcessing`)
-2. La file d'attente (`requestQueue`) est préservée — les requêtes en cours sont retraitées
-3. Backup exponentiel : 1s → 2s → 4s → 8s → 16s (max 5 tentatives)
-4. Après un redémarrage réussi, le compteur de tentatives est réinitialisé
+```mermaid
+stateDiagram-v2
+    [*] --> UNINITIALIZED: spawnLlama()
+    UNINITIALIZED --> WAITING_MODEL: stdout "> " ?
+    WAITING_MODEL --> MODEL_READY: oui → emit("ready")\nrestartCount=0
+    WAITING_MODEL --> CRASH: close/error event
+
+    MODEL_READY --> PROCESSING: request en cours
+    PROCESSING --> CRASH: non-zero exit code
+
+    CRASH --> emit("crash")
+    CRASH --> INCREMENT: restartCount++
+    INCREMENT --> CHECK_LIMIT: restartCount > 5 ?
+
+    CHECK_LIMIT --> EXIT: oui → process.exit(1)
+    CHECK_LIMIT --> BACKOFF: non → delay = restartDelay (1s)
+
+    BACKOFF --> DOUBLE: restartDelay = min(delay×2, 30s)
+    DOUBLE --> WAIT: setTimeout(delay)
+    WAIT --> RESPAWN: spawnLlama()
+    RESPAWN --> WAITING_MODER: nouvelle tentative
+
+    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s\n(max 30s, max 5 tentatives)\nFile d'attente préservée
+```
 
 Utile pour les quantifications agressives (Q2_K) qui peuvent crash sur des prompts complexes.
 
@@ -454,6 +617,33 @@ Invisibles — pas de message public, juste une ✅ de confirmation.
 **Par texte :** `-stop` (pause + reset), `-start` (reprise), `-clear` (reset historique)
 
 **Par réactions** sur un message du bot :
+
+```mermaid
+stateDiagram-v2
+    [*] --> LISTENING: bot actif
+
+    LISTENING --> REACTION: messageReactionAdd
+    REACTION --> CHECK_SELF: userId === botId ?
+    CHECK_SELF --> LISTENING: oui (ignorer)
+    REACTION --> CHECK_OWN: message.author.id === botId ?
+    CHECK_OWN --> LISTENING: non (pas notre msg)
+    CHECK_OWN --> CHECK_CHANNEL: TextChannel ?
+    CHECK_CHANNEL --> LISTENING: non
+    CHECK_CHANNEL --> LOOKUP: reactionCommands[emoji]
+
+    LOOKUP --> UNKNOWN: emoji inconnu
+    UNKNOWN --> LISTENING
+    LOOKUP --> STOP: "❌" → resetLLM()\nclearCooldown()\nsetPaused(true)
+    LOOKUP --> START: "▶️" → setPaused(false)
+    LOOKUP --> CLEAR: "🗑️" → resetLLM()\nclearCooldown()
+
+    STOP --> REACT_OK: ✅
+    START --> REACT_OK
+    CLEAR --> REACT_OK
+    REACT_OK --> addReaction("✅")
+    REACT_OK --> LISTENING
+```
+
 | Emoji | Effet |
 |---|---|
 | ❌ | Stop |
@@ -604,6 +794,37 @@ batch: 4096
 ubatch: 256
 context: 4096
 ```
+
+---
+
+## Diagrammes d'architecture détaillés
+
+Le dossier [`state-machines/`](state-machines/) contient **22 diagrammes Mermaid** couvrant l'intégralité du code source :
+
+| # | Diagramme | Type |
+|---|-----------|------|
+| 01 | Architecture Overview | `graph` |
+| 02 | Message Processing (complet) | `stateDiagram` |
+| 03 | Trigger Evaluation (flowchart) | `flowchart` |
+| 04 | LLM Core Queue (3 backends) | `stateDiagram` |
+| 05 | Crash Recovery (backoff) | `stateDiagram` |
+| 06 | Session Limit (pause 30s) | `stateDiagram` |
+| 07 | Anti-Spam Queue | `flowchart` |
+| 08 | Dynamic Status | `stateDiagram` |
+| 09 | Spontaneous Message | `flowchart` |
+| 10 | TTS Pipeline | `flowchart` |
+| 11 | Typo Correction | `flowchart` |
+| 12 | Follow-up Detection | `stateDiagram` |
+| 13 | State Persistence | `flowchart` |
+| 14 | Event Bus Architecture | `graph` |
+| 15 | Delay Computation | `flowchart` |
+| 16 | Sleep Schedule | `flowchart` |
+| 17 | Hesitation & Forget | `flowchart` |
+| 18 | Reply Style Selection | `flowchart` |
+| 19 | Config Hot-Reload | `flowchart` |
+| 20 | Reaction Commands | `stateDiagram` |
+| 21 | Timing Gantt | `gantt` |
+| 22 | Complete Lifecycle | `stateDiagram` |
 
 ---
 

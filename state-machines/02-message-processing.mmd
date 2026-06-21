@@ -1,0 +1,74 @@
+stateDiagram-v2
+    [*] --> MESSAGE_CREATE: Discord Event
+
+    MESSAGE_CREATE --> SKIP_BOT: messageCreate
+    SKIP_BOT --> EVAL_TRIGGER: author != bot
+    SKIP_BOT --> [*]: author == bot (ignore)
+
+    EVAL_TRIGGER --> HANDLE_COMMAND: evaluateMessage()
+    HANDLE_COMMAND --> [*]: -stop/-start/-clear (responded ✓)
+    HANDLE_COMMAND --> CHECK_SLEEP: not a command
+
+    CHECK_SLEEP --> CHECK_SESSION: sleepBehavior != "sleep"
+    CHECK_SLEEP --> IGNORE_SILENT: sleepBehavior == "sleep" (not mention/dm)
+
+    CHECK_SESSION --> PAUSED_QUEUE: sessionPaused.has(cid)
+    PAUSED_QUEUE --> [*]: queued for later
+    CHECK_SESSION --> RESET_COUNTER: check sessionResetMinutes expiry
+    RESET_COUNTER --> SHOULD_RESPOND: sessionCounts.delete if expired
+
+    SHOULD_RESPOND --> CHECK_IGNORE: shouldRespond == true
+    SHOULD_RESPOND --> CHECK_FOLLOWUP: shouldRespond == false
+
+    CHECK_IGNORE --> CHECK_FORGET: !shouldIgnore()
+    CHECK_IGNORE --> IGNORE_PROB: shouldIgnore() → [*]
+    CHECK_FORGET --> COMPUTE_DELAY: roll < forgetChance → oublié [*]
+
+    COMPUTE_DELAY --> REACT_AND_WAIT: computeDelay() + setTimeout
+    REACT_AND_WAIT --> TRIGGER_REPLY: delay elapsed
+    REACT_AND_WAIT --> ADD_REACTION: shouldReact() → addReaction
+
+    TRIGGER_REPLY --> ANTI_SPAM_CHECK: triggerLunaReply()
+    ANTI_SPAM_CHECK --> QUEUE_PENDING: processing.has(key) → attente [*]
+    ANTI_SPAM_CHECK --> MARK_PROCESSING: free to proceed
+
+    MARK_PROCESSING --> PICK_REPLY_STYLE: pickReplyStyle()
+    PICK_REPLY_STYLE --> STREAM_SETUP: setup onToken/onFlush
+
+    STREAM_SETUP --> HESITATION_CHECK: register event listeners
+    HESITATION_CHECK --> START_TYPING: once("token", startTyping)
+
+    START_TYPING --> CALL_LLM: askLLM({username, text})
+    CALL_LLM --> STREAM_TOKENS: LLM emits token events
+    STREAM_TOKENS --> FLUSH_MESSAGE: on("flush") → createMessage (per newline)
+    FLUSH_MESSAGE --> STREAM_TOKENS: continue until done
+    STREAM_TOKENS --> RESIDUAL_FLUSH: done → flush remaining buffer
+
+    RESIDUAL_FLUSH --> VOICE_CHECK: text response sent
+    VOICE_CHECK --> TTS_SEND: shouldSendVoice() && !hasUnsafeTTSText()
+    VOICE_CHECK --> TYPO_CHECK: no voice or unsafe text
+    TTS_SEND --> TYPO_CHECK: sendTextAsVoiceMessage()
+    TYPO_CHECK --> CORRECT_TYPO: typo chance roll → createMessage("word*")
+    TYPO_CHECK --> TRACK_SPEAKER: no typo
+    CORRECT_TYPO --> TRACK_SPEAKER
+
+    TRACK_SPEAKER --> CLEANUP: trackSpeaker()
+    CLEANUP --> DRAIN_PENDING: doneProcessing() + off listeners
+    DRAIN_PENDING --> RECURSE_TRIGGER: pending exists → triggerLunaReply()
+    DRAIN_PENDING --> [*]: no pending
+
+    CHECK_FOLLOWUP --> CAN_FOLLOWUP: canFollowUp() check
+    CAN_FOLLOWUP --> FOLLOWUP_DELAY: true → computeDelay()
+    CAN_FOLLOWUP --> [*]: false → trackSpeaker() [*]
+    FOLLOWUP_DELAY --> FOLLOWUP_REACT: wait
+    FOLLOWUP_REACT --> FOLLOWUP_CALL: shouldReact() → addReaction
+    FOLLOWUP_REACT --> FOLLOWUP_CALL: no reaction
+    FOLLOWUP_CALL --> TRIGGER_REPLY: triggerLunaReply("follow-up")
+
+    IGNORE_SILENT --> [*]
+    IGNORE_PROB --> [*]
+
+    note right of PAUSED_QUEUE: Messages mis en file d'attente\njusqu'à la fin de la pause session
+    note right of STREAM_TOKENS: Émission mot par mot avec délai\n20-80ms entre chaque mot
+    note right of FLUSH_MESSAGE: Chaque newline = un message\nDiscord séparé
+    note right of RECURSE_TRIGGER: Permet de traiter le message\nsuivant dans la file d'attente

@@ -1,0 +1,37 @@
+flowchart TD
+    START(["pickReplyStyle(\n  isActiveConversation\n)"])
+    
+    START --> ACTIVE_CONV{"isActiveConversation ?\n(15s window)"}
+    
+    ACTIVE_CONV -->|"non\n(conversation froide)"| COLD_ROLL["roll = Math.random()"]
+    COLD_ROLL --> COLD_70{"roll < 0.7 ?"}
+    COLD_70 -->|"oui"| STYLE_A["✅ messageReference: true\nmentionRepliedUser: false\n(Quote sans ping)"]
+    COLD_70 -->|"non"| COLD_90{"roll < 0.9 ?"}
+    COLD_90 -->|"oui"| STYLE_B["✅ messageReference: true\nmentionRepliedUser: true\n(Quote avec ping)"]
+    COLD_90 -->|"non"| STYLE_C["✅ messageReference: false\nmentionRepliedUser: false\n(Sans quote, sans ping)"]
+    
+    ACTIVE_CONV -->|"oui\n(conversation active)"| WEIGHTED["Sélection pondérée\nparmi replyStyles config"]
+    
+    WEIGHTED --> SUM_WEIGHTS["total = sum(weights)"]
+    SUM_WEIGHTS --> ROLL["roll = Math.random() × total"]
+    ROLL --> ITERATE["Pour chaque style:\nroll -= entry.weight"]
+    ITERATE --> CHECK_ZERO{"roll ≤ 0 ?"}
+    CHECK_ZERO -->|"non"| ITERATE
+    CHECK_ZERO -->|"oui"| SELECTED_STYLE["return entry.style"]
+    
+    subgraph "Styles dans la config actuelle"
+        S1["50% → quote sans ping"]
+        S2["15% → quote avec ping"]
+        S3["30% → sans quote, sans ping"]
+        S4["5% → sans quote, avec ping"]
+    end
+    
+    STYLE_A --> APPLY
+    STYLE_B --> APPLY
+    STYLE_C --> APPLY
+    SELECTED_STYLE --> APPLY
+    
+    APPLY["Style appliqué au\npremier message\ncreateMessage()"]
+    
+    note right of ACTIVE_CONV: isActiveConversation = true si\nle bot a parlé dans le channel\ndans les 15 dernières secondes
+    note right of WEIGHTED: Quand la conversation est active,\nles styles sont sélectionnés\npar poids (configurable dans config.yml)

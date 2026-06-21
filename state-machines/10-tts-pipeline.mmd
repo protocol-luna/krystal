@@ -1,0 +1,44 @@
+flowchart TD
+    START(["sendTextAsVoiceMessage()"]) --> TTS_READY{"isTTSReady() ?"}
+    TTS_READY -->|"non"| WARN_NO_TTS["⚠️ Piper not ready\nskip voice message"]
+    TTS_READY -->|"oui"| SANITIZE["sanitizeForTTS(text)"]
+    
+    SANITIZE --> REPLACE_MENTIONS["<@123> → @utilisateur"]
+    REPLACE_MENTIONS --> REMOVE_CHANNELS["<#123> → ''"]
+    REMOVE_CHANNELS --> REMOVE_EMOJIS["<:name:id> → ''"]
+    REMOVE_EMOJIS --> REMOVE_URLS["https://... → ''"]
+    REMOVE_URLS --> STRIP_NON_TEXT["Supprimer [^\\p{L}\\p{N}\\s@]"]
+    STRIP_NON_TEXT --> TRUNCATE["Tronquer à 500 caractères"]
+    TRUNCATE --> CHECK_EMPTY{"Texte vide après\nnettoyage ?"}
+    
+    CHECK_EMPTY -->|"oui"| WARN_EMPTY["⚠️ Empty text\nskip voice message"]
+    CHECK_EMPTY -->|"non"| CHECK_UNSAFE{"hasUnsafeTTSText() ?\n(emoji ranges)"}
+    
+    CHECK_UNSAFE -->|"oui"| UNSAFE["⚠️ Texte unsafe\n(emoji/unicode problématique)\nskip"]
+    CHECK_UNSAFE -->|"non"| SYNTHESIZE["piper.synthesize(safeText)\n→ {audio: Buffer WAV}"]
+    
+    SYNTHESIZE --> WAV_TO_OGG["wavToOgg(wavBuf)\nffmpeg -c:a libopus -b:a 32k\n-ar 24000 -ac 1"]
+    
+    WAV_TO_OGG --> GET_DURATION["getAudioDuration(oggBuf)\nffprobe → duration_secs"]
+    GET_DURATION --> BUILD_WAVEFORM["buildWaveformBase64()\n→ sinus 256 points en base64"]
+    
+    BUILD_WAVEFORM --> REQUEST_UPLOAD["requestUploadUrl()\nPOST Discord /attachments"]
+    REQUEST_UPLOAD --> PARSE_UPLOAD["Extraire upload_url\net upload_filename"]
+    
+    PARSE_UPLOAD --> PUT_FILE["putFileToUploadUrl()\nPUT ogg → CDN Discord"]
+    PUT_FILE --> POST_MESSAGE["postVoiceMessage()\nPOST message avec flags=8192\n(voice message type)"]
+    
+    POST_MESSAGE --> SUCCESS["✅ Voice message sent"]
+    WARN_NO_TTS --> END
+    WARN_EMPTY --> END
+    UNSAFE --> END
+    
+    subgraph "3-Step Discord Upload"
+        S1["1. POST /attachments\n→ récupérer upload URL"]
+        S2["2. PUT file → CDN URL"]
+        S3["3. POST message\navec attachment metadata"]
+    end
+    
+    note right of SYNTHESIZE: Piper TTS génère du WAV\nà partir du texte nettoyé
+    note right of WAV_TO_OGG: ffmpeg convertit WAV → OGG\navec libopus (obligatoire Discord)
+    note right of POST_MESSAGE: flags=8192 = VOICE_MESSAGE\npermet d'activer le\nlecteur audio Discord

@@ -1,0 +1,84 @@
+graph TB
+    subgraph "Entry Points"
+        CLI["cli.ts\nCLI Dispatcher"] -->|"bot (default)"| BOT["bot.ts\nDiscord Bot (Eris)"]
+        CLI -->|"server"| SRV["llm-server.ts\nLLM HTTP Server"]
+        CLI -->|"direct"| DIRECT["Terminal Interaction"]
+    end
+
+    subgraph "Configuration Layer"
+        CFG["config.yml\nYAML Config"] --> CFG_TS["config.ts\nParser + Hot-Reload"]
+        ENV[".env\nEnvironment Overrides"] --> CFG_TS
+        CFG_TS -->|"static exports"| BOT
+        CFG_TS -->|"static exports"| LLMCORE
+        CFG_TS -->|"live getters"| ALL_MODULES
+    end
+
+    subgraph "LLM Core"
+        LLMCORE["llm-core.ts\nQueue + Backends"]
+        LLMBUS["llm-bus.ts\nTypedBus<LLMEvents>"]
+        LLMCLIENT["llm-client.ts\nHTTP Client (Proxy)"]
+        LLMSRV["llm-server.ts\nNDJSON Server"]
+
+        LLMCORE --> LLMBUS
+        LLMCORE -->|"proxy mode"| LLMCLIENT
+        LLMCLIENT -->|"HTTP POST /ask"| LLMSRV
+        LLMSRV --> LLMCORE
+        LLMCORE -->|"cli mode"| LLAMACLI["llama-cli\n(Child Process)"]
+        LLMCORE -->|"server mode"| LLAMASRV["llama-server\n(HTTP SSE)"]
+    end
+
+    subgraph "State Management"
+        STATE["state.ts\nIn-Memory State"]
+        STATEBUS["state-bus.ts\nTypedBus<StateEvents>"]
+        PERSIST["persistence.ts\nAuto-Save/Load"]
+        STATE --> STATEBUS
+        STATEBUS --> PERSIST
+        PERSIST -->|"state.json"| DISK[(state.json)]
+    end
+
+    subgraph "Bot Subsystems"
+        BOT
+        TRIGGER["trigger.ts\nTrigger Evaluation"]
+        PENDING["pending.ts\nAnti-Spam Queue"]
+        REACTIONS["reactions.ts\nReaction Commands"]
+        GUILD["guild.ts\nChannel Utilities"]
+        BOT -->|"evaluateMessage()"| TRIGGER
+        BOT -->|"queuePending()"| PENDING
+        BOT -->|"handleReactionCommand()"| REACTIONS
+        SPONT["spontaneous.ts\nSpontaneous Messages"]
+        BOT -->|"trySpawn()"| SPONT
+    end
+
+    subgraph "Human Behaviors"
+        MANNER["mannerisms.ts\nDelay/Ignore/React"]
+        SLEEP["sleep.ts\nSleep Schedules"]
+        TYPO["typo.ts\nKeyboard Typos"]
+        MANNER -->|"getSleepBehavior()"| SLEEP
+    end
+
+    subgraph "TTS Pipeline"
+        PIPER["piper.ts\nPiper TTS Init/Synth"]
+        AUDIO["audio.ts\nWAV→OGG, Sanitize"]
+        UPLOAD["upload.ts\nDiscord CDN 3-Step"]
+        VOICE["voice-message.ts\nOrchestration"]
+        VOICE --> PIPER
+        VOICE --> AUDIO
+        VOICE --> UPLOAD
+    end
+
+    subgraph "External Dependencies"
+        DISCORD{{"Discord API"}}
+        FFMPEG{{"ffmpeg/ffprobe"}}
+        PIPER_BIN{{"Piper TTS Binary"}}
+        LLAMACLI
+        LLAMASRV
+    end
+
+    BOT -->|"askLLM()"| LLMCORE
+    BOT -->|"sendTextAsVoiceMessage()"| VOICE
+    BOT -->|"computeDelay()"| MANNER
+    BOT -->|"applyTypo()"| TYPO
+    BOT --- DISCORD
+    UPLOAD --- DISCORD
+    VOICE --> PIPER_BIN
+    VOICE --> FFMPEG

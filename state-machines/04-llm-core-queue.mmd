@@ -1,0 +1,81 @@
+stateDiagram-v2
+    [*] --> IDLE: system start
+
+    IDLE --> QUEUE_REQUEST: askLLM() called
+    QUEUE_REQUEST --> PROCESS_QUEUE: requestQueue.push() → processQueue()
+    
+    PROCESS_QUEUE --> CHECK_MODE: ensureLLM() + not busy
+    PROCESS_QUEUE --> IDLE: isProcessing || queueHead >= length
+
+    CHECK_MODE --> CLI_MODE: LLM_MODE == "cli"
+    CHECK_MODE --> SERVER_MODE: LLM_MODE == "server"
+    CHECK_MODE --> PROXY_MODE: LLM_MODE == "proxy"
+
+    state CLI_MODE {
+        [*] --> CHECK_MODEL_READY
+        CHECK_MODEL_READY --> WAIT_READY: !isModelReady
+        CHECK_MODEL_READY --> WRITE_STDIN: isModelReady
+        WAIT_READY --> WRITE_STDIN: model ready signal
+        WRITE_STDIN --> READ_STDOUT: llama.stdin.write()
+        READ_STDOUT --> PARSE_RESPONSE: stdout "data" event
+        PARSE_RESPONSE --> EMIT_TOKENS_LINE: newline detected
+        EMIT_TOKENS_LINE --> EMIT_FLUSH: line cleaned & sent
+        PARSE_RESPONSE --> DETECT_PROMPT: matches "\n> $" pattern
+        DETECT_PROMPT --> EMIT_DONE: signalDone(cleaned)
+        EMIT_DONE --> [*]
+        READ_STDOUT --> CLOSE_CRASH: process "close" event
+        CLOSE_CRASH --> CRASH: non-zero exit
+    }
+
+    state SERVER_MODE {
+        [*] --> HTTP_POST: fetch() to /completion
+        HTTP_POST --> SSE_STREAM: read response body stream
+        SSE_STREAM --> EMIT_TOKENS_SSE: parse "data: {...}" lines
+        EMIT_TOKENS_SSE --> CHECK_STOP: data.stop == true?
+        CHECK_STOP --> EMIT_DONE_SSE: signalDone(fullText)
+        CHECK_STOP --> SSE_STREAM: continue reading
+        SSE_STREAM --> EMIT_ERROR: fetch/parse error
+        EMIT_ERROR --> [*]
+    }
+
+    state PROXY_MODE {
+        [*] --> HTTP_POST_PROXY: fetch() POST /ask to llm-server
+        HTTP_POST_PROXY --> NDJSON_STREAM: read NDJSON stream
+        NDJSON_STREAM --> PARSE_EVENTS: JSON.parse per line
+        PARSE_EVENTS --> HANDLE_firstToken: type=="firstToken"
+        PARSE_EVENTS --> HANDLE_chunk: type=="chunk"
+        PARSE_EVENTS --> HANDLE_done: type=="done"
+        PARSE_EVENTS --> HANDLE_error: type=="error"
+        HANDLE_firstToken --> NDJSON_STREAM
+        HANDLE_chunk --> EMIT_WORD_TOKENS: emitWordTokens()
+        HANDLE_done --> EMIT_DONE_PROXY: signalDone(text)
+        HANDLE_error --> EMIT_ERROR_PROXY: throw Error
+    }
+
+    EMIT_TOKENS_LINE --> PROCESS_WORD_QUEUE: emitWordTokens()
+    EMIT_TOKENS_SSE --> PROCESS_WORD_QUEUE: emitWordTokens()
+    HANDLE_chunk --> PROCESS_WORD_QUEUE: emitWordTokens()
+    
+    PROCESS_WORD_QUEUE --> wordEmitQueue.push()
+    PROCESS_WORD_QUEUE --> processWordEmitQueue()
+
+    state "Word Emission" as WORD_EMIT {
+        [*] --> EMIT_WORD: shift from queue
+        EMIT_WORD --> EMIT_FIRST_TOKEN: !hasSentFirstToken → onFirstToken
+        EMIT_WORD --> EMIT_TOKEN_BUS: llmBus.emit("token", word)
+        EMIT_TOKEN_BUS --> SCHEDULE_NEXT: setTimeout(emitNext, 20-80ms)
+        SCHEDULE_NEXT --> EMIT_NEXT_WORD: i < words.length
+        EMIT_NEXT_WORD --> EMIT_TOKEN_BUS: loop
+        SCHEDULE_NEXT --> FINISH_CHUNK: i >= words.length
+        FINISH_CHUNK --> llmBus.emit("flush")
+        FINISH_CHUNK --> CHECK_PENDING_DONE: wordQueueSize--
+        CHECK_PENDING_DONE --> EMIT_DONE_BUS: wordQueue==0 && pendingDoneText
+        CHECK_PENDING_DONE --> PROCESS_NEXT_QUEUE: processWordEmitQueue()
+    }
+
+    EMIT_DONE_BUS --> FINISH: item.resolve(text)
+    FINISH --> SCHEDULE_NEXT_PROCESS: setTimeout(processQueue, 100)
+    SCHEDULE_NEXT_PROCESS --> PROCESS_QUEUE
+
+    note right of PROCESS_WORD_QUEUE: Les mots sont émis un par un\navec 20-80ms de délai aléatoire\nsimulant la frappe humaine
+    note right of EMIT_DONE: Le texte complet est envoyé\nvia signalDone() seulement\nquand tous les mots sont émis

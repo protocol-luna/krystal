@@ -1,0 +1,73 @@
+flowchart LR
+    subgraph "Mutations (émetteurs)"
+        SET_PAUSED["setPaused()"]
+        MARK_REPLIED["markReplied()"]
+        MARK_BOT_ACT["markBotActivity()"]
+        TRACK_SPEAKER["trackSpeaker()"]
+        CLEAR_CD["clearCooldown()"]
+        QUEUE_PENDING["queuePending()"]
+        DRAIN_PENDING["drainPending()"]
+    end
+    
+    subgraph "State Events"
+        STATE_BUS["stateBus\nTypedBus<StateEvents>\n'state:changed'"]
+    end
+    
+    subgraph "État en mémoire (state.ts)"
+        MAPS["Maps:\n- channelCooldowns\n- botActivity\n- lastSpeaker\n- responseCount"]
+        FLAGS["Flags:\n- paused (boolean)"]
+        TIMERS["- globalLastActivity\n- prune interval (5min)"]
+    end
+    
+    subgraph "Persistance (persistence.ts)"
+        SCHEDULE_SAVE["scheduleSave(state)\ndebounce 500ms"]
+        PERSIST_FILE["persistState()\n→ fs.writeFile(state.json)"]
+        LOAD_FILE["loadState()\n→ fs.readFile(state.json)"]
+        DEB_TIMER["setTimeout 500ms"]
+    end
+    
+    subgraph "Disk"
+        STATE_FILE["state.json"]
+    end
+    
+    subgraph "Restauration (startup)"
+        RESTORE["restoreState(data)\n→ remplir les Maps"]
+        RESTORE_PENDING["restorePending(entries)\n→ re-fetch messages"]
+    end
+    
+    subgraph "pending.ts (legacy bridge)"
+        SAVE_ALL["saveAllState()\n→ dumpState() + buildPending()"]
+        LEGACY["Appelé par:\nqueuePending()\ndrainPending()"]
+    end
+    
+    SET_PAUSED -->|"state:changed"| STATE_BUS
+    MARK_REPLIED -->|"state:changed"| STATE_BUS
+    MARK_BOT_ACT -->|"state:changed"| STATE_BUS
+    TRACK_SPEAKER -->|"state:changed"| STATE_BUS
+    CLEAR_CD -->|"state:changed"| STATE_BUS
+    
+    QUEUE_PENDING --> SAVE_ALL
+    DRAIN_PENDING --> SAVE_ALL
+    SAVE_ALL --> SCHEDULE_SAVE
+    
+    STATE_BUS -->|"state:changed"| SCHEDULE_SAVE
+    
+    SCHEDULE_SAVE --> DEB_TIMER
+    DEB_TIMER --> PERSIST_FILE
+    PERSIST_FILE --> STATE_FILE
+    
+    LOAD_FILE --> STATE_FILE
+    LOAD_FILE --> RESTORE
+    LOAD_FILE --> RESTORE_PENDING
+    
+    SET_PAUSED --> FLAGS
+    MARK_REPLIED --> MAPS
+    MARK_BOT_ACT --> MAPS
+    TRACK_SPEAKER --> MAPS
+    CLEAR_CD --> MAPS
+    
+    RESTORE --> MAPS
+    RESTORE --> FLAGS
+    
+    note right of SCHEDULE_SAVE: Debounce de 500ms :\nsi plusieurs mutations arrivent\ndans le même court intervalle,\nun seul save est émis
+    note right of LOAD_FILE: Silencieux : si state.json\nn'existe pas ou est invalide,\nun état par défaut est utilisé

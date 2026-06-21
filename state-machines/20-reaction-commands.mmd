@@ -1,0 +1,42 @@
+stateDiagram-v2
+    [*] --> LISTENING: bot démarré
+    
+    LISTENING --> REACTION_DETECTED: messageReactionAdd
+    REACTION_DETECTED --> CHECK_SELF: userId === botId?
+    CHECK_SELF --> LISTENING: YES (ignorer nos propres réactions)
+    
+    CHECK_SELF --> CHECK_OWN_MSG: message.author.id === client.user.id?
+    CHECK_OWN_MSG --> LISTENING: NO (pas notre message)
+    
+    CHECK_OWN_MSG --> CHECK_CHANNEL: message.channel instanceof TextChannel?
+    CHECK_CHANNEL --> LISTENING: NO (DM, groupe...)
+    
+    CHECK_CHANNEL --> HANDLE_CMD: handleReactionCommand()
+
+    HANDLE_CMD --> LOOKUP_CMD: reactionCommands[emojiName]
+    LOOKUP_CMD --> UNKNOWN_CMD: emoji non reconnu
+    UNKNOWN_CMD --> LISTENING: retour sans action
+    
+    LOOKUP_CMD --> STOP_CMD: "❌" → "stop"
+    LOOKUP_CMD --> START_CMD: "▶️" → "start"
+    LOOKUP_CMD --> CLEAR_CMD: "🗑️" → "clear"
+
+    STOP_CMD --> RESET_LLM1: resetLLM()
+    RESET_LLM1 --> CLEAR_COOLDOWN1: clearCooldown(channelId)
+    CLEAR_COOLDOWN1 --> TRACK1: trackSpeaker(channelId, userId)
+    TRACK1 --> PAUSE: setPaused(true)
+    PAUSE --> REACT_OK
+
+    START_CMD --> UNPAUSE: setPaused(false)
+    UNPAUSE --> REACT_OK
+
+    CLEAR_CMD --> RESET_LLM2: resetLLM()
+    RESET_LLM2 --> CLEAR_COOLDOWN2: clearCooldown(channelId)
+    CLEAR_COOLDOWN2 --> TRACK2: trackSpeaker(channelId, userId)
+    TRACK2 --> REACT_OK
+
+    REACT_OK --> ADD_CHECK: message.addReaction("✅")
+    ADD_CHECK --> LISTENING: retour écoute
+
+    note right of RESET_LLM1: resetLLM():\n- Vide la file de requêtes\n- Envoie /clear en mode cli\n- Reset le contexte LLM
+    note right of TRACK1: trackSpeaker() enregistre\nl'utilisateur comme dernier\ninterlocuteur (pour follow-up)
