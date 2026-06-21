@@ -3,12 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm run build-client && npm run build-server",
-    "build-client": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
-    "build-server": "esbuild src/core/llm-server.ts --bundle --platform=node --format=esm --packages=external --outfile=llm-server.js",
-    "start": "concurrently --kill-others \"node llm-server.js\" \"node self-cli.js\"",
-    "dev": "concurrently --kill-others \"bun --hot src/core/llm-server.ts\" \"esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js --watch\" \"bun --watch src/index.ts\"",
-    "client-only": "node self-cli.js",
+    "build": "esbuild src/core/llm-server.ts --bundle --platform=node --format=esm --packages=external --outfile=llm-server.js",
+    "start": "node llm-server.js",
     "server-only": "node llm-server.js",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
@@ -30,7 +26,6 @@
     "@biomejs/biome": "^2.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.9.3",
-    "concurrently": "^10.0.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
   }
