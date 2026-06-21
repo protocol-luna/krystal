@@ -62,15 +62,32 @@ export const LLM_PORT: number =
 	v<number | null>("llm_port", null) ??
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
-export let LLM_MODE: "cli" | "server" | "proxy" =
-	(v<string | null>("llm_mode", null) as "cli" | "server" | "proxy" | null) ??
-	(process.env.LLM_MODE as "cli" | "server" | "proxy" | undefined) ??
+export type LLMMode = "cli" | "server" | "proxy" | "online";
+
+export let LLM_MODE: LLMMode =
+	(v<string | null>("llm_mode", null) as LLMMode | null) ??
+	(process.env.LLM_MODE as LLMMode | undefined) ??
 	"proxy";
 
 /** Override LLM_MODE at runtime (used by llm-server to force cli/server) */
-export function setLLMMode(mode: "cli" | "server"): void {
+export function setLLMMode(mode: Exclude<LLMMode, "online">): void {
 	LLM_MODE = mode;
 }
+
+export const LLM_API_ENDPOINT: string =
+	v<string | null>("llm_api_endpoint", null) ??
+	process.env.LLM_API_ENDPOINT ??
+	"";
+
+export const LLM_API_TOKEN: string =
+	v<string | null>("llm_api_token", null) ??
+	process.env.LLM_API_TOKEN ??
+	"";
+
+export const LLM_MODEL: string =
+	v<string | null>("llm_model", null) ??
+	process.env.LLM_MODEL ??
+	"gpt-4o-mini";
 
 export const SYSTEM_PROMPT = (() => {
 	const fromYaml = v<string | null>("system_prompt", null);

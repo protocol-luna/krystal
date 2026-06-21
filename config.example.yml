@@ -19,7 +19,15 @@ llm_port: 3124
 #   "server" → HTTP POST à llama-server (endpoint /completion, SSE)
 #   "proxy"  → bot client → HTTP → llm-server (qui gère le LLM en direct)
 #             (nécessite `node self-cli.js server` dans un autre process)
+#   "online" → appel HTTP à une API compatible OpenAI (chat/completions)
+#             (nécessite llm_api_endpoint et llm_api_token)
 llm_mode: "proxy"
+# Endpoint API compatible OpenAI (mode online uniquement)
+# llm_api_endpoint: "https://api.openai.com/v1/chat/completions"
+# Token API (mode online uniquement)
+# llm_api_token: "sk-..."
+# Modèle (mode online uniquement)
+# llm_model: "gpt-4o-mini"
 tts_model_path: "./tts-engine/en_GB-southern_english_female-low.onnx"
 tts_binary_path: "bin/piper/piper"
 ffmpeg_path: "bin/ffmpeg/ffmpeg"

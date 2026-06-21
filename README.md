@@ -1,10 +1,10 @@
-# Project Luna Protocol
+# Luna-Protocol Project
 
-Autonomous Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
+Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Three LLM modes: `cli` (spawn llama-cli), `server` (HTTP → llama-server), `proxy` (bot → HTTP → separate llm-server)
+- Four LLM modes: `cli` (spawn llama-cli), `server` (HTTP → llama-server), `proxy` (bot → HTTP → separate llm-server), `online` (OpenAI-compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 - LLM auto-restart (cli mode) with exponential backoff and preserved queue
 
@@ -321,7 +321,10 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 | `llama_model_path` | string | `"./models/Discord-Hermes-3-8B.Q2_K.gguf"` | Path to GGUF model |
 | `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
 | `llm_port` | number | `3124` | LLM port |
-| `llm_mode` | `"cli"`, `"server"`, `"proxy"` | `"proxy"` | `cli` → spawn llama-cli, `server` → HTTP llama-server, `proxy` → bot client via llm-server |
+| `llm_mode` | `"cli"`, `"server"`, `"proxy"`, `"online"` | `"proxy"` | `cli` → spawn llama-cli, `server` → HTTP llama-server, `proxy` → bot client via llm-server, `online` → OpenAI-compatible API |
+| `llm_api_endpoint` | string | `""` | OpenAI-compatible endpoint (mode `online`) |
+| `llm_api_token` | string | `""` | API token (mode `online`) |
+| `llm_model` | string | `"gpt-4o-mini"` | Model name sent in API requests (mode `online`) |
 | `tts_model_path` | string | `"./tts-engine/..."` | Piper TTS model (.onnx) |
 | `tts_binary_path` | string | `"bin/piper/piper"` | Piper binary path |
 | `ffmpeg_path` | string | `"bin/ffmpeg/ffmpeg"` | ffmpeg binary |
@@ -551,10 +554,11 @@ npm run build && npm start     # production
 ### LLM deployment modes
 
 | Mode | Usage | Description |
-|---|---|---|
+|------|-------|-------------|
 | `cli` | `llm_mode: cli` | Bot manages the LLM directly (spawn llama-cli). Monolithic, single process. |
 | `server` | `llm_mode: server` | Bot calls llama-server via HTTP. llama-server must be running alongside. |
 | `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (which manages the LLM). Two processes, ideal for PM2. |
+| `online` | `llm_mode: online` | Bot calls any OpenAI-compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)
 

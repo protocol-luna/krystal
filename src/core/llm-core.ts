@@ -384,6 +384,30 @@ async function proxyRequest(item: QueueItem): Promise<void> {
 	}
 }
 
+// --- Online backend (OpenAI-compatible API) ---
+
+async function onlineRequest(item: QueueItem): Promise<void> {
+	try {
+		const { askOnline } = await import("./llm-online.js");
+		const text = await askOnline(item.userMessage, {
+			onFirstToken: () => {
+				if (!hasSentFirstToken) {
+					hasSentFirstToken = true;
+					currentItem?.onFirstToken?.();
+				}
+			},
+			onChunk: (chunk: string) => {
+				emitWordTokens(chunk);
+				currentItem?.onChunk?.(chunk);
+			},
+		});
+		signalDone(text);
+	} catch (err) {
+		llmBus.emit("error", err as Error);
+		throw err;
+	}
+}
+
 // --- Queue processing ---
 
 function processQueue(): void {
@@ -440,6 +464,11 @@ function processQueue(): void {
 			llmBus.off("done", doneHandler);
 			fail(err);
 		});
+	} else if (LLM_MODE === "online") {
+		void onlineRequest(item).catch((err) => {
+			llmBus.off("done", doneHandler);
+			fail(err);
+		});
 	} else {
 		cliRequest(item);
 	}
@@ -474,11 +503,13 @@ export async function resetLLM(): Promise<void> {
 	currentItem = null;
 	llmBus.emit("reset");
 
-	if (LLM_MODE === "server" || LLM_MODE === "proxy") {
-		if (LLM_MODE === "proxy") {
-			const { resetLLM: resetLLMClient } = await import("./llm-client.js");
-			await resetLLMClient();
-		}
+	if (LLM_MODE === "server" || LLM_MODE === "online") {
+		return;
+	}
+
+	if (LLM_MODE === "proxy") {
+		const { resetLLM: resetLLMClient } = await import("./llm-client.js");
+		await resetLLMClient();
 		return;
 	}
 
