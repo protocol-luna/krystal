@@ -41,6 +41,7 @@ import {
 	getFatigueMultiplier,
 	getFatigueIgnoreBonus,
 	restoreTopicFatigue,
+	pruneTopicFatigue,
 } from "./state/topic-fatigue.js";
 import {
 	processing,
@@ -649,8 +650,14 @@ export async function startBot(): Promise<void> {
 	const saved = await loadState();
 	restoreState(saved);
 	restorePending(saved.pendingMessages, client);
-	restoreTopicFatigue(saved.topicWordLogs ?? []);
+	const wordLogs = saved.topicWordLogs ?? { logs: [], lastActivity: [] };
+	restoreTopicFatigue(
+		Array.isArray(wordLogs)
+			? { logs: wordLogs as [string, string[]][], lastActivity: [] }
+			: (wordLogs as { logs: [string, string[]][]; lastActivity: [string, number][] })
+	);
 	startPruning();
+	setInterval(pruneTopicFatigue, 300_000);
 
 	client.connect();
 

@@ -13,13 +13,19 @@ const activeChannelCache = new Map<
 function getCachedActiveChannel(
 	guild: Eris.Guild
 ): Eris.TextChannel | undefined {
+	const now = Date.now();
+	for (const [id, entry] of activeChannelCache) {
+		if (now - entry.timestamp >= CACHE_TTL) {
+			activeChannelCache.delete(id);
+		}
+	}
 	const cached = activeChannelCache.get(guild.id);
-	if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+	if (cached && now - cached.timestamp < CACHE_TTL) {
 		return cached.channel;
 	}
 	const channel = findMostActiveChannel(guild);
 	if (channel) {
-		activeChannelCache.set(guild.id, { channel, timestamp: Date.now() });
+		activeChannelCache.set(guild.id, { channel, timestamp: now });
 		return channel;
 	}
 }

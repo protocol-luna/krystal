@@ -30,8 +30,8 @@ describe("loadState", () => {
 					botActivity: [],
 					lastSpeaker: [],
 					responseCount: [],
-					topicWordLogs: [],
-				}),
+				topicWordLogs: { logs: [], lastActivity: [] },
+			}),
 			writeFile: async () => {},
 		}));
 		const { loadState } = await import("../../src/state/persistence.js");
@@ -85,7 +85,7 @@ describe("persistState", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
-			topicWordLogs: [],
+			topicWordLogs: { logs: [], lastActivity: [] },
 		});
 		const parsed = JSON.parse(written);
 		expect(parsed.paused).toBeTrue();
@@ -131,7 +131,7 @@ describe("persistState", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
-			topicWordLogs: [],
+			topicWordLogs: { logs: [], lastActivity: [] },
 		});
 		const parsed = JSON.parse(written);
 		expect(parsed.pendingMessages).toHaveLength(1);
@@ -197,7 +197,7 @@ describe("scheduleSave", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
-			topicWordLogs: [],
+			topicWordLogs: { logs: [], lastActivity: [] },
 		};
 		scheduleSave(state);
 		scheduleSave(state);
