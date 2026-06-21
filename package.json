@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build-dev": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=self-cli.js",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=self-cli.js",
-    "start": "node self-cli.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=self-cli.cjs",
+    "start": "node self-cli.cjs",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
     "lint": "bunx --bun @biomejs/biome lint ./src",

@@ -1,3 +1,1 @@
-export {};
-
-await import("./cli.js");
+void import("./cli.js");
