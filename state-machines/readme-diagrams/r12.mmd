@@ -1,0 +1,24 @@
+%%{init: {"theme":"dark"}}%%
+stateDiagram-v2
+    [*] --> LISTENING: bot active
+
+    LISTENING --> REACTION: messageReactionAdd
+    REACTION --> CHECK_SELF: userId === botId ?
+    CHECK_SELF --> LISTENING: yes (ignore)
+    REACTION --> CHECK_OWN: message.author.id === botId ?
+    CHECK_OWN --> LISTENING: no (not our message)
+    CHECK_OWN --> CHECK_CHANNEL: TextChannel ?
+    CHECK_CHANNEL --> LISTENING: no
+    CHECK_CHANNEL --> LOOKUP: reactionCommands[emoji]
+
+    LOOKUP --> UNKNOWN: unknown emoji
+    UNKNOWN --> LISTENING
+    LOOKUP --> STOP: "❌" → resetLLM()\nclearCooldown()\nsetPaused(true)
+    LOOKUP --> START: "▶️" → setPaused(false)
+    LOOKUP --> CLEAR: "🗑️" → resetLLM()\nclearCooldown()
+
+    STOP --> REACT_OK: ✅
+    START --> REACT_OK
+    CLEAR --> REACT_OK
+    REACT_OK --> addReaction("✅")
+    REACT_OK --> LISTENING

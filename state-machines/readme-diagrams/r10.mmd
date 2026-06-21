@@ -1,0 +1,46 @@
+%%{init: {"theme":"dark"}}%%
+flowchart LR
+    subgraph "Emitters (state.ts)"
+        PAUSE["setPaused()"]
+        MARK["markReplied()"]
+        ACT["markBotActivity()"]
+        TRACK["trackSpeaker()"]
+        CLEAR["clearCooldown()"]
+    end
+
+    subgraph "pending.ts (legacy)"
+        SAVE_ALL["saveAllState()"]
+        QP["queuePending()"]
+        DP["drainPending()"]
+    end
+
+    subgraph "Event Bus"
+        BUS["stateBus\nTypedBus<StateEvents>\n'state:changed'"]
+    end
+
+    subgraph "Persistence"
+        SCHED["scheduleSave()\ndebounce 500ms"]
+        WRITE["persistState()\n→ state.json"]
+        LOAD["loadState()\n→ state.json"]
+    end
+
+    subgraph "Startup"
+        RESTORE["restoreState()\n→ fill Maps"]
+        RESTORE_PEND["restorePending()\n→ API getMessage()"]
+    end
+
+    PAUSE --> BUS
+    MARK --> BUS
+    ACT --> BUS
+    TRACK --> BUS
+    CLEAR --> BUS
+
+    QP --> SAVE_ALL
+    DP --> SAVE_ALL
+    SAVE_ALL --> SCHED
+
+    BUS -->|"state:changed"| SCHED
+    SCHED -->|"setTimeout 500ms"| WRITE
+
+    LOAD --> RESTORE
+    LOAD --> RESTORE_PEND

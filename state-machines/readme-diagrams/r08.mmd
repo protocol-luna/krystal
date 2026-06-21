@@ -1,0 +1,20 @@
+%%{init: {"theme":"dark"}}%%
+stateDiagram-v2
+    [*] --> SCHEDULE: startDynamicStatus()
+    SCHEDULE --> SLEEP_CHECK: updateStatus() timer
+    SLEEP_CHECK --> INVISIBLE: sleep → editStatus("invisible")
+    SLEEP_CHECK --> SKIP_ROLL: awake
+
+    INVISIBLE --> RESCHEDULE: scheduleNext()
+    RESCHEDULE --> SLEEP_CHECK: jitter 0.5-1.5x
+
+    SKIP_ROLL --> RESCHEDULE: 10% chance → keep status
+    SKIP_ROLL --> REPEAT_ROLL: 90%
+
+    REPEAT_ROLL --> USE_LAST: 15% → repeat last preset
+    REPEAT_ROLL --> NEXT_PRESET: 85% → round-robin
+
+    NEXT_PRESET --> APPLY: statusIndex++
+    USE_LAST --> APPLY: lastPresetIndex
+    APPLY --> APPLY_DONE: editStatus(preset.status, [{name, type}])
+    APPLY --> RESCHEDULE

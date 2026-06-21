@@ -1,0 +1,25 @@
+%%{init: {"theme":"dark"}}%%
+flowchart TD
+    START(["getSleepBehavior()"]) --> SCHED{"timeSchedules\nexists ?"}
+    SCHED -->|"no"| AWAKE["return null\n(permanently awake)"]
+
+    SCHED -->|"yes"| TZ["Get timezone\n(e.g. Europe/Paris)"]
+    TZ --> NOW["currentMinutes =\nHH*60 + MM\n(local time)"]
+
+    NOW --> LOOP["For each entry\nin timeSchedules"]
+    LOOP --> PARSE["startMin = parseTime(start)\nendMin = parseTime(end)"]
+    PARSE --> WINDOW{"isInWindow(now,\nstartMin, endMin) ?"}
+
+    WINDOW -->|"yes"| BEHAVIOR{"entry.behavior ?"}
+    BEHAVIOR -->|"sleep"| SLEEP["😴 Sleep:\nonly mentions/DM\npass through"]
+    BEHAVIOR -->|"slow"| SLOW["🐢 Slow:\ndelay ×3-5\nreactions ≤2%"]
+    BEHAVIOR -->|"short"| SHORT["⏳ Short:\nignore +30%\nreactions ≤2%"]
+    SLEEP --> RETURN
+    SLOW --> RETURN
+    SHORT --> RETURN
+
+    WINDOW -->|"no"| NEXT["Next entry"]
+    NEXT --> LOOP
+    NEXT -->|"no more entries"| AWAKE
+
+

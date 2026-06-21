@@ -1,0 +1,23 @@
+%%{init: {"theme":"dark"}}%%
+stateDiagram-v2
+    [*] --> UNINITIALIZED: spawnLlama()
+    UNINITIALIZED --> WAITING_MODEL: stdout "> " ?
+    WAITING_MODEL --> MODEL_READY: yes → emit("ready")\nrestartCount=0
+    WAITING_MODEL --> CRASH: close/error event
+
+    MODEL_READY --> PROCESSING: request in progress
+    PROCESSING --> CRASH: non-zero exit code
+
+    CRASH --> emit("crash")
+    CRASH --> INCREMENT: restartCount++
+    INCREMENT --> CHECK_LIMIT: restartCount > 5 ?
+
+    CHECK_LIMIT --> EXIT: yes → process.exit(1)
+    CHECK_LIMIT --> BACKOFF: no → delay = restartDelay (1s)
+
+    BACKOFF --> DOUBLE: restartDelay = min(delay×2, 30s)
+    DOUBLE --> WAIT: setTimeout(delay)
+    WAIT --> RESPAWN: spawnLlama()
+    RESPAWN --> WAITING_MODER: new attempt
+
+    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s\n(max 30s, max 5 attempts)\nQueue preserved

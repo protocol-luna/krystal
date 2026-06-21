@@ -1,0 +1,22 @@
+%%{init: {"theme":"dark"}}%%
+flowchart TD
+    START(["sendTextAsVoiceMessage()"]) --> READY{"isTTSReady() ?"}
+    READY -->|"no"| WARN["⚠️ Piper not ready\nskip"]
+    READY -->|"yes"| SANITIZE["sanitizeForTTS()\nmentions→@user, URLs removed\nemoji removed, truncated 500 char."]
+    SANITIZE --> UNSAFE{"hasUnsafeTTSText ?\n(Unicode ranges)"}
+    UNSAFE -->|"yes"| BRUTE["Send as plain text"]
+    UNSAFE -->|"no"| SYNTH["Piper TTS synthesize()\n→ WAV Buffer"]
+    SYNTH --> OGG["ffmpeg WAV→OGG\nlibopus, 32k, 24kHz, mono"]
+
+    OGG --> DURATION["ffprobe → duration\n(seconds)"]
+    DURATION --> WAVEFORM["buildWaveformBase64()\n256-point sine"]
+
+    WAVEFORM --> UPLOAD_1["1. POST /attachments\n→ upload_url + filename"]
+    UPLOAD_1 --> UPLOAD_2["2. PUT ogg → CDN URL"]
+    UPLOAD_2 --> UPLOAD_3["3. POST message\nflags=8192 (voice)"]
+
+    UPLOAD_3 --> DONE_TTS["✅ Voice message sent"]
+
+    style DONE_TTS fill:#8f8
+    style WARN fill:#f88
+    style BRUTE fill:#ff8

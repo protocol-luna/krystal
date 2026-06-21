@@ -1,0 +1,36 @@
+%%{init: {"theme":"dark"}}%%
+flowchart TD
+    A["💬 Message received"] --> CMD{"Command ?\n-stop / -start / -clear"}
+    CMD -->|"yes"| CMD_OK["✅ Executed silently"]
+
+    CMD -->|"no"| TRIG{"Trigger ?\nmention / dm / name\nkeyword / random"}
+    TRIG -->|"no"| FUP{"canFollowUp ?\n<15s, <3/60s"}
+    FUP -->|"no"| END["👋 Ignored"]
+
+    TRIG -->|"yes"| SLEEP{"Sleep ?"}
+    SLEEP -->|"sleep + not mention"| IGNORE_SLP["😴 Ignored"]
+    SLEEP -->|"slow / short"| IGNORE_ROLL{"shouldIgnore ?\n+30% on short"}
+    IGNORE_ROLL -->|"yes"| IGNORED["🙈 Ignored"]
+    IGNORE_ROLL -->|"no"| FORGET{"Forget ?\n3%"}
+    FORGET -->|"yes"| FORGOT["💀 Forgotten"]
+    FORGET -->|"no"| IGNORE_SLP
+
+    SLEEP -->|"awake"| FILTERS["Filters:\n- session limit (8 msgs)\n- anti-spam (processing)"]
+    FILTERS --> DELAY["⏳ Delay\ncomputeDelay()"]
+
+    DELAY --> REACT["Reaction ?\n2-8% depending on type"]
+    REACT --> LLM["🤖 askLLM()\n3 possible backends"]
+
+    LLM --> STREAM["Word-by-word emission\n20-80ms between words"]
+    STREAM --> FLUSH["Send in batches\n(1 newline = 1 message)"]
+    FLUSH --> TTS["🗣️ Voice message ?\n(8-12%)"]
+    TTS --> TYPO["✍️ Typo ?\n(6%)"]
+    TYPO --> DONE["✔️ Response sent"]
+
+    FUP -->|"yes"| DELAY
+
+    style CMD_OK fill:#8f8
+    style END fill:#f88
+    style IGNORE_SLP fill:#f88
+    style IGNORED fill:#f88
+    style FORGOT fill:#f88

@@ -1,0 +1,27 @@
+%%{init: {"theme":"dark"}}%%
+flowchart TD
+    START(["Timer 5min"]) --> CHANCE{"Math.random() <\nspontaneousChance (12%) ?"}
+    CHANCE -->|"no"| WAIT(["Next cycle"])
+    CHANCE -->|"yes"| BUSY{"isLLMBusy() ?"}
+    BUSY -->|"yes"| WAIT
+
+    BUSY -->|"no"| PICK["pickWeightedGuild(client)\nWhitelist filter\nSort by lastMessageID\nDecreasing linear weight"]
+
+    PICK --> SELECTED{"Channel found ?"}
+    SELECTED -->|"no"| WAIT
+    SELECTED -->|"yes"| FETCH["fetchContext(channel, N)\ngetMessages({limit: 5})\n→ username: content"]
+
+    FETCH --> RESET["resetLLM() → /clear"]
+    RESET --> PROMPT["Build prompt:\n'Join the conversation...'"]
+
+    PROMPT --> ASK["askLLM({username: 'system', text})"]
+    ASK --> REPLY{"reply.trim()\nnon-empty ?"}
+    REPLY -->|"no"| EMPTY["log: empty response"]
+    REPLY -->|"yes"| SEND["createMessage(channel, reply)"]
+    SEND --> MARK["markBotActivity(channel.id)"]
+    SEND --> ERR{"Error ?"}
+    ERR -->|"yes"| PERM["log: permission failure"]
+    MARK --> RESET_AGAIN["resetLLM()"]
+    PERM --> RESET_AGAIN
+    EMPTY --> RESET_AGAIN
+    RESET_AGAIN --> WAIT

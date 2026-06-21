@@ -1,0 +1,22 @@
+%%{init: {"theme":"dark"}}%%
+stateDiagram-v2
+    [*] --> TRIGGER_REPLY: triggerLunaReply(key)\nkey = "channelId:userId"
+
+    TRIGGER_REPLY --> PROCESSING_CHECK
+    PROCESSING_CHECK --> QUEUED: processing.has(key) == true
+    PROCESSING_CHECK --> MARK_PROCESSING: free
+
+    QUEUED --> queuePending(): Map.set(key, {msg, reason})
+    QUEUED --> [*]: waiting
+
+    MARK_PROCESSING --> processing.add(key)
+    MARK_PROCESSING --> LLM_REPLY: askLLM() streaming
+
+    LLM_REPLY --> CLEANUP: doneProcessing() + cleanup handlers
+    CLEANUP --> DRAIN: drainPending(key)
+
+    DRAIN --> PENDING_EXISTS: queued !== null
+    DRAIN --> [*]: nothing waiting
+
+    PENDING_EXISTS --> RECURSE: triggerLunaReply(msg)
+    RECURSE --> PROCESSING_CHECK: safe recursion
