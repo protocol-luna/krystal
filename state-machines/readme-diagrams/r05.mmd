@@ -1,18 +1,18 @@
 flowchart TD
-    START(["getSleepBehavior()"]) --> SCHED{"timeSchedules\nexists ?"}
-    SCHED -->|"no"| AWAKE["return null\n(permanently awake)"]
+    START(["getSleepBehavior()"]) --> SCHED{"timeSchedules<br/>exists ?"}
+    SCHED -->|"no"| AWAKE["return null<br/>(permanently awake)"]
 
-    SCHED -->|"yes"| TZ["Get timezone\n(e.g. Europe/Paris)"]
-    TZ --> NOW["currentMinutes =\nHH*60 + MM\n(local time)"]
+    SCHED -->|"yes"| TZ["Get timezone<br/>(e.g. Europe/Paris)"]
+    TZ --> NOW["currentMinutes =<br/>HH*60 + MM<br/>(local time)"]
 
-    NOW --> LOOP["For each entry\nin timeSchedules"]
-    LOOP --> PARSE["startMin = parseTime(start)\nendMin = parseTime(end)"]
-    PARSE --> WINDOW{"isInWindow(now,\nstartMin, endMin) ?"}
+    NOW --> LOOP["For each entry<br/>in timeSchedules"]
+    LOOP --> PARSE["startMin = parseTime(start)<br/>endMin = parseTime(end)"]
+    PARSE --> WINDOW{"isInWindow(now,<br/>startMin, endMin) ?"}
 
     WINDOW -->|"yes"| BEHAVIOR{"entry.behavior ?"}
-    BEHAVIOR -->|"sleep"| SLEEP["😴 Sleep:\nonly mentions/DM\npass through"]
-    BEHAVIOR -->|"slow"| SLOW["🐢 Slow:\ndelay ×3-5\nreactions ≤2%"]
-    BEHAVIOR -->|"short"| SHORT["⏳ Short:\nignore +30%\nreactions ≤2%"]
+    BEHAVIOR -->|"sleep"| SLEEP["😴 Sleep:<br/>only mentions/DM<br/>pass through"]
+    BEHAVIOR -->|"slow"| SLOW["🐢 Slow:<br/>delay ×3-5<br/>reactions ≤2%"]
+    BEHAVIOR -->|"short"| SHORT["⏳ Short:<br/>ignore +30%<br/>reactions ≤2%"]
     SLEEP --> RETURN
     SLOW --> RETURN
     SHORT --> RETURN

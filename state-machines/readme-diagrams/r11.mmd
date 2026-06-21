@@ -1,7 +1,7 @@
 stateDiagram-v2
     [*] --> UNINITIALIZED: spawnLlama()
     UNINITIALIZED --> WAITING_MODEL: stdout "> " ?
-    WAITING_MODEL --> MODEL_READY: yes → emit("ready")\nrestartCount=0
+    WAITING_MODEL --> MODEL_READY: yes → emit("ready")<br/>restartCount=0
     WAITING_MODEL --> CRASH: close/error event
 
     MODEL_READY --> PROCESSING: request in progress
@@ -19,4 +19,4 @@ stateDiagram-v2
     WAIT --> RESPAWN: spawnLlama()
     RESPAWN --> WAITING_MODER: new attempt
 
-    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s\n(max 30s, max 5 attempts)\nQueue preserved
+    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s<br/>(max 30s, max 5 attempts)<br/>Queue preserved

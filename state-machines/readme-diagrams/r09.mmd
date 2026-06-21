@@ -1,5 +1,5 @@
 stateDiagram-v2
-    [*] --> TRIGGER_REPLY: triggerLunaReply(key)\nkey = "channelId:userId"
+    [*] --> TRIGGER_REPLY: triggerLunaReply(key)<br/>key = "channelId:userId"
 
     TRIGGER_REPLY --> PROCESSING_CHECK
     PROCESSING_CHECK --> QUEUED: processing.has(key) == true

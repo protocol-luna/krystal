@@ -1,29 +1,29 @@
 flowchart TD
-    A["💬 Message received"] --> CMD{"Command ?\n-stop / -start / -clear"}
+    A["💬 Message received"] --> CMD{"Command ?<br/>-stop / -start / -clear"}
     CMD -->|"yes"| CMD_OK["✅ Executed silently"]
 
-    CMD -->|"no"| TRIG{"Trigger ?\nmention / dm / name\nkeyword / random"}
-    TRIG -->|"no"| FUP{"canFollowUp ?\n<15s, <3/60s"}
+    CMD -->|"no"| TRIG{"Trigger ?<br/>mention / dm / name<br/>keyword / random"}
+    TRIG -->|"no"| FUP{"canFollowUp ?<br/><15s, <3/60s"}
     FUP -->|"no"| END["👋 Ignored"]
 
     TRIG -->|"yes"| SLEEP{"Sleep ?"}
     SLEEP -->|"sleep + not mention"| IGNORE_SLP["😴 Ignored"]
-    SLEEP -->|"slow / short"| IGNORE_ROLL{"shouldIgnore ?\n+30% on short"}
+    SLEEP -->|"slow / short"| IGNORE_ROLL{"shouldIgnore ?<br/>+30% on short"}
     IGNORE_ROLL -->|"yes"| IGNORED["🙈 Ignored"]
-    IGNORE_ROLL -->|"no"| FORGET{"Forget ?\n3%"}
+    IGNORE_ROLL -->|"no"| FORGET{"Forget ?<br/>3%"}
     FORGET -->|"yes"| FORGOT["💀 Forgotten"]
     FORGET -->|"no"| IGNORE_SLP
 
-    SLEEP -->|"awake"| FILTERS["Filters:\n- session limit (8 msgs)\n- anti-spam (processing)"]
-    FILTERS --> DELAY["⏳ Delay\ncomputeDelay()"]
+    SLEEP -->|"awake"| FILTERS["Filters:<br/>- session limit (8 msgs)<br/>- anti-spam (processing)"]
+    FILTERS --> DELAY["⏳ Delay<br/>computeDelay()"]
 
-    DELAY --> REACT["Reaction ?\n2-8% depending on type"]
-    REACT --> LLM["🤖 askLLM()\n3 possible backends"]
+    DELAY --> REACT["Reaction ?<br/>2-8% depending on type"]
+    REACT --> LLM["🤖 askLLM()<br/>3 possible backends"]
 
-    LLM --> STREAM["Word-by-word emission\n20-80ms between words"]
-    STREAM --> FLUSH["Send in batches\n(1 newline = 1 message)"]
-    FLUSH --> TTS["🗣️ Voice message ?\n(8-12%)"]
-    TTS --> TYPO["✍️ Typo ?\n(6%)"]
+    LLM --> STREAM["Word-by-word emission<br/>20-80ms between words"]
+    STREAM --> FLUSH["Send in batches<br/>(1 newline = 1 message)"]
+    FLUSH --> TTS["🗣️ Voice message ?<br/>(8-12%)"]
+    TTS --> TYPO["✍️ Typo ?<br/>(6%)"]
     TYPO --> DONE["✔️ Response sent"]
 
     FUP -->|"yes"| DELAY

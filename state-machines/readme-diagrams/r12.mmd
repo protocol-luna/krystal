@@ -12,9 +12,9 @@ stateDiagram-v2
 
     LOOKUP --> UNKNOWN: unknown emoji
     UNKNOWN --> LISTENING
-    LOOKUP --> STOP: "❌" → resetLLM()\nclearCooldown()\nsetPaused(true)
+    LOOKUP --> STOP: "❌" → resetLLM()<br/>clearCooldown()<br/>setPaused(true)
     LOOKUP --> START: "▶️" → setPaused(false)
-    LOOKUP --> CLEAR: "🗑️" → resetLLM()\nclearCooldown()
+    LOOKUP --> CLEAR: "🗑️" → resetLLM()<br/>clearCooldown()
 
     STOP --> REACT_OK: ✅
     START --> REACT_OK

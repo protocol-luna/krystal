@@ -14,18 +14,18 @@ flowchart LR
     end
 
     subgraph "Event Bus"
-        BUS["stateBus\nTypedBus<StateEvents>\n'state:changed'"]
+        BUS["stateBus<br/>TypedBus<StateEvents><br/>'state:changed'"]
     end
 
     subgraph "Persistence"
-        SCHED["scheduleSave()\ndebounce 500ms"]
-        WRITE["persistState()\n→ state.json"]
-        LOAD["loadState()\n→ state.json"]
+        SCHED["scheduleSave()<br/>debounce 500ms"]
+        WRITE["persistState()<br/>→ state.json"]
+        LOAD["loadState()<br/>→ state.json"]
     end
 
     subgraph "Startup"
-        RESTORE["restoreState()\n→ fill Maps"]
-        RESTORE_PEND["restorePending()\n→ API getMessage()"]
+        RESTORE["restoreState()<br/>→ fill Maps"]
+        RESTORE_PEND["restorePending()<br/>→ API getMessage()"]
     end
 
     PAUSE --> BUS

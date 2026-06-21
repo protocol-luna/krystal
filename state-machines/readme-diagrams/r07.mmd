@@ -1,20 +1,20 @@
 flowchart TD
-    START(["Timer 5min"]) --> CHANCE{"Math.random() <\nspontaneousChance (12%) ?"}
+    START(["Timer 5min"]) --> CHANCE{"Math.random() <<br/>spontaneousChance (12%) ?"}
     CHANCE -->|"no"| WAIT(["Next cycle"])
     CHANCE -->|"yes"| BUSY{"isLLMBusy() ?"}
     BUSY -->|"yes"| WAIT
 
-    BUSY -->|"no"| PICK["pickWeightedGuild(client)\nWhitelist filter\nSort by lastMessageID\nDecreasing linear weight"]
+    BUSY -->|"no"| PICK["pickWeightedGuild(client)<br/>Whitelist filter<br/>Sort by lastMessageID<br/>Decreasing linear weight"]
 
     PICK --> SELECTED{"Channel found ?"}
     SELECTED -->|"no"| WAIT
-    SELECTED -->|"yes"| FETCH["fetchContext(channel, N)\ngetMessages({limit: 5})\n→ username: content"]
+    SELECTED -->|"yes"| FETCH["fetchContext(channel, N)<br/>getMessages({limit: 5})<br/>→ username: content"]
 
     FETCH --> RESET["resetLLM() → /clear"]
-    RESET --> PROMPT["Build prompt:\n'Join the conversation...'"]
+    RESET --> PROMPT["Build prompt:<br/>'Join the conversation...'"]
 
     PROMPT --> ASK["askLLM({username: 'system', text})"]
-    ASK --> REPLY{"reply.trim()\nnon-empty ?"}
+    ASK --> REPLY{"reply.trim()<br/>non-empty ?"}
     REPLY -->|"no"| EMPTY["log: empty response"]
     REPLY -->|"yes"| SEND["createMessage(channel, reply)"]
     SEND --> MARK["markBotActivity(channel.id)"]

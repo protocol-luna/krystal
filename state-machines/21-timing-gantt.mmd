@@ -3,7 +3,7 @@ gantt
     dateFormat  X
     axisFormat %s
 
-    section Evaluation & Filtres
+    section Evaluation & Filters
     messageCreate received      :0, 1
     skip bot author              :0, 1
     eval trigger                 :1, 2
@@ -17,7 +17,7 @@ gantt
     computeDelay (base 800-4000) :crit, 3, 60
     setTimeout delay             :crit, 63, 223
 
-    section Reaction optionnelle
+    section Optional reaction
     shouldReact ?                :63, 1
     addReaction (API)            :64, 10
 
@@ -32,7 +32,7 @@ gantt
     flush message 2              :crit, 750, 15
     residual flush               :crit, 765, 15
 
-    section TTS (optionnel)
+    section TTS (optional)
     shouldSendVoice ?            :570, 2
     TTS pipeline (synthese)      :crit, 572, 150
     upload Discord               :crit, 722, 50

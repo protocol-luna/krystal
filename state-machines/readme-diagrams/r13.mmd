@@ -60,7 +60,7 @@ sequenceDiagram
                     bot.ts->>trigger.ts: markBotActivity()
                     Note over state.ts: stateBus.emit("state:changed")
                 end
-                alt residual flush (last line without \n)
+                alt residual flush (last line without <br/>)
                     bot.ts->>Discord: createMessage(buffer)
                 end
                 alt LLM error

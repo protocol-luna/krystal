@@ -3,10 +3,10 @@ flowchart TD
     BOT_AUTHOR -->|"yes"| SKIP["❌ Ignored (other bot)"]
 
     BOT_AUTHOR -->|"no"| TEXT_CMD{"Text message ?"}
-    TEXT_CMD -->|"-stop"| STOPCMD["setPaused(true)\nresetLLM()\n✅"]
-    TEXT_CMD -->|"-start"| STARTCMD["setPaused(false)\n✅"]
-    TEXT_CMD -->|"-clear"| CLEARCMD["resetLLM()\nclearCooldown()\n✅"]
-    TEXT_CMD -->|"other"| MENTION{"@mentions\nbotId ?"}
+    TEXT_CMD -->|"-stop"| STOPCMD["setPaused(true)<br/>resetLLM()<br/>✅"]
+    TEXT_CMD -->|"-start"| STARTCMD["setPaused(false)<br/>✅"]
+    TEXT_CMD -->|"-clear"| CLEARCMD["resetLLM()<br/>clearCooldown()<br/>✅"]
+    TEXT_CMD -->|"other"| MENTION{"@mentions<br/>botId ?"}
 
     MENTION -->|"yes"| SET_PAUSED_OFF["setPaused(false)"]
     SET_PAUSED_OFF --> RESPOND["✅ reason=mention"]
@@ -21,19 +21,19 @@ flowchart TD
     PAUSED_CHECK -->|"no"| COOLDOWN{"isOnCooldown() ?"}
     COOLDOWN -->|"yes"| CD_IGN["❌ Cooldown active"]
 
-    COOLDOWN -->|"no"| NAME_CHECK{"Bot name\nin message ?"}
+    COOLDOWN -->|"no"| NAME_CHECK{"Bot name<br/>in message ?"}
     NAME_CHECK -->|"yes"| MARK_REPLIED["markReplied()"]
     MARK_REPLIED --> RESPOND_NAME["✅ reason=name"]
 
-    NAME_CHECK -->|"no"| KW_CHECK{"Keyword\ndetected ?"}
+    NAME_CHECK -->|"no"| KW_CHECK{"Keyword<br/>detected ?"}
     KW_CHECK -->|"yes"| MARK_KW["markReplied()"]
     MARK_KW --> RESPOND_KW["✅ reason=keyword"]
 
-    KW_CHECK -->|"no"| RANDOM_ROLL{"1.5% random\nchance ?"}
+    KW_CHECK -->|"no"| RANDOM_ROLL{"1.5% random<br/>chance ?"}
     RANDOM_ROLL -->|"yes"| MARK_RANDOM["markReplied()"]
     MARK_RANDOM --> RESPOND_RANDOM["✅ reason=random"]
 
-    RANDOM_ROLL -->|"no (98.5%)"| TRACK_USER["trackSpeaker(user)\nwithout responding"]
+    RANDOM_ROLL -->|"no (98.5%)"| TRACK_USER["trackSpeaker(user)<br/>without responding"]
 
     RESPOND --> SLEEP_GATE
     RESPOND_DM --> SLEEP_GATE
@@ -45,31 +45,31 @@ flowchart TD
     CHECK_SLEEP_BEH -->|"sleep + not mention/dm"| SLEEP_IGNORE["😴 Ignored (sleep)"]
     CHECK_SLEEP_BEH -->|"slow / short / null"| SESSION_CHECK
 
-    SESSION_CHECK --> SESSION_PAUSED{"sessionPaused\non this channel ?"}
-    SESSION_PAUSED -->|"yes"| QUEUE_MSG["📥 Queued\n(30s session pause)"]
-    SESSION_PAUSED -->|"no"| EXPIRE_CHECK{"sessionResetMinutes\nexpired ?"}
+    SESSION_CHECK --> SESSION_PAUSED{"sessionPaused<br/>on this channel ?"}
+    SESSION_PAUSED -->|"yes"| QUEUE_MSG["📥 Queued<br/>(30s session pause)"]
+    SESSION_PAUSED -->|"no"| EXPIRE_CHECK{"sessionResetMinutes<br/>expired ?"}
     EXPIRE_CHECK -->|"yes"| RESET_COUNTER["sessionCounts.delete(cid)"]
     EXPIRE_CHECK -->|"no"| IGNORE_ROLL
     RESET_COUNTER --> IGNORE_ROLL
 
-    IGNORE_ROLL -->|"shouldIgnore()\n+30% on short"| IGNORED["🙈 Ignored"]
-    IGNORE_ROLL --> FORGET_ROLL{"forgetChance\n3% ?"}
+    IGNORE_ROLL -->|"shouldIgnore()<br/>+30% on short"| IGNORED["🙈 Ignored"]
+    IGNORE_ROLL --> FORGET_ROLL{"forgetChance<br/>3% ?"}
     FORGET_ROLL -->|"yes"| FORGOTTEN["💀 Forgotten"]
     FORGET_ROLL -->|"no"| LOG_REACT
 
-    LOG_REACT["logAndReact()\nsetTimeout + reaction"] --> WAIT_DELAY["⏳ computeDelay()\nreal wait"]
+    LOG_REACT["logAndReact()<br/>setTimeout + reaction"] --> WAIT_DELAY["⏳ computeDelay()<br/>real wait"]
     WAIT_DELAY --> TRIGGER_REPLY["triggerLunaReply()"]
 
     TRIGGER_REPLY --> PROCESSING_CHECK{"processing.has(key) ?"}
-    PROCESSING_CHECK -->|"yes"| QUEUE_PENDING["📥 Queued\n(already processing)"]
+    PROCESSING_CHECK -->|"yes"| QUEUE_PENDING["📥 Queued<br/>(already processing)"]
     PROCESSING_CHECK -->|"no"| MARK_P["markProcessing()"]
 
-    MARK_P --> LLM_FLOW["🤖 askLLM()\nstreaming tokens..."]
+    MARK_P --> LLM_FLOW["🤖 askLLM()<br/>streaming tokens..."]
 
     LLM_FLOW --> CHECK_SESSION_LIMIT["checkSessionLimit()"]
     CHECK_SESSION_LIMIT --> UNDER_LIMIT["✅ Session OK"]
-    CHECK_SESSION_LIMIT --> PAUSE_SESSION["⏸️ Pause 30s\n then drainSessionQueue()"]
-    UNDER_LIMIT --> DRAIN_PENDING["drainPending() →\nnext message ?"]
+    CHECK_SESSION_LIMIT --> PAUSE_SESSION["⏸️ Pause 30s<br/> then drainSessionQueue()"]
+    UNDER_LIMIT --> DRAIN_PENDING["drainPending() →<br/>next message ?"]
     DRAIN_PENDING -->|"yes"| TRIGGER_REPLY
     DRAIN_PENDING -->|"no"| DONE["✅ Done"]
 

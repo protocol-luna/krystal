@@ -1,18 +1,18 @@
 flowchart TD
     START(["sendTextAsVoiceMessage()"]) --> READY{"isTTSReady() ?"}
-    READY -->|"no"| WARN["⚠️ Piper not ready\nskip"]
-    READY -->|"yes"| SANITIZE["sanitizeForTTS()\nmentions→@user, URLs removed\nemoji removed, truncated 500 char."]
-    SANITIZE --> UNSAFE{"hasUnsafeTTSText ?\n(Unicode ranges)"}
+    READY -->|"no"| WARN["⚠️ Piper not ready<br/>skip"]
+    READY -->|"yes"| SANITIZE["sanitizeForTTS()<br/>mentions→@user, URLs removed<br/>emoji removed, truncated 500 char."]
+    SANITIZE --> UNSAFE{"hasUnsafeTTSText ?<br/>(Unicode ranges)"}
     UNSAFE -->|"yes"| BRUTE["Send as plain text"]
-    UNSAFE -->|"no"| SYNTH["Piper TTS synthesize()\n→ WAV Buffer"]
-    SYNTH --> OGG["ffmpeg WAV→OGG\nlibopus, 32k, 24kHz, mono"]
+    UNSAFE -->|"no"| SYNTH["Piper TTS synthesize()<br/>→ WAV Buffer"]
+    SYNTH --> OGG["ffmpeg WAV→OGG<br/>libopus, 32k, 24kHz, mono"]
 
-    OGG --> DURATION["ffprobe → duration\n(seconds)"]
-    DURATION --> WAVEFORM["buildWaveformBase64()\n256-point sine"]
+    OGG --> DURATION["ffprobe → duration<br/>(seconds)"]
+    DURATION --> WAVEFORM["buildWaveformBase64()<br/>256-point sine"]
 
-    WAVEFORM --> UPLOAD_1["1. POST /attachments\n→ upload_url + filename"]
+    WAVEFORM --> UPLOAD_1["1. POST /attachments<br/>→ upload_url + filename"]
     UPLOAD_1 --> UPLOAD_2["2. PUT ogg → CDN URL"]
-    UPLOAD_2 --> UPLOAD_3["3. POST message\nflags=8192 (voice)"]
+    UPLOAD_2 --> UPLOAD_3["3. POST message<br/>flags=8192 (voice)"]
 
     UPLOAD_3 --> DONE_TTS["✅ Voice message sent"]
 
