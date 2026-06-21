@@ -64,7 +64,6 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 			typoCorrectionDelay: 0,
 			typoCorrectionDelayMax: 0,
 			typoCorrectionStyle: "mixed",
-			typingWpm: 300,
 			hesitationChance: 0,
 			hesitationWords: [
 				"uh...",

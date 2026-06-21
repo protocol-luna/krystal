@@ -9,7 +9,6 @@ describe("config getters", () => {
 		expect(config.keywords.length).toBeGreaterThan(0);
 		expect(config.cooldownSeconds).toBe(0);
 		expect(config.randomChance).toBe(0.015);
-		expect(config.typingWpm).toBe(300);
 	});
 
 	it("loads names from override", async () => {
@@ -86,12 +85,6 @@ describe("config getters", () => {
 		expect(config.timeSchedules).toHaveLength(1);
 		expect(config.timeSchedules[0].start).toBe("22:00");
 		expect(config.timeSchedules[0].behavior).toBe("sleep");
-	});
-
-	it("reads typing WPM", async () => {
-		mockConfig({ typingWpm: 150 });
-		const { config } = await import("../src/config.js");
-		expect(config.typingWpm).toBe(150);
 	});
 
 	it("reads hesitation config", async () => {

@@ -142,11 +142,6 @@ typo_correction_style: "mixed"
 # Style de correction des fautes : "edit" (édite tout le message), "message" (envoie "mot*"),
 # ou "mixed" (50/50 aléatoire).
 
-# --- Typing speed (WPM) — vitesse de frappe simulée entre les chunks ---
-typing_wpm: 300
-# Délai entre chunks calculé à partir de la longueur du chunk et de la vitesse WPM.
-# 300 WPM = ~60ms par mot, ajustable selon la réactivité souhaitée.
-
 # --- Inactivity warmup — délai plus long si le bot n'a pas parlé depuis longtemps ---
 inactivity_warmup_minutes: 10
 inactivity_warmup_multiplier: 2

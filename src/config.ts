@@ -345,9 +345,6 @@ export const config = {
 	get typoCorrectionStyle(): "edit" | "message" | "mixed" {
 		return v<"edit" | "message" | "mixed">("typo_correction_style", "mixed");
 	},
-	get typingWpm(): number {
-		return v<number>("typing_wpm", 300);
-	},
 	get hesitationChance(): number {
 		return v<number>("hesitation_chance", 0.15);
 	},
