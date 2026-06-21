@@ -405,6 +405,15 @@ export const config = {
 	get dynamicStatusIntervalMinutes(): number {
 		return v<number>("dynamic_status_interval_minutes", 15);
 	},
+	get sessionMessageLimit(): number {
+		return v<number>("session_message_limit", 8);
+	},
+	get sessionPauseSeconds(): number {
+		return v<number>("session_pause_seconds", 30);
+	},
+	get sessionResetMinutes(): number {
+		return v<number>("session_reset_minutes", 3);
+	},
 	get replyStyles(): { style: ReplyStyle; weight: number }[] {
 		const raw = v<ReplyStyleEntry[]>("reply_styles", [
 			{ message_reference: true, mention_replied_user: false, weight: 50 },

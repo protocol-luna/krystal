@@ -47,6 +47,28 @@ import {
 } from "./bot/pending.js";
 import { handleReactionCommand } from "./bot/reactions.js";
 
+const sessionCounts = new Map<string, number>();
+const sessionPaused = new Set<string>();
+const sessionLastMessage = new Map<string, number>();
+
+// --- Session limit (after replying) ---
+function checkSessionLimit(channelId: string, callback: () => void): void {
+	const count = (sessionCounts.get(channelId) ?? 0) + 1;
+	sessionCounts.set(channelId, count);
+	if (count >= config.sessionMessageLimit) {
+		sessionPaused.add(channelId);
+		console.log(
+			`[bot] session limit atteinte (${count}), pause ${config.sessionPauseSeconds}s`
+		);
+		setTimeout(() => {
+			sessionPaused.delete(channelId);
+			sessionCounts.delete(channelId);
+			callback();
+			console.log("[bot] session reprise, contexte vidé");
+		}, config.sessionPauseSeconds * 1000);
+	}
+}
+
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: [
 		"guilds",
@@ -440,6 +462,19 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		return;
 	}
 
+	const cid = message.channel.id;
+
+	if (sessionPaused.has(cid)) {
+		console.log(`[bot] #${channelName} ${author}: ignoré (session pause)`);
+		return;
+	}
+
+	const lastMsg = sessionLastMessage.get(cid);
+	if (lastMsg && Date.now() - lastMsg > config.sessionResetMinutes * 60000) {
+		sessionCounts.delete(cid);
+	}
+	sessionLastMessage.set(cid, Date.now());
+
 	if (result.shouldRespond) {
 		trackSpeaker(message.channel.id, message.author.id);
 		if (shouldIgnore(result.reason, sleepBehavior)) {
@@ -462,6 +497,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		);
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
+		checkSessionLimit(cid, () => { void resetLLM(); });
 		return;
 	}
 
@@ -489,6 +525,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		}
 
 		await triggerLunaReply(message, isDM, "follow-up");
+		checkSessionLimit(cid, () => { void resetLLM(); });
 	}
 
 	trackSpeaker(message.channel.id, message.author.id);

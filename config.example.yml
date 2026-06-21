@@ -205,6 +205,14 @@ time_schedules:
     end: "07:00"
     behavior: "sleep"
 
+# --- Session limit (pause after N exchanges) ---
+session_message_limit: 8
+# Nombre max d'échanges avant une pause. Le bot ignore les messages dans le
+# channel pendant session_pause_seconds secondes, puis appelle /clear.
+session_pause_seconds: 30
+session_reset_minutes: 3
+# Si personne ne parle dans le channel pendant reset_minutes, le compteur se remet à zéro.
+
 # --- TTS / Voice messages ---
 voice_message_chance: 0.12
 # Probabilité qu'une réponse soit envoyée sous forme de message vocal (fichier audio)
