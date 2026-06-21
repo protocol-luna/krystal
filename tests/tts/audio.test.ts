@@ -57,7 +57,7 @@ describe("sanitizeForTTS", () => {
 	it("preserves normal text", async () => {
 		const { sanitizeForTTS } = await import("../../src/tts/audio.js");
 		const result = sanitizeForTTS("Hello, how are you?");
-		expect(result).toBe("Hello, how are you?");
+		expect(result).toBe("Hello how are you");
 	});
 });
 

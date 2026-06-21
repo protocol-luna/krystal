@@ -117,8 +117,12 @@ async function triggerLunaReply(
 		if (isVoice && !hasUnsafeTTSText(fullText)) {
 			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
 		} else {
-			let typoState: TypoCorrectionState | null = null;
+			const messages = fullText
+				.split("\n")
+				.map((l) => l.trim())
+				.filter(Boolean);
 
+			let typoState: TypoCorrectionState | null = null;
 			if (
 				config.typoChance > 0 &&
 				Math.random() < config.typoChance &&
@@ -136,24 +140,31 @@ async function triggerLunaReply(
 				}
 			}
 
+			let globalWordIdx = 0;
+
+			const hasHesitation =
+				chunks.length > 0 && Math.random() < config.hesitationChance;
+
+			const wordDelay = (w: string): number => {
+				const cpm = config.typingWpm * 5;
+				const baseDelay = (w.length / cpm) * 60000;
+				return Math.max(80, baseDelay * (0.5 + Math.random() * 0.5));
+			};
+
 			let isFirstChunk = true;
 			let typoMessageId: string | null = null;
 
-			if (chunks.length > 0 && Math.random() < config.hesitationChance) {
-				const words = config.hesitationWords;
-				const word = words[Math.floor(Math.random() * words.length)];
-				chunks[0] = `${word} `;
-			}
-
-			for (const chunk of chunks) {
-				if (!isFirstChunk) {
-					const cpm = config.typingWpm * 5;
-					const baseDelay = (chunk.length / cpm) * 60000;
-					const delay = baseDelay * (0.5 + Math.random() * 0.5);
-					await new Promise((r) => setTimeout(r, delay));
+			for (const msg of messages) {
+				const msgWords = msg.split(/\s+/).filter(Boolean);
+				for (let i = 0; i < msgWords.length; i++) {
+					if (globalWordIdx > 0 || (globalWordIdx === 0 && hasHesitation)) {
+						await new Promise((r) => setTimeout(r, wordDelay(msgWords[i])));
+					}
+					globalWordIdx++;
 				}
+
 				const sent = await client.createMessage(message.channel.id, {
-					content: chunk,
+					content: msg,
 					...(isFirstChunk && refStyle.messageReference
 						? {
 								messageReference: { messageID: message.id },

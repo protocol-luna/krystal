@@ -162,11 +162,7 @@ function handleStdout(data: Buffer): void {
 			.map((l) => l.trim())
 			.filter(Boolean);
 		for (const l of lines) {
-			if (!hasSentFirstToken) {
-				hasSentFirstToken = true;
-				currentItem?.onFirstToken?.();
-			}
-			llmBus.emit("token", l);
+			emitWordTokens(l);
 			currentItem?.onChunk?.(l);
 		}
 		llmBus.emit("done", cleaned);
@@ -177,23 +173,23 @@ function handleStdout(data: Buffer): void {
 		return;
 	}
 
-	const lastNewline = stdoutBuffer.lastIndexOf("\n");
-	if (lastNewline === -1) {
+	let newlineIdx = stdoutBuffer.indexOf("\n");
+	if (newlineIdx === -1) {
 		return;
 	}
 
-	const chunk = stdoutBuffer.slice(0, lastNewline);
-	stdoutBuffer = stdoutBuffer.slice(lastNewline + 1);
+	do {
+		const chunk = stdoutBuffer.slice(0, newlineIdx);
+		stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
 
-	const cleaned = cleanLine(chunk);
-	if (cleaned) {
-		if (!hasSentFirstToken) {
-			hasSentFirstToken = true;
-			currentItem?.onFirstToken?.();
+		const cleaned = cleanLine(chunk);
+		if (cleaned) {
+			emitWordTokens(cleaned);
+			currentItem?.onChunk?.(cleaned);
 		}
-		llmBus.emit("token", cleaned);
-		currentItem?.onChunk?.(cleaned);
-	}
+
+		newlineIdx = stdoutBuffer.indexOf("\n");
+	} while (newlineIdx !== -1);
 }
 
 function cliRequest(item: QueueItem): void {
@@ -278,12 +274,8 @@ async function serverRequest(item: QueueItem): Promise<void> {
 					};
 					const content = data.content ?? "";
 					if (content) {
-						if (!hasSentFirstToken) {
-							hasSentFirstToken = true;
-							currentItem?.onFirstToken?.();
-						}
 						fullText += content;
-						llmBus.emit("token", content);
+						emitWordTokens(content);
 						currentItem?.onChunk?.(content);
 					}
 					if (data.stop) {
@@ -306,6 +298,17 @@ async function serverRequest(item: QueueItem): Promise<void> {
 
 // --- Proxy backend (HTTP → llm-server.ts) ---
 
+function emitWordTokens(chunk: string): void {
+	const words = chunk.split(/\s+/).filter(Boolean);
+	for (const word of words) {
+		if (!hasSentFirstToken) {
+			hasSentFirstToken = true;
+			currentItem?.onFirstToken?.();
+		}
+		llmBus.emit("token", word);
+	}
+}
+
 async function proxyRequest(item: QueueItem): Promise<void> {
 	try {
 		const { askLLM: askLLMClient } = await import("./llm-client.js");
@@ -317,7 +320,7 @@ async function proxyRequest(item: QueueItem): Promise<void> {
 				}
 			},
 			onChunk: (chunk: string) => {
-				llmBus.emit("token", chunk);
+				emitWordTokens(chunk);
 				currentItem?.onChunk?.(chunk);
 			},
 		});

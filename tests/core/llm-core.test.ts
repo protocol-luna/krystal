@@ -65,7 +65,7 @@ describe("askLLM", () => {
 				},
 			}
 		);
-		expect(firstToken).toBeFalse(); // proxy mode uses llm-client which calls onChunk then onDone
+		expect(firstToken).toBeTrue(); // first word token triggers onFirstToken via emitWordTokens
 		expect(chunks).toEqual(["Hello"]);
 		expect(text).toBe("Hello");
 		globalThis.fetch = orig;
