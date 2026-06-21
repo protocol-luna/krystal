@@ -10,7 +10,7 @@ for f in state-machines/[0-9][0-9]-*.mmd; do
   bunx mmdc \
     -i "$f" \
     -o "$OUTDIR/$base.svg" \
-    -b "#1e1e2e"
+    --backgroundColor transparent
 done
 
 echo "Done — $(ls "$OUTDIR"/*.svg | wc -l) SVGs exported"

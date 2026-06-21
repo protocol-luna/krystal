@@ -1,4 +1,3 @@
-%%{init: {"theme":"dark"}}%%
 flowchart TD
     START(["getSleepBehavior()"]) --> SCHED{"timeSchedules\nexists ?"}
     SCHED -->|"no"| AWAKE["return null\n(permanently awake)"]

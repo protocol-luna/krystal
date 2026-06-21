@@ -1,4 +1,3 @@
-%%{init: {"theme":"dark"}}%%
 flowchart TD
     START(["getSleepBehavior()"]) -->     CHECK_SCHED{"timeSchedules<br/>exists and non-empty ?"}
     CHECK_SCHED -->|"no"| NULL_RETURN["return null (always awake)"]

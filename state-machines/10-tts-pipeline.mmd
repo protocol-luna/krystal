@@ -1,4 +1,3 @@
-%%{init: {"theme":"dark"}}%%
 flowchart TD
     START(["sendTextAsVoiceMessage()"]) --> TTS_READY{"isTTSReady() ?"}
     TTS_READY -->|"non"| WARN_NO_TTS["Piper not ready<br/>skip voice message"]
