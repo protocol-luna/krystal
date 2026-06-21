@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import fs from "node:fs";
+import { unlink, writeFile, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ffmpegPath, ffprobePath } from "../config.js";
@@ -29,7 +29,7 @@ export async function wavToOgg(wavBuf: Buffer): Promise<Buffer> {
 	const tmpWav = path.join(os.tmpdir(), `piper_${Date.now()}.wav`);
 	const tmpOgg = path.join(os.tmpdir(), `piper_${Date.now()}.ogg`);
 	try {
-		fs.writeFileSync(tmpWav, wavBuf);
+		await writeFile(tmpWav, wavBuf);
 		await new Promise<void>((resolve, reject) => {
 			execFile(
 				ffmpegPath,
@@ -50,27 +50,17 @@ export async function wavToOgg(wavBuf: Buffer): Promise<Buffer> {
 				(err) => (err ? reject(err) : resolve())
 			);
 		});
-		return fs.readFileSync(tmpOgg);
+		return await readFile(tmpOgg);
 	} finally {
-		try {
-			fs.unlinkSync(tmpWav);
-		} catch {
-			/* ignore */
-		}
-		try {
-			if (fs.existsSync(tmpOgg)) {
-				fs.unlinkSync(tmpOgg);
-			}
-		} catch {
-			/* ignore */
-		}
+		await unlink(tmpWav).catch(() => {});
+		await unlink(tmpOgg).catch(() => {});
 	}
 }
 
 export async function getAudioDuration(oggBuf: Buffer): Promise<number> {
 	const tmpOgg = path.join(os.tmpdir(), `dur_${Date.now()}.ogg`);
 	try {
-		fs.writeFileSync(tmpOgg, oggBuf);
+		await writeFile(tmpOgg, oggBuf);
 		const duration = await new Promise<number>((resolve, reject) => {
 			execFile(
 				ffprobePath,
@@ -91,13 +81,7 @@ export async function getAudioDuration(oggBuf: Buffer): Promise<number> {
 	} catch {
 		return Math.max(1, Math.ceil(oggBuf.byteLength / 8000));
 	} finally {
-		try {
-			if (fs.existsSync(tmpOgg)) {
-				fs.unlinkSync(tmpOgg);
-			}
-		} catch {
-			/* ignore */
-		}
+		await unlink(tmpOgg).catch(() => {});
 	}
 }
 

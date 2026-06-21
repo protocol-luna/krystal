@@ -135,7 +135,7 @@ describe("persistState", () => {
 		});
 		const parsed = JSON.parse(written);
 		expect(parsed.pendingMessages).toHaveLength(1);
-		expect(parsed.pendingMessages[0].channelId).toBe("c1");
+		expect(parsed.pendingMessages[0].channelId).toBe("123");
 	});
 });
 
