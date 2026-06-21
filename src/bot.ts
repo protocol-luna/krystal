@@ -57,15 +57,15 @@ const sessionQueue = new Map<
 
 function drainSessionQueue(channelId: string): void {
 	const queued = sessionQueue.get(channelId);
-	if (!queued || queued.length === 0) return;
+	if (!queued || queued.length === 0) { return; }
 	sessionQueue.delete(channelId);
 	const next = queued.shift()!;
-	if (queued.length > 0) sessionQueue.set(channelId, queued);
+	if (queued.length > 0) { sessionQueue.set(channelId, queued); }
 	console.log(
 		`[bot] session queue: reprise du message en attente dans #${channelId}`
 	);
 	void triggerLunaReply(next.message, next.isDM, next.reason).then(() => {
-		if (!sessionPaused.has(channelId)) drainSessionQueue(channelId);
+		if (!sessionPaused.has(channelId)) { drainSessionQueue(channelId); }
 	});
 }
 
