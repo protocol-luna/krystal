@@ -154,13 +154,17 @@ async function triggerLunaReply(
 
 		const willBurst = !isVoice && Math.random() < config.burstChance;
 
-		function sendFragments(parts: string[], hasRef: boolean): void {
-			let accDelay = 0;
-			for (let i = 0; i < parts.length; i++) {
-				const frag = parts[i];
-				if (!frag) {
-					continue;
-				}
+function stripLlmPrefix(text: string): string {
+	return text.replace(/^[^:]+:\s*/, "");
+}
+
+function sendFragments(parts: string[], hasRef: boolean): void {
+	let accDelay = 0;
+	for (let i = 0; i < parts.length; i++) {
+		const frag = stripLlmPrefix(parts[i]);
+		if (!frag) {
+			continue;
+		}
 				if (i === 0) {
 					const content = hesitationWord ? `${hesitationWord} ${frag}` : frag;
 					hesitationWord = "";
@@ -270,7 +274,11 @@ async function triggerLunaReply(
 
 		// voice TTS
 		if (isVoice && !hasUnsafeTTSText(fullText)) {
-			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
+			await sendTextAsVoiceMessage(
+				message.channel.id,
+				message.id,
+				stripLlmPrefix(fullText)
+			);
 		}
 
 		// typo correction: sending correction message
