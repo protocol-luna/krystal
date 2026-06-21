@@ -62,7 +62,35 @@ let restartCount = 0;
 const MAX_RESTARTS = 5;
 let restartDelay = 1_000;
 
+let currentDoneHandler: ((text: string) => void) | null = null;
+
 const LLM_BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+
+function handleStderr(data: Buffer): void {
+	const msg = data.toString();
+	if (
+		msg.toLowerCase().includes("error") ||
+		msg.toLowerCase().includes("failed")
+	) {
+		process.stderr.write(msg);
+	}
+}
+
+function handleClose(code: number | null): void {
+	if (shutdownRequested) {
+		console.log("[llm-core] llama-cli arrêté proprement");
+		return;
+	}
+	console.error(`[llm-core] llama-cli crashé (code=${code}), redémarrage...`);
+	llmBus.emit("crash", code);
+	scheduleRestart();
+}
+
+function handleError(err: Error): void {
+	console.error(`[llm-core] erreur spawn: ${err.message}`);
+	llmBus.emit("error", err);
+	scheduleRestart();
+}
 
 function ensureLLM(): void {
 	if (initialized) {
@@ -81,6 +109,11 @@ function spawnLlama(): void {
 	if (LLM_MODE !== "cli") {
 		return;
 	}
+
+	llama?.removeAllListeners();
+	llama?.kill();
+	llama = undefined;
+
 	console.log(`[llm-core] spawn: ${LLAMA_CLI_PATH} ${llamaArgs.join(" ")}`);
 	llama = spawn(LLAMA_CLI_PATH, llamaArgs);
 
@@ -89,32 +122,9 @@ function spawnLlama(): void {
 	isProcessing = false;
 
 	llama.stdout!.on("data", handleStdout);
-
-	llama.stderr!.on("data", (data: Buffer) => {
-		const msg = data.toString();
-		if (
-			msg.toLowerCase().includes("error") ||
-			msg.toLowerCase().includes("failed")
-		) {
-			process.stderr.write(msg);
-		}
-	});
-
-	llama.on("close", (code: number | null) => {
-		if (shutdownRequested) {
-			console.log("[llm-core] llama-cli arrêté proprement");
-			return;
-		}
-		console.error(`[llm-core] llama-cli crashé (code=${code}), redémarrage...`);
-		llmBus.emit("crash", code);
-		scheduleRestart();
-	});
-
-	llama.on("error", (err: Error) => {
-		console.error(`[llm-core] erreur spawn: ${err.message}`);
-		llmBus.emit("error", err);
-		scheduleRestart();
-	});
+	llama.stderr!.on("data", handleStderr);
+	llama.on("close", handleClose);
+	llama.on("error", handleError);
 }
 
 function scheduleRestart(): void {
@@ -445,25 +455,35 @@ function processQueue(): void {
 		setTimeout(() => processQueue(), 100);
 	};
 
-	const doneHandler = (text: string) => {
-		llmBus.off("done", doneHandler);
+	currentDoneHandler = (text: string) => {
+		llmBus.off("done", currentDoneHandler!);
+		currentDoneHandler = null;
 		finish(text);
 	};
-	llmBus.on("done", doneHandler);
+	llmBus.on("done", currentDoneHandler);
 
 	if (LLM_MODE === "server") {
 		void serverRequest(item).catch((err) => {
-			llmBus.off("done", doneHandler);
+			if (currentDoneHandler) {
+				llmBus.off("done", currentDoneHandler);
+				currentDoneHandler = null;
+			}
 			fail(err);
 		});
 	} else if (LLM_MODE === "proxy") {
 		void proxyRequest(item).catch((err) => {
-			llmBus.off("done", doneHandler);
+			if (currentDoneHandler) {
+				llmBus.off("done", currentDoneHandler);
+				currentDoneHandler = null;
+			}
 			fail(err);
 		});
 	} else if (LLM_MODE === "online") {
 		void onlineRequest(item).catch((err) => {
-			llmBus.off("done", doneHandler);
+			if (currentDoneHandler) {
+				llmBus.off("done", currentDoneHandler);
+				currentDoneHandler = null;
+			}
 			fail(err);
 		});
 	} else {
@@ -498,6 +518,12 @@ export async function resetLLM(): Promise<void> {
 	queueHead = 0;
 	isProcessing = false;
 	currentItem = null;
+
+	if (currentDoneHandler) {
+		llmBus.off("done", currentDoneHandler);
+		currentDoneHandler = null;
+	}
+
 	llmBus.emit("reset");
 
 	if (LLM_MODE === "server" || LLM_MODE === "online") {
