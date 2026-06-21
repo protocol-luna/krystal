@@ -51,11 +51,17 @@ function pickWeightedGuild(
 			(entry): entry is { guild: Eris.Guild; channel: Eris.TextChannel } =>
 				entry.channel !== undefined
 		)
-		.sort((a, b) =>
-			(b.channel.lastMessageID ?? "0").localeCompare(
-				a.channel.lastMessageID ?? "0"
-			)
-		);
+		.sort((a, b) => {
+			const aId = BigInt(a.channel.lastMessageID ?? "0");
+			const bId = BigInt(b.channel.lastMessageID ?? "0");
+			if (bId > aId) {
+				return 1;
+			}
+			if (bId < aId) {
+				return -1;
+			}
+			return 0;
+		});
 
 	if (ranked.length === 0) {
 		return null;
