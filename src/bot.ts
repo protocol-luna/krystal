@@ -80,6 +80,7 @@ async function triggerLunaReply(
 
 	let typingInterval: ReturnType<typeof setInterval> | null = null;
 	const startTyping = () => {
+		console.log("[bot] startTyping appelé");
 		client.sendChannelTyping(message.channel.id);
 		typingInterval = setInterval(() => {
 			client.sendChannelTyping(message.channel.id);
