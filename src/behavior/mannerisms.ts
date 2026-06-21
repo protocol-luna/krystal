@@ -43,6 +43,7 @@ export function computeDelay(
 	if (sleepBehavior === "slow") {
 		delay *= 3 + Math.random() * 2;
 	}
+	delay *= 0.5 + Math.random() * 1.5; // jitter agressif
 	console.log(
 		`[mannerisms] delay=${delay.toFixed(0)}ms (reason=${reason} sleep=${sleepBehavior ?? "none"} len=${msgLength ?? 0} idle=${inactivityMs ?? 0})`
 	);
