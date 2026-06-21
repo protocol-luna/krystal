@@ -303,35 +303,136 @@ Internal error → ❌ on the message (no public error message).
 
 ## Configuration
 
-Single `config.yml` file. Shell env vars override YAML keys if present. Hot-reload for dynamic values (triggers, delays, behaviors) -- no restart needed.
+Single `config.yml` file. Shell env vars override YAML keys if present. Hot-reload for dynamic values -- no restart needed.
 
-See `config.example.yml` for the exhaustive list: LLM, TTS, triggers, concentration, typos, WPM, hesitation, forget, inactivity warmup, dynamic status, sleep, spontaneous, reply styles.
+### Hot-reload legend
 
-### `system_prompt`
+| Icon | Meaning |
+|------|---------|
+| ✅ | Hot-reloadable -- changes picked up at runtime |
+| ❌ | Requires restart |
 
-Key `system_prompt` with the system prompt. Supports YAML multiline format (`|`).
+### Secrets & Paths (❌)
 
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `discord_token` | string | *(required)* | Discord bot token |
+| `llama_cli_path` | string | `"llama/llama-cli"` | Path to llama-cli binary |
+| `llama_model_path` | string | `"./models/Discord-Hermes-3-8B.Q2_K.gguf"` | Path to GGUF model |
+| `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
+| `llm_port` | number | `3124` | LLM port |
+| `llm_mode` | `"cli"`, `"server"`, `"proxy"` | `"proxy"` | `cli` → spawn llama-cli, `server` → HTTP llama-server, `proxy` → bot client via llm-server |
+| `tts_model_path` | string | `"./tts-engine/..."` | Piper TTS model (.onnx) |
+| `tts_binary_path` | string | `"bin/piper/piper"` | Piper binary path |
+| `ffmpeg_path` | string | `"bin/ffmpeg/ffmpeg"` | ffmpeg binary |
+| `ffprobe_path` | string | `"bin/ffmpeg/ffprobe"` | ffprobe binary |
+
+### System Prompt (❌)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `system_prompt` | string (YAML `\|`) | `"Your name is Luna..."` | System prompt for the LLM. Falls back to `prompt.txt` if unset. |
+
+### Triggers (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `names` | string[] | `["Luna", "Pixie"]` | Names the bot recognizes as its own (whole word) |
+| `keywords` | string[] | `["hello","hi","hey","yo","help","question","ai","llm","bot"]` | Keywords that trigger a response (whole word) |
+| `random_chance` | number | `0.015` | Probability (0.0-1.0) that a non-matching message triggers a response |
+| `cooldown_seconds` | number | `8` | Min seconds between two bot replies in the same channel |
+| `reply_in_dm` | boolean | `true` | Whether the bot responds to DMs |
+
+### Mannerisms -- Concentration (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `concentration` | object | *(see below)* | Per-trigger delays, ignore & reaction chances |
+
+Each trigger type supports:
 ```yaml
-discord_token: "your_token"
-llama_cli_path: "bin/llama/llama-cli"
-llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
-llm_host: "localhost"
-llm_port: 3124
-llm_mode: "cli"          # cli → spawn llama-cli, server → HTTP llama-server, proxy → bot client via llm-server
-system_prompt: |
-  You are Luna...
-tts_model_path: "./bin/piper/en_GB-southern_english_female-low.onnx"
-tts_binary_path: "bin/piper/piper"
-ffmpeg_path: "bin/ffmpeg/ffmpeg"
-ffprobe_path: "bin/ffmpeg/ffprobe"
-
-names: ["Luna", "Pixie"]
-keywords: ["hello", "hi", "hey", "yo", "ai", "bot"]
-typo_chance: 0.06
-voice_message_chance: 0.08
+concentration:
+  mention:      { delay_min: 300,  delay_max: 1500, ignore_chance: 0,    reaction_chance: 0.08 }
+  dm:           { delay_min: 400,  delay_max: 1800, ignore_chance: 0,    reaction_chance: 0.05 }
+  name:         { delay_min: 800,  delay_max: 4000, ignore_chance: 0.05, reaction_chance: 0.06 }
+  keyword:      { delay_min: 1000, delay_max: 3500, ignore_chance: 0.08, reaction_chance: 0.04 }
+  follow-up:    { delay_min: 500,  delay_max: 2000, ignore_chance: 0,    reaction_chance: 0.03 }
+  random:       { delay_min: 1500, delay_max: 5000, ignore_chance: 0.15, reaction_chance: 0.02 }
 ```
 
-**LLM parameters** (hardcoded in `src/config.ts`). ChatML template (`<|im_start|>/<|im_end|>`). Threads detected via `os.cpus().length`.
+### Reactions (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `server_emoji_chance` | number | `0.3` | Probability the reaction is a server custom emoji (vs standard) |
+| `reactions` | string[] | 14 standard emoji | List of unicode emojis for reactions |
+
+### Spontaneous Messages (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `spontaneous_interval_ms` | number | `300000` | Interval (ms) between spontaneous message attempts |
+| `spontaneous_chance` | number | `0.12` | Probability (0.0-1.0) that an attempt succeeds |
+| `spontaneous_context_messages` | number | `5` | Recent messages read for context |
+| `spontaneous_whitelist` | string | `"*"` | Comma-separated guild IDs allowed for spontaneous (`"*"` = all) |
+
+### Typos (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `typo_chance` | number | `0.06` | Probability a message contains a typo |
+| `typo_correction_delay_min` | number | `2000` | Min delay (ms) before correction |
+| `typo_correction_delay_max` | number | `4000` | Max delay (ms) before correction |
+| `typo_layout` | `"azerty"` \| `"qwerty"` | `"azerty"` | Keyboard layout for adjacent-key typos |
+| `typo_correction_style` | `"edit"` \| `"message"` \| `"mixed"` | `"mixed"` | Correction style: edit message, new `word*` message, or 50/50 |
+
+### Human-like Behaviors (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `hesitation_chance` | number | `0.15` | Probability of starting with a filler word |
+| `hesitation_words` | string[] | `["uh...","um...","well...","i mean...","hmm...","so..."]` | Filler word list |
+| `forget_chance` | number | `0.03` | Probability the bot forgets to respond even after trigger |
+| `inactivity_warmup_minutes` | number | `10` | Minutes of inactivity before warmup kicks in |
+| `inactivity_warmup_multiplier` | number | `2` | Delay multiplier after inactivity period |
+
+### Dynamic Status (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `dynamic_status_interval_minutes` | number | `15` | Rotation interval (minutes) between status presets |
+| `dynamic_status_presets` | object[] | `[]` (disabled) | Array of `{ status, text, type }`. type: 0=Playing, 1=Streaming, 2=Listening, 3=Watching, 4=Custom, 5=Competing |
+
+### Sleep Schedules (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `timezone` | string | `"Europe/Paris"` | IANA timezone for schedule evaluation |
+| `time_schedules` | object[] | `[]` (always active) | Array of `{ start, end, behavior? }` with `sleep`, `slow`, or `short` behavior |
+
+### Session Limits (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `session_message_limit` | number | `8` | Max exchanges before a pause |
+| `session_pause_seconds` | number | `30` | Pause duration (seconds) after limit hit |
+| `session_reset_minutes` | number | `3` | Idle time before session counter resets |
+
+### TTS / Voice Messages (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `voice_message_chance` | number | `0.08` | Probability a reply is sent as voice message instead of text |
+
+### Reply Styles (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `reply_styles` | object[] | Weighted 50/15/30/5 | Array of `{ message_reference, mention_replied_user, weight }` entries |
+
+### LLM Parameters (hardcoded in `src/config.ts`)
+
+ChatML template (`<|im_start|>/<|im_end|>`). Threads auto-detected via `os.cpus().length`.
 
 ```yaml
 temp: 0.75
