@@ -29,11 +29,28 @@ export function watchConfig(): void {
 				string,
 				unknown
 			>;
+			rebuildCache();
 			console.log("[config] hot-reloaded config.yml");
 		} catch (err) {
 			console.error("[config] failed to reload config.yml:", err);
 		}
 	});
+}
+
+// --- Hot-reload cache ---
+
+let cachedNames: string[] | null = null;
+let cachedKeywords: string[] | null = null;
+let cachedConcentration: ConcentrationThresholds | null = null;
+let cachedReactions: string[] | null = null;
+let cachedHesitationWords: string[] | null = null;
+
+function rebuildCache(): void {
+	cachedNames = null;
+	cachedKeywords = null;
+	cachedConcentration = null;
+	cachedReactions = null;
+	cachedHesitationWords = null;
 }
 
 // --- Static exports (require restart) ---
@@ -284,20 +301,26 @@ function mergeConcentration(
 
 export const config = {
 	get names(): string[] {
-		return v<string[]>("names", ["Luna", "Pixie"]);
+		if (!cachedNames) {
+			cachedNames = v<string[]>("names", ["Luna", "Pixie"]);
+		}
+		return cachedNames;
 	},
 	get keywords(): string[] {
-		return v<string[]>("keywords", [
-			"hello",
-			"hi",
-			"hey",
-			"yo",
-			"help",
-			"question",
-			"ai",
-			"llm",
-			"bot",
-		]);
+		if (!cachedKeywords) {
+			cachedKeywords = v<string[]>("keywords", [
+				"hello",
+				"hi",
+				"hey",
+				"yo",
+				"help",
+				"question",
+				"ai",
+				"llm",
+				"bot",
+			]);
+		}
+		return cachedKeywords;
 	},
 	get randomChance(): number {
 		return v<number>("random_chance", 0.015);
@@ -309,31 +332,37 @@ export const config = {
 		return v<boolean>("reply_in_dm", true);
 	},
 	get concentration(): ConcentrationThresholds {
-		return mergeConcentration(
-			v<Record<string, unknown>>("concentration", {}),
-			DEFAULT_CONCENTRATION
-		);
+		if (!cachedConcentration) {
+			cachedConcentration = mergeConcentration(
+				v<Record<string, unknown>>("concentration", {}),
+				DEFAULT_CONCENTRATION
+			);
+		}
+		return cachedConcentration;
 	},
 	get serverEmojiChance(): number {
 		return v<number>("server_emoji_chance", 0.3);
 	},
 	get reactions(): string[] {
-		return v<string[]>("reactions", [
-			"👀",
-			"😄",
-			"🤔",
-			"👋",
-			"🔥",
-			"💀",
-			"✨",
-			"😭",
-			"🤨",
-			"👌",
-			"🙏",
-			"💅",
-			"🗿",
-			"🌚",
-		]);
+		if (!cachedReactions) {
+			cachedReactions = v<string[]>("reactions", [
+				"👀",
+				"😄",
+				"🤔",
+				"👋",
+				"🔥",
+				"💀",
+				"✨",
+				"😭",
+				"🤨",
+				"👌",
+				"🙏",
+				"💅",
+				"🗿",
+				"🌚",
+			]);
+		}
+		return cachedReactions;
 	},
 	get spontaneousIntervalMs(): number {
 		return v<number>("spontaneous_interval_ms", 300_000);
@@ -390,14 +419,17 @@ export const config = {
 		return v<number>("hesitation_chance", 0.15);
 	},
 	get hesitationWords(): string[] {
-		return v<string[]>("hesitation_words", [
-			"uh...",
-			"um...",
-			"well...",
-			"i mean...",
-			"hmm...",
-			"so...",
-		]);
+		if (!cachedHesitationWords) {
+			cachedHesitationWords = v<string[]>("hesitation_words", [
+				"uh...",
+				"um...",
+				"well...",
+				"i mean...",
+				"hmm...",
+				"so...",
+			]);
+		}
+		return cachedHesitationWords;
 	},
 	get forgetChance(): number {
 		return v<number>("forget_chance", 0.03);
