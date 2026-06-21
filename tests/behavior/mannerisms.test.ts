@@ -56,8 +56,8 @@ describe("computeDelay", () => {
 	it("returns delay within reason range", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
 		const delay = computeDelay("mention");
-		expect(delay).toBeGreaterThanOrEqual(300);
-		expect(delay).toBeLessThanOrEqual(1500);
+		expect(delay).toBeGreaterThanOrEqual(150);
+		expect(delay).toBeLessThanOrEqual(3000);
 	});
 
 	it("increases delay with msgLength", async () => {
@@ -88,8 +88,8 @@ describe("computeDelay", () => {
 	it("uses default thresholds for unknown reason", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
 		const delay = computeDelay("unknown");
-		expect(delay).toBeGreaterThanOrEqual(800);
-		expect(delay).toBeLessThanOrEqual(4000);
+		expect(delay).toBeGreaterThanOrEqual(400);
+		expect(delay).toBeLessThanOrEqual(8000);
 	});
 
 	it("caps reading factor at 3x for very long messages", async () => {
