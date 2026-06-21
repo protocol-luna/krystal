@@ -19,7 +19,8 @@ stateDiagram-v2
     SPONT_ASK --> SEND_SPONT: createMessage()
     SEND_SPONT --> LISTENING: resetLLM() again
     
-    MESSAGE_EVENT --> TRIGGER_CHAIN: evaluateMessage()
+    MESSAGE_EVENT --> RECORD_FATIGUE: recordMessage()
+    RECORD_FATIGUE --> TRIGGER_CHAIN: evaluateMessage()
     
     state TRIGGER_CHAIN {
         [*] --> CHECK_BOT_CMD
@@ -45,7 +46,8 @@ stateDiagram-v2
     
     state FOLLOWUP_FLOW {
         [*] --> FUP_DELAY: computeDelay(follow-up)
-        FUP_DELAY --> FUP_REACT: setTimeout done
+        FUP_DELAY --> FUP_FATIGUE: × fatigue multiplier
+        FUP_FATIGUE --> FUP_REACT: setTimeout done
         FUP_REACT --> FUP_EXEC: maybe addReaction
         FUP_EXEC --> FUP_REPLY: triggerLunaReply()
         FUP_REPLY --> [*]
@@ -55,10 +57,12 @@ stateDiagram-v2
     SLEEP_GATE --> LISTENING: sleep mode, not mention/dm
     SLEEP_GATE --> SESSION_GATE: awake
     
-    SESSION_GATE --> IGNORE_CHECK: session not paused
+    SESSION_GATE --> FATIGUE_IGNORE: session not paused
     SESSION_GATE --> QUEUE_SESSION: session paused
     QUEUE_SESSION --> LISTENING
     
+    FATIGUE_IGNORE --> IGNORE_CHECK: fatigue ignore bonus?
+    FATIGUE_IGNORE --> IGNORE_CHECK: no bonus
     IGNORE_CHECK --> LISTENING: shouldIgnore() true
     IGNORE_CHECK --> FORGET_CHECK: false
     
@@ -67,7 +71,8 @@ stateDiagram-v2
 
     state DELAY_PHASE {
         [*] --> COMPUTE: computeDelay(reason, sleep, length, inactivity)
-        COMPUTE --> LOG_DELAY: console log
+        COMPUTE --> FATIGUE_MUL: × fatigueMultiplier
+        FATIGUE_MUL --> LOG_DELAY: console log
         LOG_DELAY --> SET_REACTION: setTimeout(delay)
         SET_REACTION --> MAYBE_REACT_AFTER: shouldReact()?
         MAYBE_REACT_AFTER --> ADD_REACTION_EMOJI: yes
@@ -94,12 +99,14 @@ stateDiagram-v2
         STREAMING --> FIRST_TOKEN: llmBus.once(token)
         FIRST_TOKEN --> START_TYPING: typing indicator
         STREAMING --> FLUSH_ON_NEWLINE: llmBus.on(flush)
-        FLUSH_ON_NEWLINE --> SEND_CHUNK: createMessage()
+        FLUSH_ON_NEWLINE --> BURST_SPLIT: burst chance?
+        BURST_SPLIT --> SEND_CHUNK: send fragment(s)
         STREAMING --> RESPONSE_DONE: llmBus.on(done)
         
         RESPONSE_DONE --> RESIDUAL_FLUSH: remaining buffer?
-        RESIDUAL_FLUSH --> SEND_LAST: createMessage() if needed
-        RESIDUAL_FLUSH --> VOICE_ROLL: check shouldSendVoice()
+        RESIDUAL_FLUSH --> BURST_LAST: burst chance?
+        BURST_LAST --> SEND_LAST: send fragment(s)
+        RESIDUAL_FLUSH --> VOICE_ROLL: no buffer
         
         VOICE_ROLL --> VOICE_PATH: yes
         VOICE_ROLL --> TYPO_ROLL_C: no

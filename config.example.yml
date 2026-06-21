@@ -158,6 +158,18 @@ burst_delay_min: 1500
 burst_delay_max: 4000
 # Délai (ms) minimum et maximum entre chaque fragment du burst.
 
+# --- Topic fatigue -- lassitude quand le même sujet revient trop souvent ---
+topic_fatigue_enabled: true
+# Active ou désactive le système de fatigue thématique.
+topic_fatigue_window: 10
+# Nombre de messages analysés pour détecter un sujet récurrent.
+topic_fatigue_threshold: 3
+# Nombre d'occurrences d'un même mot déclenchant la fatigue.
+topic_fatigue_delay_multiplier: 2
+# Multiplicateur de délai quand la fatigue est active.
+topic_fatigue_ignore_bonus: 0.15
+# Probabilité supplémentaire d'ignorer un message (0.0 - 1.0).
+
 # --- Inactivity warmup -- délai plus long si le bot n'a pas parlé depuis longtemps ---
 inactivity_warmup_minutes: 10
 inactivity_warmup_multiplier: 2

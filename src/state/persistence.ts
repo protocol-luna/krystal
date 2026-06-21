@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { stateBus } from "./state-bus.js";
 import { dumpState } from "./state.js";
+import { dumpTopicFatigue } from "./topic-fatigue.js";
 
 const STATE_FILE = path.resolve("state.json");
 
@@ -25,6 +26,7 @@ export interface PersistedState {
 	botActivity: [string, number][];
 	lastSpeaker: [string, LastSpeakerEntry][];
 	responseCount: [string, number][];
+	topicWordLogs: [string, string[]][];
 }
 
 function defaultState(): PersistedState {
@@ -35,6 +37,7 @@ function defaultState(): PersistedState {
 		botActivity: [],
 		lastSpeaker: [],
 		responseCount: [],
+		topicWordLogs: [],
 	};
 }
 
@@ -104,5 +107,6 @@ stateBus.on("state:changed", () => {
 		botActivity: raw.botActivity,
 		lastSpeaker: raw.lastSpeaker,
 		responseCount: raw.responseCount,
+		topicWordLogs: dumpTopicFatigue(),
 	});
 });

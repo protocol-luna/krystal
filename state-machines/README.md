@@ -266,11 +266,31 @@ The optional TTS pipeline adds roughly 200ms. The typo correction waits 2-4 seco
 
 [![Complete Lifecycle](output/22-complete-lifecycle.svg)](22-complete-lifecycle.mmd)
 
-This is the master state machine that unifies all 21 other diagrams into a single end-to-end lifecycle. The bot starts in `READY`, connects to Discord, and then three parallel loops run: the main message processing loop, the dynamic status rotation loop (every ~15 minutes), and the spontaneous message loop (every 5 minutes with 12% chance).
+This is the master state machine that unifies all 23 other diagrams into a single end-to-end lifecycle. The bot starts in `READY`, connects to Discord, and then three parallel loops run: the main message processing loop, the dynamic status rotation loop (every ~15 minutes), and the spontaneous message loop (every 5 minutes with 12% chance).
 
 The message processing path is the most elaborate. A `messageCreate` event enters the trigger chain -- checking for commands and auto-triggers. Auto-triggers proceed through sleep check, session check, ignore roll, forget roll, delay phase (with optional reaction), anti-spam gate, LLM execution (streaming, voice, typo), session limit check, and cleanup.
 
 Non-triggered messages go through follow-up detection: if the bot just spoke within 15 seconds and the budget allows, it enters a mini follow-up flow with its own delay, optional reaction, and `triggerLunaReply()`. The beauty of this unified view is seeing how every sub-system -- trigger evaluation, sleeping, ignoring, forgetting, delay, reactions, anti-spam, LLM streaming, voice, typos, session limits, follow-ups, status rotation, and spontaneity -- all compose together into one coherent bot that behaves unpredictably but believably.
+
+---
+
+## 23 -- Message Burst
+
+[![Message Burst](output/23-burst.svg)](23-burst.mmd)
+
+This diagram shows how a single line of text can be split into multiple fragments to simulate human typing rhythm. When the LLM flushes a response line (either during streaming on `\n` or after the final `askLLM` completes), the flush handler checks `burst_chance` (default 15%). If the chance hits and the text is at least 4 words long, the line is split at word boundaries into 2 or 3 fragments.
+
+The first fragment is sent immediately with the reply style (`messageReference` if it's the first chunk). Subsequent fragments are queued with `setTimeout` delays randomized between `burst_delay_min` and `burst_delay_max` (default 1.5-4s), sent as plain messages without reference. Short messages (< 4 words) and voice responses never burst. The effect is subtle: most responses are normal, but occasionally the bot "types" in stops and starts, revealing its thought process piece by piece.
+
+---
+
+## 24 -- Topic Fatigue
+
+[![Topic Fatigue](output/24-topic-fatigue.svg)](24-topic-fatigue.mmd)
+
+Topic fatigue adds conversational boredom. Every incoming message, `recordMessage()` extracts significant words (alphabetic, >= 4 characters, lowercased) and appends them to a per-channel word log. The log is trimmed to `topic_fatigue_window * 10` words (default 100). Before each response, the system counts word frequencies: if any word appears `topic_fatigue_threshold` or more times (default 3), the channel is considered fatigued.
+
+When fatigued, two things change: the response delay is multiplied by `topic_fatigue_delay_multiplier` (default ×2, scaling with excess occurrences, capped at ×5), and the ignore probability increases by `topic_fatigue_ignore_bonus` (default +15%). This makes the bot seem bored of repetitive topics -- it takes longer to answer and is more likely to ignore. The word logs are persisted in `state.json`, so fatigue survives restarts. If `topic_fatigue_enabled` is false or the channel hasn't repeated itself, everything runs normally and both modifiers stay at 1× and 0%.
 
 ---
 
@@ -288,6 +308,6 @@ Non-triggered messages go through follow-up detection: if the bot just spoke wit
 - Total source files: ~30 TypeScript files
 - Lines of code: ~3500 LOC
 - Tests: ~71 test files (Bun)
-- LLM backends: 3 (cli, server, proxy)
+- LLM backends: 4 (cli, server, proxy, online)
 - Event bus types: 7 (llmBus) + 1 (stateBus)
-- Simulated human behaviors: 8 (delay, ignore, forget, hesitation, typo, reaction, voice, follow-up)
+- Simulated human behaviors: 10 (delay, ignore, forget, hesitation, typo, reaction, voice, follow-up, burst, topic fatigue)

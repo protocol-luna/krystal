@@ -1,0 +1,15 @@
+flowchart LR
+    A([onFlush / final flush]) --> B{messageBuffer has text?}
+    B -->|no| END([return])
+    B -->|yes| C{willBurst && >=4 words?}
+    C -->|no| D[send as single message]
+    D --> END
+    C -->|yes| E[split into 2-3 fragments at word boundaries]
+    E --> F[send fragment 1 with reply style]
+    F --> G[setTimeout burst_delay]
+    G --> H[send fragment 2 without reply]
+    H --> I{3 fragments?}
+    I -->|yes| J[setTimeout burst_delay]
+    J --> K[send fragment 3]
+    I -->|no| END
+    K --> END

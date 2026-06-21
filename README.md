@@ -1,6 +1,6 @@
 # Luna-Protocol Project
 
-Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
+Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, topic fatigue, message bursts, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
@@ -397,6 +397,16 @@ concentration:
 | `burst_delay_min` | number | `1500` | Min delay (ms) between burst fragments |
 | `burst_delay_max` | number | `4000` | Max delay (ms) between burst fragments |
 
+### Topic Fatigue (✅)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `topic_fatigue_enabled` | boolean | `true` | Enable topic fatigue system |
+| `topic_fatigue_window` | number | `10` | Messages analyzed to detect recurring topics |
+| `topic_fatigue_threshold` | number | `3` | Word occurrences before fatigue kicks in |
+| `topic_fatigue_delay_multiplier` | number | `2` | Delay multiplier when fatigued |
+| `topic_fatigue_ignore_bonus` | number | `0.15` | Extra ignore probability when fatigued (0.0-1.0) |
+
 ### Human-like Behaviors (✅)
 
 | Key | Type | Default | Description |
@@ -463,7 +473,7 @@ context: 4096
 
 ## Detailed Architecture Diagrams
 
-The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams** covering the entire source code, each with a detailed human-language explanation:
+The [`state-machines/`](state-machines/) folder contains **24 Mermaid diagrams** covering the entire source code, each with a detailed human-language explanation:
 
 | # | Diagram | Type |
 |---|---------|------|
@@ -489,6 +499,8 @@ The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams**
 | 20 | Reaction Commands | `stateDiagram` |
 | 21 | Timing Gantt | `gantt` |
 | 22 | Complete Lifecycle | `stateDiagram` |
+| 23 | Message Burst | `flowchart` |
+| 24 | Topic Fatigue | `flowchart` |
 
 All SVGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
 

@@ -371,6 +371,21 @@ export const config = {
 	get burstDelayMax(): number {
 		return v<number>("burst_delay_max", 4000);
 	},
+	get topicFatigueEnabled(): boolean {
+		return v<boolean>("topic_fatigue_enabled", true);
+	},
+	get topicFatigueWindow(): number {
+		return v<number>("topic_fatigue_window", 10);
+	},
+	get topicFatigueThreshold(): number {
+		return v<number>("topic_fatigue_threshold", 3);
+	},
+	get topicFatigueDelayMultiplier(): number {
+		return v<number>("topic_fatigue_delay_multiplier", 2);
+	},
+	get topicFatigueIgnoreBonus(): number {
+		return v<number>("topic_fatigue_ignore_bonus", 0.15);
+	},
 	get hesitationChance(): number {
 		return v<number>("hesitation_chance", 0.15);
 	},

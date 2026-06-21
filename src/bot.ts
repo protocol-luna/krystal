@@ -37,6 +37,12 @@ import { getSleepBehavior } from "./behavior/sleep.js";
 import { applyTypo } from "./behavior/typo.js";
 import { loadState } from "./state/persistence.js";
 import {
+	recordMessage,
+	getFatigueMultiplier,
+	getFatigueIgnoreBonus,
+	restoreTopicFatigue,
+} from "./state/topic-fatigue.js";
+import {
 	processing,
 	pendingKey,
 	queuePending,
@@ -501,6 +507,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	const channelName = channel.name ?? message.channel.id;
 	const isDM = message.channel.type === 1;
 
+	recordMessage(message.channel.id, message.content);
+
 	const result: TriggerResult = evaluateMessage(
 		message,
 		client.user.id,
@@ -544,8 +552,14 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
 	if (result.shouldRespond) {
 		trackSpeaker(message.channel.id, message.author.id);
-		if (shouldIgnore(result.reason, sleepBehavior)) {
-			console.log(`[bot] #${channelName} ${author}: ignoré (${result.reason})`);
+		const fatigueIgnoreBonus = getFatigueIgnoreBonus(message.channel.id);
+		if (
+			shouldIgnore(result.reason, sleepBehavior) ||
+			Math.random() < fatigueIgnoreBonus
+		) {
+			console.log(
+				`[bot] #${channelName} ${author}: ignoré (${result.reason})${fatigueIgnoreBonus > 0 ? ` fatigue=${fatigueIgnoreBonus.toFixed(2)}` : ""}`
+			);
 			return;
 		}
 
@@ -556,12 +570,14 @@ client.on("messageCreate", async (message: Eris.Message) => {
 
 		logAndReact(message, author, channelName, result.reason, sleepBehavior);
 
-		const delay = computeDelay(
-			result.reason,
-			sleepBehavior,
-			message.content.length,
-			getGlobalInactivityMs()
-		);
+		const fatigueMul = getFatigueMultiplier(message.channel.id);
+		const delay =
+			computeDelay(
+				result.reason,
+				sleepBehavior,
+				message.content.length,
+				getGlobalInactivityMs()
+			) * fatigueMul;
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
 		checkSessionLimit(cid, () => {
@@ -579,12 +595,14 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		markReplied(message.channel.id);
 		console.log(`[bot] #${channelName} ${author}: follow-up immédiat`);
 
-		const delay = computeDelay(
-			"follow-up",
-			sleepBehavior,
-			message.content.length,
-			getGlobalInactivityMs()
-		);
+		const fatigueMul = getFatigueMultiplier(message.channel.id);
+		const delay =
+			computeDelay(
+				"follow-up",
+				sleepBehavior,
+				message.content.length,
+				getGlobalInactivityMs()
+			) * fatigueMul;
 		await new Promise((r) => setTimeout(r, delay));
 
 		if (shouldReact("follow-up", sleepBehavior)) {
@@ -630,6 +648,7 @@ export async function startBot(): Promise<void> {
 	const saved = await loadState();
 	restoreState(saved);
 	restorePending(saved.pendingMessages, client);
+	restoreTopicFatigue(saved.topicWordLogs ?? []);
 	startPruning();
 
 	client.connect();

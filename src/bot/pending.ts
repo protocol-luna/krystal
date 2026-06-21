@@ -1,6 +1,7 @@
 import type * as Eris from "eris";
 import { buildPending, scheduleSave } from "../state/persistence.js";
 import { dumpState } from "../state/state.js";
+import { dumpTopicFatigue } from "../state/topic-fatigue.js";
 
 export const processing = new Set<string>();
 export const pendingMessages = new Map<
@@ -21,6 +22,7 @@ export function saveAllState(): void {
 		botActivity: t.botActivity,
 		lastSpeaker: t.lastSpeaker,
 		responseCount: t.responseCount,
+		topicWordLogs: dumpTopicFatigue(),
 	});
 }
 

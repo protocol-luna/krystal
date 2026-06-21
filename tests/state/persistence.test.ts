@@ -30,6 +30,7 @@ describe("loadState", () => {
 					botActivity: [],
 					lastSpeaker: [],
 					responseCount: [],
+					topicWordLogs: [],
 				}),
 			writeFile: async () => {},
 		}));
@@ -84,6 +85,7 @@ describe("persistState", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
+			topicWordLogs: [],
 		});
 		const parsed = JSON.parse(written);
 		expect(parsed.paused).toBeTrue();
@@ -92,9 +94,23 @@ describe("persistState", () => {
 	it("serializes pending messages", async () => {
 		let written = "";
 		mock.module("node:fs/promises", () => ({
-			readFile: async () => {
-				throw new Error("ENOENT");
-			},
+			readFile: async () =>
+				JSON.stringify({
+					paused: false,
+					pendingMessages: [
+						{
+							channelId: "123",
+							messageId: "456",
+							userId: "789",
+							reason: "mention",
+							timestamp: 1000,
+						},
+					],
+					channelCooldowns: [],
+					botActivity: [],
+					lastSpeaker: [],
+					responseCount: [],
+				}),
 			writeFile: async (_path: string, data: string) => {
 				written = data;
 			},
@@ -104,9 +120,9 @@ describe("persistState", () => {
 			paused: false,
 			pendingMessages: [
 				{
-					channelId: "c1",
-					messageId: "m1",
-					userId: "u1",
+					channelId: "123",
+					messageId: "456",
+					userId: "789",
 					reason: "mention",
 					timestamp: 1000,
 				},
@@ -115,6 +131,7 @@ describe("persistState", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
+			topicWordLogs: [],
 		});
 		const parsed = JSON.parse(written);
 		expect(parsed.pendingMessages).toHaveLength(1);
@@ -180,6 +197,7 @@ describe("scheduleSave", () => {
 			botActivity: [],
 			lastSpeaker: [],
 			responseCount: [],
+			topicWordLogs: [],
 		};
 		scheduleSave(state);
 		scheduleSave(state);
