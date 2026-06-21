@@ -9,7 +9,8 @@ export function sanitizeForTTS(text: string): string {
 		.replace(/<@&?\d+>/g, "@utilisateur")
 		.replace(/<#\d+>/g, "")
 		.replace(/<a?:[\w-]+:\d+>/g, "")
-		.replace(/https?:\/\/\S+/g, "");
+		.replace(/https?:\/\/\S+/g, "")
+		.replace(/[^\p{L}\p{N}\s@]/gu, "");
 	if (t.length > 500) {
 		t = t.slice(0, 500);
 	}
