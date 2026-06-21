@@ -8,6 +8,7 @@ export type LLMEvents = {
 	crash: [code: number | null];
 	ready: [];
 	reset: [];
+	flush: [];
 };
 
 export const llmBus = new TypedBus<LLMEvents>();

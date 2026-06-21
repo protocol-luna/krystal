@@ -46,10 +46,6 @@ import {
 	restorePending,
 } from "./bot/pending.js";
 import { handleReactionCommand } from "./bot/reactions.js";
-import {
-	applyTypoCorrection,
-	type TypoCorrectionState,
-} from "./bot/typo-correction.js";
 
 const client = new Eris.Client(DISCORD_TOKEN, {
 	intents: [
@@ -93,6 +89,7 @@ async function triggerLunaReply(
 		: style;
 
 	let onToken: ((chunk: string) => void) | null = null;
+	let onFlush: (() => void) | null = null;
 
 	try {
 		const content = message.content
@@ -104,67 +101,36 @@ async function triggerLunaReply(
 
 		const isVoice = shouldSendVoice();
 		const chunks: string[] = [];
+		let messageBuffer = "";
+		let isFirstChunk = true;
 
-		onToken = (chunk: string) => chunks.push(chunk);
+		onToken = (word: string) => {
+			chunks.push(word);
+			if (messageBuffer) messageBuffer += " ";
+			messageBuffer += word;
+		};
 		llmBus.on("token", onToken);
 
 		if (!isVoice) {
 			llmBus.once("token", startTyping);
 		}
 
-		const fullText = await askLLM({ username: displayName, text: content });
+		const hasHesitation = Math.random() < config.hesitationChance;
+		let hesitationWord = "";
+		if (hasHesitation) {
+			hesitationWord = config.hesitationWords[
+				Math.floor(Math.random() * config.hesitationWords.length)
+			];
+		}
 
-		if (isVoice && !hasUnsafeTTSText(fullText)) {
-			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
-		} else {
-			const messages = fullText
-				.split("\n")
-				.map((l) => l.trim())
-				.filter(Boolean);
-
-			let typoState: TypoCorrectionState | null = null;
-			if (
-				config.typoChance > 0 &&
-				Math.random() < config.typoChance &&
-				chunks.length > 0
-			) {
-				const idx = Math.floor(Math.random() * chunks.length);
-				const result = applyTypo(chunks[idx], config.typoLayout);
-				if (result) {
-					chunks[idx] = result.text;
-					typoState = {
-						chunkIndex: idx,
-						original: result.original,
-						correctedWord: result.correctedWord,
-					};
-				}
-			}
-
-			let globalWordIdx = 0;
-
-			const hasHesitation =
-				chunks.length > 0 && Math.random() < config.hesitationChance;
-
-			const wordDelay = (w: string): number => {
-				const cpm = config.typingWpm * 5;
-				const baseDelay = (w.length / cpm) * 60000;
-				return Math.max(80, baseDelay * (0.5 + Math.random() * 0.5));
-			};
-
-			let isFirstChunk = true;
-			let typoMessageId: string | null = null;
-
-			for (const msg of messages) {
-				const msgWords = msg.split(/\s+/).filter(Boolean);
-				for (let i = 0; i < msgWords.length; i++) {
-					if (globalWordIdx > 0 || (globalWordIdx === 0 && hasHesitation)) {
-						await new Promise((r) => setTimeout(r, wordDelay(msgWords[i])));
-					}
-					globalWordIdx++;
-				}
-
-				const sent = await client.createMessage(message.channel.id, {
-					content: msg,
+		if (!isVoice) {
+			onFlush = () => {
+				if (!messageBuffer) return;
+				const content = hesitationWord ? `${hesitationWord} ${messageBuffer}` : messageBuffer;
+				hesitationWord = "";
+				messageBuffer = "";
+				client.createMessage(message.channel.id, {
+					content,
 					...(isFirstChunk && refStyle.messageReference
 						? {
 								messageReference: { messageID: message.id },
@@ -173,22 +139,48 @@ async function triggerLunaReply(
 								},
 							}
 						: {}),
+				}).then((sent) => {
+					isFirstChunk = false;
+					markBotActivity(message.channel.id);
+				}).catch(() => {});
+			};
+			llmBus.on("flush", onFlush);
+		}
+
+		const fullText = await askLLM({ username: displayName, text: content });
+
+		// flush remaining buffer (last line without newline sentinel)
+		if (!isVoice && messageBuffer) {
+			await client.createMessage(message.channel.id, {
+				content: messageBuffer,
+				...(isFirstChunk && refStyle.messageReference
+					? {
+							messageReference: { messageID: message.id },
+							allowedMentions: {
+								repliedUser: refStyle.mentionRepliedUser,
+							},
+						}
+					: {}),
+			});
+			isFirstChunk = false;
+			markBotActivity(message.channel.id);
+			messageBuffer = "";
+		}
+
+		// voice TTS
+		if (isVoice && !hasUnsafeTTSText(fullText)) {
+			await sendTextAsVoiceMessage(message.channel.id, message.id, fullText);
+		}
+
+		// typo correction: sending correction message
+		if (!isVoice && chunks.length > 0 && Math.random() < config.typoChance) {
+			const idx = Math.floor(Math.random() * chunks.length);
+			const result = applyTypo(chunks[idx], config.typoLayout);
+			if (result) {
+				await client.createMessage(message.channel.id, {
+					content: `${result.correctedWord}*`,
 				});
-				isFirstChunk = false;
-				markBotActivity(message.channel.id);
-
-				if (typoState && typoMessageId === null) {
-					typoMessageId = sent.id;
-				}
-			}
-
-			if (typoMessageId && typoState) {
-				await applyTypoCorrection(
-					client,
-					message.channel.id,
-					typoMessageId,
-					typoState
-				);
+				console.log(`[bot] typo corrigé par message: ${result.correctedWord}*`);
 			}
 		}
 
@@ -207,6 +199,9 @@ async function triggerLunaReply(
 		}
 		if (onToken) {
 			llmBus.off("token", onToken);
+		}
+		if (onFlush) {
+			llmBus.off("flush", onFlush);
 		}
 
 		const queued = drainPending(key);

@@ -164,6 +164,7 @@ function handleStdout(data: Buffer): void {
 		for (const l of lines) {
 			emitWordTokens(l);
 			currentItem?.onChunk?.(l);
+			llmBus.emit("flush");
 		}
 		llmBus.emit("done", cleaned);
 		return;
@@ -186,6 +187,7 @@ function handleStdout(data: Buffer): void {
 		if (cleaned) {
 			emitWordTokens(cleaned);
 			currentItem?.onChunk?.(cleaned);
+			llmBus.emit("flush");
 		}
 
 		newlineIdx = stdoutBuffer.indexOf("\n");
@@ -322,6 +324,7 @@ async function proxyRequest(item: QueueItem): Promise<void> {
 			onChunk: (chunk: string) => {
 				emitWordTokens(chunk);
 				currentItem?.onChunk?.(chunk);
+				llmBus.emit("flush");
 			},
 		});
 		llmBus.emit("done", text);
