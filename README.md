@@ -351,7 +351,7 @@ context: 4096
 
 ## Detailed Architecture Diagrams
 
-The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams** covering the entire source code:
+The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams** covering the entire source code, each with a detailed human-language explanation:
 
 | # | Diagram | Type |
 |---|---------|------|
