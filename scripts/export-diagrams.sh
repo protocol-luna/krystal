@@ -13,4 +13,4 @@ for f in state-machines/[0-9][0-9]-*.mmd; do
     --backgroundColor transparent
 done
 
-echo "Done — $(ls "$OUTDIR"/*.svg | wc -l) SVGs exported"
+echo "Done -- $(ls "$OUTDIR"/*.svg | wc -l) SVGs exported"

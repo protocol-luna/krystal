@@ -1,5 +1,5 @@
 # Configuration du bot Discord
-# Fichier unique — plus besoin de .env ni de prompt.txt
+# Fichier unique -- plus besoin de .env ni de prompt.txt
 
 # --- System prompt ---
 system_prompt: |
@@ -10,7 +10,7 @@ system_prompt: |
 discord_token: "ton_token_ici"
 llama_cli_path: "bin/llama/llama-cli"
 llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
-# Hôte du LLM — utilisé uniquement en mode "server"
+# Hôte du LLM -- utilisé uniquement en mode "server"
 llm_host: "localhost"
 # Port du LLM (CLI ou serveur HTTP llama-server)
 llm_port: 3124
@@ -142,12 +142,12 @@ typo_correction_style: "mixed"
 # Style de correction des fautes : "edit" (édite tout le message), "message" (envoie "mot*"),
 # ou "mixed" (50/50 aléatoire).
 
-# --- Inactivity warmup — délai plus long si le bot n'a pas parlé depuis longtemps ---
+# --- Inactivity warmup -- délai plus long si le bot n'a pas parlé depuis longtemps ---
 inactivity_warmup_minutes: 10
 inactivity_warmup_multiplier: 2
 # Simule le "réveil" : réponse plus lente après une période d'inactivité.
 
-# --- Hesitation — le bot hésite parfois avant de répondre ---
+# --- Hesitation -- le bot hésite parfois avant de répondre ---
 hesitation_chance: 0.15
 hesitation_words:
   - "uh..."
@@ -157,7 +157,7 @@ hesitation_words:
   - "hmm..."
   - "so..."
 
-# --- Forget — le bot oublie parfois de répondre ---
+# --- Forget -- le bot oublie parfois de répondre ---
 forget_chance: 0.03
 # Probabilité faible que le bot ignore un message même après trigger.
 

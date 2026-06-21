@@ -1,6 +1,6 @@
 # Project Luna Protocol
 
-Autonomous Discord bot. Runs a local LLM (llama.cpp) and converses naturally — sleep, inattention, typos, hesitations, forgetfulness, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
+Autonomous Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
@@ -11,7 +11,7 @@ Autonomous Discord bot. Runs a local LLM (llama.cpp) and converses naturally —
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   core/bus.ts                        │
-│  TypedBus<K, V> — on / off / once / emit            │
+│  TypedBus<K, V> -- on / off / once / emit            │
 ├──────────────────┬──────────────────────────────────┤
 │   core/llm-bus   │       state/state-bus             │
 │  token / done /  │     state:changed                 │
@@ -74,7 +74,7 @@ src/
 
 ## Overview
 
-> Detailed diagrams (state machines, flowcharts, Gantt) are available in the [`state-machines/`](state-machines/) folder — 22 Mermaid diagrams covering the entire codebase.
+> Detailed diagrams (state machines, flowcharts, Gantt) are available in the [`state-machines/`](state-machines/) folder -- 22 Mermaid diagrams covering the entire codebase.
 
 [![Message processing overview](state-machines/readme-diagrams/r01.svg)](state-machines/readme-diagrams/r01.mmd)
 
@@ -82,9 +82,9 @@ src/
 
 ## Trigger System
 
-### State machine — incoming message decision
+### State machine -- incoming message decision
 
-[![Trigger system — incoming message decision](state-machines/readme-diagrams/r02.svg)](state-machines/readme-diagrams/r02.mmd)
+[![Trigger system -- incoming message decision](state-machines/readme-diagrams/r02.svg)](state-machines/readme-diagrams/r02.mmd)
 
 ### Trigger priority order
 
@@ -94,7 +94,7 @@ src/
 | 2 | `dm` | DM with `replyInDM = true` | Yes (0%) | No |
 | 3 | `name` | "Luna"/"Pixie"/alias (whole word) | No (8%) | No |
 | 4 | `keyword` | `hello`, `hi`, `hey`, `yo`, `ai`, `bot`... (whole word) | No (8%) | No |
-| 5 | `follow-up` | Bot was last speaker + < 15s + < 3 / 60s | — | — |
+| 5 | `follow-up` | Bot was last speaker + < 15s + < 3 / 60s | -- | -- |
 | 6 | `random` | 1.5% chance on non-matching | No (8%) | No |
 
 Whole word matching (`\b`): "ai" does not match "mais", "vrai", "lait".
@@ -189,7 +189,7 @@ Typing only appears when the LLM starts generating (first `token` event on `llmB
 
 ### Real-time response
 
-The LLM streams its response line by line (`\n`). Each line is split into words (tokens), emitted one by one on `llmBus.emit("token", word)`. At each `\n`, a `flush` event is emitted — the bot immediately sends the accumulated message. No simulated delay: the pace is the LLM's own. Only the first message has a `messageReference` (visual reply). In voice mode, streaming is skipped (single voice message).
+The LLM streams its response line by line (`\n`). Each line is split into words (tokens), emitted one by one on `llmBus.emit("token", word)`. At each `\n`, a `flush` event is emitted -- the bot immediately sends the accumulated message. No simulated delay: the pace is the LLM's own. Only the first message has a `messageReference` (visual reply). In voice mode, streaming is skipped (single voice message).
 
 ### Reactions
 
@@ -239,11 +239,11 @@ The bot sometimes starts its response with a hesitation word: `uh...`, `um...`, 
 
 ### Forgetfulness
 
-Even after matching a trigger, the bot can "forget" to respond with a probability of `forget_chance` (default 3%). No message, no reaction — as if it hadn't seen it.
+Even after matching a trigger, the bot can "forget" to respond with a probability of `forget_chance` (default 3%). No message, no reaction -- as if it hadn't seen it.
 
 ### Inactivity warmup
 
-If the bot has not been active for `inactivity_warmup_minutes` (default 10 min), the response delay is multiplied by `inactivity_warmup_multiplier` (default ×2) — simulates a "waking up" time after an absence.
+If the bot has not been active for `inactivity_warmup_minutes` (default 10 min), the response delay is multiplied by `inactivity_warmup_multiplier` (default ×2) -- simulates a "waking up" time after an absence.
 
 ### Dynamic Discord Status
 
@@ -277,7 +277,7 @@ Useful for aggressive quantizations (Q2_K) that may crash on complex prompts.
 
 ## Commands
 
-Invisible — no public message, just a ✅ confirmation.
+Invisible -- no public message, just a ✅ confirmation.
 
 **By text:** `-stop` (pause + reset), `-start` (resume), `-clear` (reset history)
 
@@ -297,13 +297,13 @@ Internal error → ❌ on the message (no public error message).
 
 ## Detailed response flow
 
-[![Detailed response flow — from message to reply](state-machines/readme-diagrams/r13.svg)](state-machines/readme-diagrams/r13.mmd)
+[![Detailed response flow -- from message to reply](state-machines/readme-diagrams/r13.svg)](state-machines/readme-diagrams/r13.mmd)
 
 ---
 
 ## Configuration
 
-Single `config.yml` file. Shell env vars override YAML keys if present. Hot-reload for dynamic values (triggers, delays, behaviors) — no restart needed.
+Single `config.yml` file. Shell env vars override YAML keys if present. Hot-reload for dynamic values (triggers, delays, behaviors) -- no restart needed.
 
 See `config.example.yml` for the exhaustive list: LLM, TTS, triggers, concentration, typos, WPM, hesitation, forget, inactivity warmup, dynamic status, sleep, spontaneous, reply styles.
 
@@ -381,19 +381,19 @@ The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams**
 All SVGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
 
 [![Architecture Overview](state-machines/output/01-architecture-overview.svg)](state-machines/01-architecture-overview.mmd)
-*Architecture Overview — global system components and data flow*
+*Architecture Overview -- global system components and data flow*
 
 [![Complete Lifecycle](state-machines/output/22-complete-lifecycle.svg)](state-machines/22-complete-lifecycle.mmd)
-*Complete Lifecycle — full bot behavior from message to response, including timers and edge cases*
+*Complete Lifecycle -- full bot behavior from message to response, including timers and edge cases*
 
 [![Timing Gantt](state-machines/output/21-timing-gantt.svg)](state-machines/21-timing-gantt.mmd)
-*Timing Gantt — real wait times for delays, reactions, LLM streaming, and corrections*
+*Timing Gantt -- real wait times for delays, reactions, LLM streaming, and corrections*
 
 ---
 
 ## Dataset
 
-[**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) — 7.3M exchanges, 17M turns, 140M words. Real Discord conversations spring-summer 2025, filtered PII/ToS/bots/commands. Apache 2.0.
+[**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) -- 7.3M exchanges, 17M turns, 140M words. Real Discord conversations spring-summer 2025, filtered PII/ToS/bots/commands. Apache 2.0.
 
 Explore the dataset interactively: [**Atlas Map**](https://atlas.nomic.ai/data/mookiezi/discord-alpha/map)
 

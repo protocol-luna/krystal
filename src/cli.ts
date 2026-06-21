@@ -18,7 +18,7 @@ switch (command) {
 
 	case "direct": {
 		console.log(
-			"Direct LLM mode — type messages, /clear to reset, /exit to quit"
+			"Direct LLM mode -- type messages, /clear to reset, /exit to quit"
 		);
 		const { askLLM, resetLLM } = await import("./core/llm-core.js");
 		const rl = createInterface({

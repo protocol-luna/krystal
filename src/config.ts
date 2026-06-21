@@ -41,7 +41,7 @@ export const DISCORD_TOKEN: string =
 	v<string | null>("discord_token", null) ??
 	process.env.DISCORD_TOKEN ??
 	(() => {
-		console.error("DISCORD_TOKEN manquant — mets-le dans config.yml ou .env");
+		console.error("DISCORD_TOKEN manquant -- mets-le dans config.yml ou .env");
 		process.exit(1);
 	})();
 

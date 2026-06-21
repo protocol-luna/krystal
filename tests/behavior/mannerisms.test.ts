@@ -109,7 +109,7 @@ describe("computeDelay", () => {
 
 	it("caps inactivity ratio at 5x", async () => {
 		const { computeDelay } = await import("../../src/behavior/mannerisms.js");
-		// 30min vs 500min — both exceed warmup threshold; ratio capped at 5x
+		// 30min vs 500min -- both exceed warmup threshold; ratio capped at 5x
 		const milds = Array.from({ length: 30 }, () =>
 			computeDelay("mention", null, undefined, 600_000 * 3)
 		);
