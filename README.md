@@ -378,15 +378,15 @@ The [`state-machines/`](state-machines/) folder contains **22 Mermaid diagrams**
 | 21 | Timing Gantt | `gantt` |
 | 22 | Complete Lifecycle | `stateDiagram` |
 
-All PNGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
+All SVGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
 
-![Architecture Overview](state-machines/output/01-architecture-overview.svg)
+[![Architecture Overview](state-machines/output/01-architecture-overview.svg)](state-machines/01-architecture-overview.mmd)
 *Architecture Overview — global system components and data flow*
 
-![Complete Lifecycle](state-machines/output/22-complete-lifecycle.svg)
+[![Complete Lifecycle](state-machines/output/22-complete-lifecycle.svg)](state-machines/22-complete-lifecycle.mmd)
 *Complete Lifecycle — full bot behavior from message to response, including timers and edge cases*
 
-![Timing Gantt](state-machines/output/21-timing-gantt.svg)
+[![Timing Gantt](state-machines/output/21-timing-gantt.svg)](state-machines/21-timing-gantt.mmd)
 *Timing Gantt — real wait times for delays, reactions, LLM streaming, and corrections*
 
 ---
@@ -394,6 +394,8 @@ All PNGs are available in [`state-machines/output/`](state-machines/output/). Be
 ## Dataset
 
 [**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) — 7.3M exchanges, 17M turns, 140M words. Real Discord conversations spring-summer 2025, filtered PII/ToS/bots/commands. Apache 2.0.
+
+Explore the dataset interactively: [**Atlas Map**](https://atlas.nomic.ai/data/mookiezi/discord-alpha/map)
 
 | Metric | Value |
 |---|---|
