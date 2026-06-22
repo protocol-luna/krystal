@@ -9,14 +9,8 @@ async function main(): Promise<void> {
 			break;
 		}
 
-		case "server": {
-			const { startServer } = await import("./core/llm-server.js");
-			await startServer();
-			break;
-		}
-
 		default: {
-			console.error("Usage: node self-cli.js [bot|server]");
+			console.error("Usage: node self-cli.js [bot]");
 			process.exit(1);
 		}
 	}

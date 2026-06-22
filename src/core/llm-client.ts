@@ -1,98 +1,101 @@
-import { LLM_HOST, LLM_PORT, LLM_SERVER_KEY } from "../config.js";
+import { LLM_HOST, LLM_PORT, SYSTEM_PROMPT, LLM_SESSION_TTL } from "../config.js";
 
+interface Message {
+	role: "system" | "user" | "assistant";
+	content: string;
+}
+
+const SLOTS = 4;
 const BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+const sessions = new Map<string, { messages: Message[]; lastUsed: number }>();
 
-function authHeaders(): Record<string, string> {
-	return LLM_SERVER_KEY
-		? { Authorization: `Bearer ${LLM_SERVER_KEY}`, "Content-Type": "application/json" }
-		: { "Content-Type": "application/json" };
+function slotForSession(sessionId: string): number {
+	let hash = 0;
+	for (let i = 0; i < sessionId.length; i++) {
+		hash = ((hash << 5) - hash + sessionId.charCodeAt(i)) | 0;
+	}
+	return Math.abs(hash) % SLOTS;
+}
+
+function cleanupStaleSessions(): void {
+	const now = Date.now();
+	for (const [sid, session] of sessions) {
+		if (now - session.lastUsed > LLM_SESSION_TTL) {
+			sessions.delete(sid);
+		}
+	}
+}
+
+async function askLlamaServer(messages: Message[], slot: number): Promise<string> {
+	const body = JSON.stringify({
+		messages,
+		id_slot: slot,
+		cache_prompt: true,
+		temperature: 0.8,
+		top_k: 40,
+		top_p: 0.95,
+		min_p: 0.05,
+		max_tokens: 2000,
+	});
+
+	const resp = await fetch(`${BASE}/v1/chat/completions`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body,
+	});
+
+	if (!resp.ok) {
+		const errText = await resp.text();
+		throw new Error(`llama-server error ${resp.status}: ${errText.slice(0, 200)}`);
+	}
+
+	const data = (await resp.json()) as {
+		choices: { message: { content: string } }[];
+	};
+	return data.choices?.[0]?.message?.content ?? "";
 }
 
 export async function askLLM(
 	userMessage: { username: string; text: string; sessionId?: string },
 	callbacks: { onFirstToken?: () => void; onChunk: (chunk: string) => void }
 ): Promise<string> {
-	const response = await fetch(`${BASE}/ask`, {
-		method: "POST",
-		body: JSON.stringify(userMessage),
-		headers: authHeaders(),
-	});
+	const sid = userMessage.sessionId ?? "default";
 
-	if (!(response.ok && response.body)) {
-		throw new Error(`LLM server error: ${response.status}`);
+	let session = sessions.get(sid);
+	if (!session) {
+		session = { messages: [{ role: "system", content: SYSTEM_PROMPT }], lastUsed: Date.now() };
+		sessions.set(sid, session);
 	}
+	session.lastUsed = Date.now();
 
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let buffer = "";
-	let fullText = "";
-	let llmError: Error | null = null;
+	const userMsg = userMessage.username ? `${userMessage.username}: ${userMessage.text}` : userMessage.text;
+	session.messages.push({ role: "user", content: userMsg });
 
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) {
-			break;
-		}
+	cleanupStaleSessions();
 
-		buffer += decoder.decode(value, { stream: true });
-		const lines = buffer.split("\n");
-		buffer = lines.pop() ?? "";
+	const slot = slotForSession(sid);
+	const response = await askLlamaServer(session.messages, slot);
 
-		for (const line of lines) {
-			if (!line.trim()) {
-				continue;
-			}
-			try {
-				const event = JSON.parse(line);
-				switch (event.type) {
-					case "firstToken":
-						callbacks.onFirstToken?.();
-						break;
-					case "chunk":
-						callbacks.onChunk(event.data);
-						break;
-					case "done":
-						fullText = event.data;
-						break;
-					case "error":
-						llmError = new Error(event.data);
-						break;
-					default:
-						break;
-				}
-			} catch {
-				// skip malformed JSON lines
-			}
-		}
-	}
+	session.messages.push({ role: "assistant", content: response });
 
-	if (llmError) {
-		throw llmError;
-	}
-	return fullText;
+	callbacks.onFirstToken?.();
+	callbacks.onChunk(response);
+
+	return response;
 }
 
 export async function resetLLM(sessionId?: string): Promise<void> {
-	const url = sessionId
-		? `${BASE}/reset?sessionId=${encodeURIComponent(sessionId)}`
-		: `${BASE}/reset`;
-	const response = await fetch(url, {
-		method: "POST",
-		headers: authHeaders(),
-	});
-	if (!response.ok) {
-		console.error("LLM reset failed:", response.status);
+	if (sessionId) {
+		sessions.delete(sessionId);
+	} else {
+		sessions.clear();
 	}
 }
 
 export async function isLLMBusy(): Promise<boolean> {
 	try {
-		const response = await fetch(`${BASE}/health`, { headers: authHeaders() });
-		if (!response.ok) {
-			return true;
-		}
-		const data = (await response.json()) as { busy: boolean };
-		return data.busy;
+		const resp = await fetch(`${BASE}/health`);
+		return !resp.ok;
 	} catch {
 		return true;
 	}

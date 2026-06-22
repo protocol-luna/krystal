@@ -1,47 +1,33 @@
 import { describe, it, expect, beforeAll } from "bun:test";
 import { mockConfig } from "../_mock-config.js";
 
+function mockCompletion(response: string, status = 200) {
+	return (async () =>
+		new Response(
+			JSON.stringify({
+				choices: [{ message: { content: response } }],
+				usage: { prompt_tokens: 10, completion_tokens: 5 },
+			}),
+			{ status }
+		)) as any;
+}
+
 describe("askLLM", () => {
 	beforeAll(() => mockConfig());
 
 	it("throws on non-ok response", async () => {
-		const originalFetch = globalThis.fetch;
-		globalThis.fetch = (async () => new Response(null, { status: 500 })) as any;
+		const orig = globalThis.fetch;
+		globalThis.fetch = mockCompletion("", 500);
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		await expect(
 			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
-		).rejects.toThrow("LLM server error");
-		globalThis.fetch = originalFetch;
+		).rejects.toThrow("llama-server error");
+		globalThis.fetch = orig;
 	});
 
-	it("parses NDJSON stream with chunk/done events", async () => {
-		const originalFetch = globalThis.fetch;
-		const encoder = new TextEncoder();
-		const stream = new ReadableStream({
-			start(controller) {
-				controller.enqueue(
-					encoder.encode(`${JSON.stringify({ type: "firstToken" })}\n`)
-				);
-				controller.enqueue(
-					encoder.encode(
-						`${JSON.stringify({ type: "chunk", data: "Hello" })}\n`
-					)
-				);
-				controller.enqueue(
-					encoder.encode(
-						`${JSON.stringify({ type: "chunk", data: " world" })}\n`
-					)
-				);
-				controller.enqueue(
-					encoder.encode(
-						`${JSON.stringify({ type: "done", data: "Hello world" })}\n`
-					)
-				);
-				controller.close();
-			},
-		});
-		globalThis.fetch = (async () =>
-			new Response(stream, { status: 200 })) as any;
+	it("returns response and calls callbacks", async () => {
+		const orig = globalThis.fetch;
+		globalThis.fetch = mockCompletion("Hello world");
 		const { askLLM } = await import("../../src/core/llm-client.js");
 		let firstToken = false;
 		const chunks: string[] = [];
@@ -57,80 +43,58 @@ describe("askLLM", () => {
 			}
 		);
 		expect(firstToken).toBeTrue();
-		expect(chunks).toEqual(["Hello", " world"]);
+		expect(chunks).toEqual(["Hello world"]);
 		expect(result).toBe("Hello world");
-		globalThis.fetch = originalFetch;
+		globalThis.fetch = orig;
 	});
 
-	it("handles error event from server", async () => {
-		const originalFetch = globalThis.fetch;
-		const encoder = new TextEncoder();
-		const stream = new ReadableStream({
-			start(controller) {
-				controller.enqueue(
-					encoder.encode(
-						`${JSON.stringify({ type: "error", data: "model overloaded" })}\n`
-					)
-				);
-				controller.close();
-			},
-		});
-		globalThis.fetch = (async () =>
-			new Response(stream, { status: 200 })) as any;
-		const { askLLM } = await import("../../src/core/llm-client.js");
-		await expect(
-			askLLM({ username: "test", text: "hi" }, { onChunk: () => {} })
-		).rejects.toThrow("model overloaded");
-		globalThis.fetch = originalFetch;
-	});
-
-	it("skips malformed JSON lines", async () => {
-		const originalFetch = globalThis.fetch;
-		const encoder = new TextEncoder();
-		const stream = new ReadableStream({
-			start(controller) {
-				controller.enqueue(encoder.encode("not json\n"));
-				controller.enqueue(
-					encoder.encode(`${JSON.stringify({ type: "done", data: "" })}\n`)
-				);
-				controller.close();
-			},
-		});
-		globalThis.fetch = (async () =>
-			new Response(stream, { status: 200 })) as any;
-		const { askLLM } = await import("../../src/core/llm-client.js");
-		const result = await askLLM(
-			{ username: "test", text: "hi" },
-			{ onChunk: () => {} }
-		);
-		expect(result).toBe("");
-		globalThis.fetch = originalFetch;
+	it("sends session messages to /v1/chat/completions", async () => {
+		const orig = globalThis.fetch;
+		let sentBody = "";
+		globalThis.fetch = (async (url: string, opts: any) => {
+			sentBody = opts.body;
+			return new Response(
+				JSON.stringify({
+					choices: [{ message: { content: "ok" } }],
+				}),
+				{ status: 200 }
+			);
+		}) as any;
+		const { askLLM, resetLLM } = await import("../../src/core/llm-client.js");
+		await askLLM({ username: "tester", text: "hello", sessionId: "s1" }, { onChunk: () => {} });
+		const body = JSON.parse(sentBody);
+		expect(body.messages[0].role).toBe("system");
+		expect(body.messages[1].role).toBe("user");
+		expect(body.messages[1].content).toContain("tester: hello");
+		expect(body.id_slot).toBeDefined();
+		expect(body.cache_prompt).toBeTrue();
+		await resetLLM();
+		globalThis.fetch = orig;
 	});
 });
 
 describe("resetLLM", () => {
 	beforeAll(() => mockConfig());
 
-	it("sends POST to /reset", async () => {
-		const originalFetch = globalThis.fetch;
-		let called = "";
-		globalThis.fetch = (async (url: string, opts: any) => {
-			called = `${opts.method} ${url}`;
-			return new Response("ok", { status: 200 });
+	it("clears in-memory sessions without HTTP", async () => {
+		const orig = globalThis.fetch;
+		let fetchCalled = false;
+		globalThis.fetch = (async () => {
+			fetchCalled = true;
+			return new Response(null, { status: 200 });
 		}) as any;
-		const { resetLLM } = await import("../../src/core/llm-client.js");
+		const { resetLLM, askLLM } = await import("../../src/core/llm-client.js");
+		// populate a session
+		globalThis.fetch = mockCompletion("ok");
+		await askLLM({ username: "t", text: "hi" }, { onChunk: () => {} });
+		// now reset (no fetch should be made)
+		globalThis.fetch = (async () => {
+			fetchCalled = true;
+			return new Response(null, { status: 200 });
+		}) as any;
 		await resetLLM();
-		expect(called).toContain("POST");
-		expect(called).toContain("/reset");
-		globalThis.fetch = originalFetch;
-	});
-
-	it("handles reset failure gracefully", async () => {
-		const originalFetch = globalThis.fetch;
-		globalThis.fetch = (async () => new Response(null, { status: 500 })) as any;
-		const { resetLLM } = await import("../../src/core/llm-client.js");
-		await resetLLM(); // should not throw
-		globalThis.fetch = originalFetch;
+		expect(fetchCalled).toBeFalse();
+		globalThis.fetch = orig;
 	});
 });
 
@@ -138,32 +102,31 @@ describe("isLLMBusy", () => {
 	beforeAll(() => mockConfig());
 
 	it("returns true on fetch failure", async () => {
-		const originalFetch = globalThis.fetch;
+		const orig = globalThis.fetch;
 		globalThis.fetch = (async () => {
 			throw new Error("network error");
 		}) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeTrue();
-		globalThis.fetch = originalFetch;
+		globalThis.fetch = orig;
 	});
 
 	it("returns true on non-ok response", async () => {
-		const originalFetch = globalThis.fetch;
+		const orig = globalThis.fetch;
 		globalThis.fetch = (async () => new Response(null, { status: 503 })) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeTrue();
-		globalThis.fetch = originalFetch;
+		globalThis.fetch = orig;
 	});
 
-	it("returns the busy field from response", async () => {
-		const originalFetch = globalThis.fetch;
-		globalThis.fetch = (async () =>
-			new Response(JSON.stringify({ busy: false }), { status: 200 })) as any;
+	it("returns false on healthy response", async () => {
+		const orig = globalThis.fetch;
+		globalThis.fetch = (async () => new Response("ok", { status: 200 })) as any;
 		const { isLLMBusy } = await import("../../src/core/llm-client.js");
 		const busy = await isLLMBusy();
 		expect(busy).toBeFalse();
-		globalThis.fetch = originalFetch;
+		globalThis.fetch = orig;
 	});
 });
