@@ -259,6 +259,8 @@ async function triggerLunaReply(
 				];
 		}
 
+		startTyping();
+
 		const fullText = await askLLM({ username: displayName, text: content, sessionId: message.channel.id });
 
 		// build the text to send (with optional typo)
@@ -286,7 +288,6 @@ async function triggerLunaReply(
 
 		let firstMessageId: string | null = null;
 		if (!isVoice) {
-			startTyping();
 			const parts = splitBurst(textToSend);
 			firstMessageId = await sendFragments(parts, isFirstChunk);
 		}
