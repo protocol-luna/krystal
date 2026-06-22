@@ -44,10 +44,16 @@ interface SessionEntry {
 	lastUsed: number;
 }
 
-function formatChatML(messages: ChatMessage[]): string {
+function formatChatML(
+	messages: ChatMessage[],
+	includeAssistantPrompt: boolean
+): string {
 	let text = "";
 	for (const msg of messages) {
 		text += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
+	}
+	if (includeAssistantPrompt) {
+		text += "<|im_start|>assistant\n";
 	}
 	return text;
 }
@@ -151,9 +157,8 @@ export async function startServer(): Promise<void> {
 
 					const userMsg = username ? `${username}: ${text}` : text;
 					entry.messages.push({ role: "user", content: userMsg });
-					entry.messages.push({ role: "assistant", content: "" });
 
-					const convText = formatChatML(entry.messages);
+					const convText = formatChatML(entry.messages, true);
 					const convTokens = entry.model.tokenize(convText);
 					const newTokens = convTokens.slice(entry.nextTokenIndex);
 
@@ -247,11 +252,7 @@ export async function startServer(): Promise<void> {
 					}
 
 					entry.nextTokenIndex = entry.seq.nextTokenIndex;
-
-					const lastMsg = entry.messages[entry.messages.length - 1];
-					if (lastMsg.role === "assistant") {
-						lastMsg.content = cleanResp;
-					}
+					entry.messages.push({ role: "assistant", content: cleanResp });
 
 					res.write(`${JSON.stringify({ type: "done", data: cleanResp })}\n`);
 					res.end();
