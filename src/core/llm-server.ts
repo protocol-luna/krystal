@@ -57,12 +57,12 @@ function spawnSession(): SessionEntry {
 			LLAMA_MODEL_PATH,
 			"-t",
 			String(cpuThreads),
+			"-c",
+			"4096",
 			"--conversation",
 			"--simple-io",
 			"-sys",
 			SYSTEM_PROMPT,
-			"-p",
-			"",
 			"--temp",
 			"0.8",
 			"--top-k",
@@ -90,7 +90,9 @@ function spawnSession(): SessionEntry {
 	let collecting = false;
 	let ready = false;
 
+	const out: string[] = [];
 	rl.on("line", (line) => {
+		out.push(line);
 		if (!ready) {
 			if (line.trim() === ">") {
 				ready = true;
@@ -125,12 +127,16 @@ function spawnSession(): SessionEntry {
 	});
 
 	proc.on("exit", (code) => {
+		const dump = out.join("|").slice(0, 400);
 		const err = errBuf.join("").trim();
+		console.log(
+			`[llm-server] llama-cli exited (${code}). stdout (${out.length}): ${dump}`
+		);
 		if (readResolve) {
 			readResolve("");
 		}
 		if (err) {
-			console.error(`[llm-server] llama-cli exited (${code}): ${err}`);
+			console.error(`[llm-server] llama-cli stderr: ${err.slice(0, 500)}`);
 		}
 	});
 
