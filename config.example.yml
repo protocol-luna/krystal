@@ -15,9 +15,7 @@ llm_host: "localhost"
 # Port du LLM (CLI ou serveur HTTP llama-server)
 llm_port: 3124
 # Mode de connexion au LLM :
-#   "cli"    → spawn llama-cli en subprocess (monolithique)
-#   "server" → HTTP POST à llama-server (endpoint /completion, SSE)
-#   "proxy"  → bot client → HTTP → llm-server (qui gère le LLM en direct)
+#   "proxy"  → bot client → HTTP → llm-server (qui gère le LLM via node-llama-cpp)
 #             (nécessite `node self-cli.js server` dans un autre process)
 #   "online" → appel HTTP à une API compatible OpenAI (chat/completions)
 #             (nécessite llm_api_endpoint et llm_api_token)

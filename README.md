@@ -4,9 +4,8 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Four LLM modes: `cli` (spawn llama-cli), `server` (HTTP → llama-server), `proxy` (bot → HTTP → separate llm-server), `online` (OpenAI-compatible API)
+- Two LLM modes: `proxy` (bot → HTTP → llm-server with node-llama-cpp), `online` (OpenAI-compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
-- LLM auto-restart (cli mode) with exponential backoff and preserved queue
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -312,11 +311,10 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `discord_token` | string | *(required)* | Discord bot token |
-| `llama_cli_path` | string | `"llama/llama-cli"` | Path to llama-cli binary |
 | `llama_model_path` | string | `"./models/Discord-Hermes-3-8B.Q2_K.gguf"` | Path to GGUF model |
 | `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
 | `llm_port` | number | `3124` | LLM port |
-| `llm_mode` | `"cli"`, `"server"`, `"proxy"`, `"online"` | `"proxy"` | `cli` → spawn llama-cli, `server` → HTTP llama-server, `proxy` → bot client via llm-server, `online` → OpenAI-compatible API |
+| `llm_mode` | `"proxy"`, `"online"` | `"proxy"` | `proxy` → bot client via llm-server, `online` → OpenAI-compatible API |
 | `llm_api_endpoint` | string | `""` | OpenAI-compatible endpoint (mode `online`) |
 | `llm_api_token` | string | `""` | API token (mode `online`) |
 | `llm_model` | string | `"gpt-4o-mini"` | Model name sent in API requests (mode `online`) |
@@ -539,7 +537,7 @@ Explore the dataset interactively: [**Atlas Map**](https://atlas.nomic.ai/data/m
 | `[bot]` | Decision, follow-up, reply style, forget |
 | `[tts]` | Synthesis, upload, voice message |
 | `[persist]` | Save/restore |
-| `[llm-core]` | Spawn, crash, restart, CLI/server mode |
+| `[llm-core]` | Queue, proxy/server, LLM events |
 | `[llmBus]` | LLM events (token, done, flush, error, ready) |
 
 ---
@@ -555,24 +553,19 @@ npm run build && npm start     # production
 ```
 
 | Script | Description |
-|---|---|
-| `dev` | Bot + server (hot reload, bun) |
-| `start` | Bot + server (production, concurrently) |
-| `build` | Bundle bot + server |
-| `client-only` | Bot only (proxy mode) |
-| `server-only` | LLM server only |
-| `direct` | Direct CLI mode: `node . direct` |
+|---|---|---|
+| `build` | Bundle self-contained CLI |
+| `start` | Run bot |
 | `lint` / `format` / `check` | Biome |
+| `test` | Run tests (Bun) |
 | `download-model` | GGUF from HuggingFace |
-| `diagrams` | Export 22 Mermaid diagrams as dark-theme PNGs |
+| `diagrams` | Export Mermaid diagrams as SVGs/PNGs |
 
 ### LLM deployment modes
 
 | Mode | Usage | Description |
 |------|-------|-------------|
-| `cli` | `llm_mode: cli` | Bot manages the LLM directly (spawn llama-cli). Monolithic, single process. |
-| `server` | `llm_mode: server` | Bot calls llama-server via HTTP. llama-server must be running alongside. |
-| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (which manages the LLM). Two processes, ideal for PM2. |
+| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (which manages the LLM via node-llama-cpp). Two processes, ideal for PM2. |
 | `online` | `llm_mode: online` | Bot calls any OpenAI-compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)

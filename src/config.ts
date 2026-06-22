@@ -1,7 +1,6 @@
 import { readFileSync, existsSync, watch } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import { cpus } from "node:os";
 
 const ROOT = process.cwd();
 
@@ -68,11 +67,6 @@ export const DISCORD_TOKEN: string =
 		process.exit(1);
 	})();
 
-export const LLAMA_CLI_PATH: string =
-	v<string | null>("llama_cli_path", null) ??
-	process.env.LLAMA_CLI_PATH ??
-	"llama/llama-cli";
-
 export const LLAMA_MODEL_PATH: string =
 	v<string | null>("llama_model_path", null) ??
 	process.env.LLAMA_MODEL_PATH ??
@@ -85,17 +79,12 @@ export const LLM_PORT: number =
 	v<number | null>("llm_port", null) ??
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
-export type LLMMode = "cli" | "server" | "proxy" | "online";
+export type LLMMode = "proxy" | "online";
 
-export let LLM_MODE: LLMMode =
+export const LLM_MODE: LLMMode =
 	(v<string | null>("llm_mode", null) as LLMMode | null) ??
 	(process.env.LLM_MODE as LLMMode | undefined) ??
 	"proxy";
-
-/** Override LLM_MODE at runtime (used by llm-server to force cli/server) */
-export function setLLMMode(mode: Exclude<LLMMode, "online">): void {
-	LLM_MODE = mode;
-}
 
 export const LLM_API_ENDPOINT: string =
 	v<string | null>("llm_api_endpoint", null) ??
@@ -146,46 +135,6 @@ export const ffprobePath: string =
 	v<string | null>("ffprobe_path", null) ??
 	process.env.FFPROBE_PATH ??
 	join(ROOT, "bin/ffmpeg/ffprobe");
-
-const cpuCount = cpus().length;
-
-export const llamaArgs = [
-	"-m",
-	LLAMA_MODEL_PATH,
-	"-t",
-	String(cpuCount),
-	"-tb",
-	String(cpuCount),
-	"-b",
-	"4096",
-	"-ub",
-	"256",
-	"--mlock",
-	"-c",
-	"4096",
-	"-cnv",
-	"--simple-io",
-	"--temp",
-	"0.75",
-	"--dynatemp-range",
-	"0.15",
-	"--top-k",
-	"40",
-	"--top-p",
-	"0.95",
-	"--min-p",
-	"0.05",
-	"--repeat-penalty",
-	"1.12",
-	"--repeat-last-n",
-	"256",
-	"--presence-penalty",
-	"0.1",
-	"-sys",
-	SYSTEM_PROMPT,
-	"--chat-template",
-	jinjaTemplate,
-];
 
 // --- Types (shared by static & reloadable) ---
 

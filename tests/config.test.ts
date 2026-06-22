@@ -156,18 +156,6 @@ describe("config.static exports", () => {
 		expect(mod.LLM_PORT).toBe(3124);
 	});
 
-	it("exports llamaArgs array", async () => {
-		mockConfig();
-		const mod = await import("../src/config.js");
-		expect(Array.isArray(mod.llamaArgs)).toBeTrue();
-	});
-
-	it("exports setLLMMode", async () => {
-		mockConfig();
-		const mod = await import("../src/config.js");
-		expect(typeof mod.setLLMMode).toBe("function");
-	});
-
 	it("exports watchConfig", async () => {
 		mockConfig();
 		const mod = await import("../src/config.js");

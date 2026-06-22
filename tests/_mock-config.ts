@@ -107,7 +107,6 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 		ffmpegPath: "/usr/bin/ffmpeg",
 		ffprobePath: "/usr/bin/ffprobe",
 		DISCORD_TOKEN: "mock_token",
-		LLAMA_CLI_PATH: "llama/llama-cli",
 		LLAMA_MODEL_PATH: "models/model.gguf",
 		LLM_HOST: "localhost",
 		LLM_PORT: 3124,
@@ -116,8 +115,6 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 		jinjaTemplate: "template",
 		ttsModelPath: "tts/model.onnx",
 		ttsBinaryPath: "bin/piper",
-		llamaArgs: [] as string[],
-		setLLMMode() {},
 		watchConfig() {},
 		pickReplyStyle() {
 			return { messageReference: true, mentionRepliedUser: false };

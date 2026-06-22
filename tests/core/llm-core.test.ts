@@ -89,12 +89,3 @@ describe("resetLLM", () => {
 		globalThis.fetch = orig;
 	});
 });
-
-describe("shutdown", () => {
-	beforeAll(() => mockConfig());
-
-	it("is no-op in proxy mode", async () => {
-		const mod = await import("../../src/core/llm-core.js");
-		mod.shutdown();
-	});
-});

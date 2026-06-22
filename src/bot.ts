@@ -334,7 +334,6 @@ async function triggerLunaReply(
 		if (typingInterval) {
 			clearInterval(typingInterval);
 		}
-		llmBus.off("token", startTyping);
 		if (onToken) {
 			llmBus.off("token", onToken);
 		}
