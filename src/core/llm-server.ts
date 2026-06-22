@@ -1,6 +1,16 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT, LLM_SERVER_KEY, LLM_SESSION_TTL } from "../config.js";
-import type { LlamaChatSession } from "node-llama-cpp";
+import {
+	createServer,
+	type IncomingMessage,
+	type Server,
+	type ServerResponse,
+} from "node:http";
+import {
+	LLAMA_MODEL_PATH,
+	LLM_PORT,
+	SYSTEM_PROMPT,
+	LLM_SERVER_KEY,
+	LLM_SESSION_TTL,
+} from "../config.js";
 
 function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	if (!LLM_SERVER_KEY) {
@@ -10,7 +20,10 @@ function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	if (header === `Bearer ${LLM_SERVER_KEY}`) {
 		return true;
 	}
-	res.writeHead(401, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+	res.writeHead(401, {
+		"Content-Type": "application/json",
+		"Access-Control-Allow-Origin": "*",
+	});
 	res.end(JSON.stringify({ error: "unauthorized" }));
 	return false;
 }
@@ -18,14 +31,38 @@ function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 const SESSION_TTL = LLM_SESSION_TTL * 60 * 1000;
 const PRUNE_INTERVAL = 60_000;
 
+interface ChatMessage {
+	role: "system" | "user" | "assistant";
+	content: string;
+}
+
+interface SessionEntry {
+	seq: import("node-llama-cpp").LlamaContextSequence;
+	model: import("node-llama-cpp").LlamaModel;
+	messages: ChatMessage[];
+	nextTokenIndex: number;
+	lastUsed: number;
+}
+
+function formatChatML(messages: ChatMessage[]): string {
+	let text = "";
+	for (const msg of messages) {
+		text += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
+	}
+	return text;
+}
+
 let server: Server | undefined;
-let sessions: Map<string, { session: LlamaChatSession; lastUsed: number }>;
+let sessions: Map<string, SessionEntry>;
 
 export async function startServer(): Promise<void> {
-	const { getLlama, LlamaChatSession } = await import("node-llama-cpp");
+	const { getLlama } = await import("node-llama-cpp");
 	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
 	const llama = await getLlama();
-	const model = await llama.loadModel({ modelPath: LLAMA_MODEL_PATH, useMlock: true });
+	const model = await llama.loadModel({
+		modelPath: LLAMA_MODEL_PATH,
+		useMlock: true,
+	});
 	console.log("[llm-server] model loaded");
 
 	sessions = new Map();
@@ -34,7 +71,7 @@ export async function startServer(): Promise<void> {
 		const now = Date.now();
 		for (const [id, s] of sessions) {
 			if (now - s.lastUsed > SESSION_TTL) {
-				s.session.dispose();
+				s.seq.dispose();
 				sessions.delete(id);
 				console.log(`[llm-server] pruned stale session: ${id.slice(0, 8)}...`);
 			}
@@ -72,10 +109,21 @@ export async function startServer(): Promise<void> {
 
 				if (!entry) {
 					try {
-						const ctx = await model.createContext({ contextSize: 4096, batchSize: 4096 });
+						const ctx = await model.createContext({
+							contextSize: 4096,
+							batchSize: 4096,
+						});
 						const seq = ctx.getSequence();
-						const session = new LlamaChatSession({ contextSequence: seq, systemPrompt: SYSTEM_PROMPT });
-						entry = { session, lastUsed: Date.now() };
+						const messages: ChatMessage[] = [
+							{ role: "system", content: SYSTEM_PROMPT },
+						];
+						entry = {
+							seq,
+							model,
+							messages,
+							nextTokenIndex: 0,
+							lastUsed: Date.now(),
+						};
 						sessions.set(sid, entry);
 						console.log(
 							`[llm-server] new session: ${sid.slice(0, 8)}... (${sessions.size} total)`
@@ -99,40 +147,83 @@ export async function startServer(): Promise<void> {
 				});
 
 				try {
-					const promptText = username ? `${username}: ${text}` : text;
-					let firstToken = true;
-					let fullText = "";
+					const userMsg = username ? `${username}: ${text}` : text;
+					entry.messages.push({ role: "user", content: userMsg });
+					entry.messages.push({ role: "assistant", content: "" });
+
+					const convText = formatChatML(entry.messages);
+					const convTokens = entry.model.tokenize(convText);
+					const newTokens = convTokens.slice(entry.nextTokenIndex);
+
+					let genTokens: import("node-llama-cpp").Token[] = [];
+					let prevDetokLen = 0;
+					let firstTokenSent = false;
 					let chunkBuf = "";
 
-					await entry.session.prompt(promptText, {
+					for await (const token of entry.seq.evaluate(newTokens, {
 						temperature: 0.8,
 						minP: 0.05,
 						topK: 40,
 						topP: 0.95,
-						maxTokens: 4096,
-						onTextChunk(token: string) {
-							if (!token) {
-								return;
-							}
-							if (firstToken) {
-								firstToken = false;
-								res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
-							}
-							fullText += token;
-							chunkBuf += token;
-							if (chunkBuf.includes("\n") || chunkBuf.length >= 40) {
-								res.write(
-									`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`
-								);
-								chunkBuf = "";
-							}
-						},
-					});
+						yieldEogToken: true,
+					})) {
+						if (entry.model.isEogToken(token)) {
+							break;
+						}
 
+						genTokens.push(token);
+
+						if (genTokens.length > 3) {
+							const textSoFar = entry.model.detokenize(genTokens);
+							const stopIdx = textSoFar.indexOf("<|im_end|>");
+							if (stopIdx !== -1) {
+								const keepText = textSoFar.slice(0, stopIdx);
+								genTokens = entry.model.tokenize(keepText);
+								break;
+							}
+
+							const delta = textSoFar.slice(prevDetokLen);
+							if (delta) {
+								if (!firstTokenSent) {
+									firstTokenSent = true;
+									res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
+								}
+								chunkBuf += delta;
+								if (chunkBuf.includes("\n") || chunkBuf.length >= 40) {
+									res.write(
+										`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`
+									);
+									chunkBuf = "";
+								}
+							}
+							prevDetokLen = textSoFar.length;
+						}
+
+						if (genTokens.length > 4000) {
+							break;
+						}
+					}
+
+					const responseText = entry.model.detokenize(genTokens);
+					let cleanResp = responseText;
+					if (cleanResp.includes("<|im_end|>")) {
+						cleanResp = cleanResp.slice(0, cleanResp.indexOf("<|im_end|>"));
+					}
+					if (!firstTokenSent && cleanResp) {
+						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
+					}
 					if (chunkBuf) {
 						res.write(`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`);
 					}
-					res.write(`${JSON.stringify({ type: "done", data: fullText })}\n`);
+
+					entry.nextTokenIndex = entry.seq.nextTokenIndex;
+
+					const lastMsg = entry.messages[entry.messages.length - 1];
+					if (lastMsg.role === "assistant") {
+						lastMsg.content = cleanResp;
+					}
+
+					res.write(`${JSON.stringify({ type: "done", data: cleanResp })}\n`);
 					res.end();
 				} catch (err) {
 					res.write(
@@ -149,7 +240,7 @@ export async function startServer(): Promise<void> {
 			if (sessionId) {
 				const entry = sessions.get(sessionId);
 				if (entry) {
-					entry.session.dispose();
+					entry.seq.dispose();
 					sessions.delete(sessionId);
 					console.log(
 						`[llm-server] reset session: ${sessionId.slice(0, 8)}...`
@@ -157,7 +248,7 @@ export async function startServer(): Promise<void> {
 				}
 			} else {
 				for (const [, s] of sessions) {
-					s.session.dispose();
+					s.seq.dispose();
 				}
 				sessions.clear();
 				console.log("[llm-server] reset all sessions");
