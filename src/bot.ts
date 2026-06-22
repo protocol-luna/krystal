@@ -591,8 +591,9 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		trackSpeaker(message.channel.id, message.author.id);
 		const fatigueIgnoreBonus = getFatigueIgnoreBonus(message.channel.id);
 		if (
-			shouldIgnore(result.reason, sleepBehavior) ||
-			Math.random() < fatigueIgnoreBonus
+			!isDM &&
+			(shouldIgnore(result.reason, sleepBehavior) ||
+			Math.random() < fatigueIgnoreBonus)
 		) {
 			console.log(
 				`[bot] #${channelName} ${author}: ignoré (${result.reason})${fatigueIgnoreBonus > 0 ? ` fatigue=${fatigueIgnoreBonus.toFixed(2)}` : ""}`
@@ -600,7 +601,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			return;
 		}
 
-		if (Math.random() < config.forgetChance) {
+		if (!isDM && Math.random() < config.forgetChance) {
 			console.log(`[bot] #${channelName} ${author}: oublié (${result.reason})`);
 			return;
 		}
