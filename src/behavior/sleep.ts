@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { config, DISCORD_TOKEN } from "../config.js";
 
 function parseTime(t: string): number {
 	const [h, m] = t.split(":").map(Number);
@@ -15,6 +15,9 @@ function isInWindow(now: number, start: number, end: number): boolean {
 export type SleepBehavior = "sleep" | "slow" | "short" | null;
 
 export function getSleepBehavior(): SleepBehavior {
+	if (DISCORD_TOKEN.startsWith("Bot ")) {
+		return null;
+	}
 	const schedules = config.timeSchedules;
 	if (!Array.isArray(schedules) || schedules.length === 0) {
 		return null;
