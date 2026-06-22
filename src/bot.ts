@@ -259,7 +259,7 @@ async function triggerLunaReply(
 				];
 		}
 
-		const fullText = await askLLM({ username: displayName, text: content });
+		const fullText = await askLLM({ username: displayName, text: content, sessionId: message.channel.id });
 
 		// build the text to send (with optional typo)
 		const text = stripLlmPrefix(fullText);

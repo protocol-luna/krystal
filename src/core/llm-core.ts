@@ -228,6 +228,8 @@ export async function resetLLM(): Promise<void> {
 	llmBus.emit("reset");
 
 	if (LLM_MODE === "online") {
+		const { clearConversations } = await import("./llm-online.js");
+		clearConversations();
 		return;
 	}
 

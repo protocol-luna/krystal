@@ -127,6 +127,7 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 	await askLLM(
 		{
 			username: "system",
+			sessionId: picked.channel.id,
 			text: context
 				? `Recent conversation in #${picked.channel.name}:\n${context}\n\nJoin the conversation naturally. Keep it short and relevant to what was just said.`
 				: `You are in #${picked.channel.name}. The channel is quiet. Say something engaging to spark conversation. Keep it short.`,

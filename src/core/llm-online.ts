@@ -10,8 +10,16 @@ interface OnlineCallbacks {
 	onChunk: (chunk: string) => void;
 }
 
+interface Message {
+	role: "system" | "user" | "assistant";
+	content: string;
+}
+
+const conversations = new Map<string, Message[]>();
+const MAX_HISTORY = 20; // max exchanges (user+assistant pairs)
+
 export async function askOnline(
-	userMessage: { username: string; text: string },
+	userMessage: { username: string; text: string; sessionId?: string },
 	callbacks: OnlineCallbacks
 ): Promise<string> {
 	if (!(LLM_API_ENDPOINT && LLM_API_TOKEN)) {
@@ -19,6 +27,26 @@ export async function askOnline(
 			"llm_api_endpoint and llm_api_token required in online mode"
 		);
 	}
+
+	const sid = userMessage.sessionId ?? "default";
+	let history: Message[] | undefined;
+
+	if (sid) {
+		history = conversations.get(sid);
+		if (!history) {
+			history = [{ role: "system", content: SYSTEM_PROMPT }];
+			conversations.set(sid, history);
+		}
+	}
+
+	const messages: Message[] = history ?? [
+		{ role: "system", content: SYSTEM_PROMPT },
+	];
+
+	messages.push({
+		role: "user",
+		content: `${userMessage.username}: ${userMessage.text}`,
+	});
 
 	const response = await fetch(LLM_API_ENDPOINT, {
 		method: "POST",
@@ -28,13 +56,7 @@ export async function askOnline(
 		},
 		body: JSON.stringify({
 			model: LLM_MODEL,
-			messages: [
-				{ role: "system", content: SYSTEM_PROMPT },
-				{
-					role: "user",
-					content: `${userMessage.username}: ${userMessage.text}`,
-				},
-			],
+			messages,
 			stream: true,
 		}),
 	});
@@ -69,7 +91,7 @@ export async function askOnline(
 			}
 			const payload = trimmed.slice(6);
 			if (payload === "[DONE]") {
-				return fullText;
+				return finishResponse(fullText, messages, history);
 			}
 			try {
 				const data = JSON.parse(payload) as {
@@ -90,5 +112,30 @@ export async function askOnline(
 		}
 	}
 
-	return fullText;
+	return finishResponse(fullText, messages, history);
+}
+
+function finishResponse(
+	text: string,
+	messages: Message[],
+	history: Message[] | undefined
+): string {
+	messages.push({ role: "assistant", content: text });
+
+	if (history) {
+		// trim: keep system prompt + last MAX_HISTORY exchanges
+		const system = messages[0];
+		const exchanges = messages.slice(1);
+		if (exchanges.length > MAX_HISTORY * 2) {
+			history.length = 0;
+			history.push(system);
+			history.push(...exchanges.slice(-MAX_HISTORY * 2));
+		}
+	}
+
+	return text;
+}
+
+export function clearConversations(): void {
+	conversations.clear();
 }
