@@ -1,5 +1,4 @@
 import { availableParallelism } from "node:os";
-import { createInterface } from "node:readline";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import { cwd } from "node:process";
@@ -18,6 +17,7 @@ import {
 } from "../config.js";
 
 const LLAMA_CLI = resolve(cwd(), "bin/llama/llama-cli");
+const cpuThreads = availableParallelism();
 
 function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	if (!LLM_SERVER_KEY) {
@@ -47,7 +47,6 @@ interface SessionEntry {
 
 let server: Server | undefined;
 let sessions: Map<string, SessionEntry>;
-const cpuThreads = availableParallelism();
 
 function spawnSession(): SessionEntry {
 	const proc = spawn(
@@ -77,88 +76,75 @@ function spawnSession(): SessionEntry {
 		}
 	);
 
-	const rl = createInterface({
-		input: proc.stdout!,
-		crlfDelay: Number.POSITIVE_INFINITY,
-	});
 	const errBuf: string[] = [];
 	proc.stderr!.on("data", (d) => errBuf.push(d.toString()));
 
-	let readyResolve: (() => void) | null = null;
 	let readResolve: ((resp: string) => void) | null = null;
-	let responseLines: string[] = [];
-	let collecting = false;
-	let ready = false;
+	let responseBuffer = "";
+	let responseTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	const out: string[] = [];
-	rl.on("line", (line) => {
-		out.push(line);
-		if (!ready) {
-			if (line.trim() === ">") {
-				ready = true;
-				if (readyResolve) {
-					readyResolve();
-					readyResolve = null;
-				}
-			}
+	proc.stdout!.on("data", (chunk: Buffer) => {
+		const text = chunk.toString();
+		if (!readResolve) {
 			return;
 		}
+		responseBuffer += text;
+		const promptIdx = responseBuffer.lastIndexOf("[ Prompt:");
+		if (promptIdx !== -1) {
+			const before = responseBuffer.slice(0, promptIdx).trimEnd();
+			const promptLineEnd = responseBuffer.indexOf("\n", promptIdx);
+			responseBuffer =
+				promptLineEnd === -1 ? "" : responseBuffer.slice(promptLineEnd + 1);
 
-		if (readResolve) {
-			if (line.startsWith("[ Prompt:")) {
-				const resp = responseLines.join("\n").trim();
-				responseLines = [];
-				collecting = false;
-				const r = readResolve;
-				readResolve = null;
-				r(resp);
-				return;
+			let resp = before;
+			const lastGt = resp.lastIndexOf("> ");
+			if (lastGt !== -1) {
+				resp = resp.slice(lastGt + 2).trim();
 			}
+			resp = resp.replace(/\n{3,}/g, "\n\n").trim();
 
-			if (!collecting && line.trim() === "") {
-				collecting = true;
-				return;
+			if (responseTimeout) {
+				clearTimeout(responseTimeout);
+				responseTimeout = null;
 			}
-
-			if (collecting) {
-				responseLines.push(line);
-			}
+			const r = readResolve;
+			readResolve = null;
+			r(resp);
 		}
 	});
 
 	proc.on("exit", (code) => {
-		const dump = out.join("|").slice(0, 400);
 		const err = errBuf.join("").trim();
-		console.log(
-			`[llm-server] llama-cli exited (${code}). stdout (${out.length}): ${dump}`
-		);
 		if (readResolve) {
-			readResolve("");
+			if (responseBuffer) {
+				const resp = responseBuffer.replace(/\n{3,}/g, "\n\n").trim();
+				const r = readResolve;
+				readResolve = null;
+				r(resp);
+			} else {
+				const r = readResolve;
+				readResolve = null;
+				r("");
+			}
 		}
 		if (err) {
-			console.error(`[llm-server] llama-cli stderr: ${err.slice(0, 500)}`);
+			console.error(
+				`[llm-server] llama-cli exited (${code}): ${err.slice(0, 300)}`
+			);
 		}
 	});
 
 	return {
 		process: proc,
 		lastUsed: Date.now(),
-		send: async (msg: string): Promise<string> => {
-			if (!ready) {
-				await new Promise<void>((resolve) => {
-					readyResolve = resolve;
-				});
-			}
-			responseLines = [];
-			collecting = false;
+		send: (msg: string): Promise<string> => {
+			responseBuffer = "";
 			return new Promise((resolve, reject) => {
-				const timeout = setTimeout(() => {
+				responseTimeout = setTimeout(() => {
+					readResolve = null;
 					reject(new Error("response timeout"));
 				}, 120_000);
-				readResolve = (resp: string) => {
-					clearTimeout(timeout);
-					resolve(resp);
-				};
+				readResolve = resolve;
 				proc.stdin!.write(`${msg}\n`);
 			});
 		},
@@ -245,7 +231,7 @@ export async function startServer(): Promise<void> {
 					const brief =
 						response.length > 60 ? `${response.slice(0, 60)}...` : response;
 					console.log(
-						`[llm-server] sid=${sid.slice(0, 8)} total=${totalMs}ms "${brief}"`
+						`[llm-server] sid=${sid.slice(0, 8)} total=${totalMs}ms len=${response.length} "${brief}"`
 					);
 
 					res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
