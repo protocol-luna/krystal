@@ -5,3 +5,4 @@ config.yml
 prompt.txt
 *.tsbuildinfo
 state.json
+self-cli.cjs

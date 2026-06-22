@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { LLAMA_MODEL_PATH, LLM_PORT } from "../config.js";
+import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT } from "../config.js";
 import type { LlamaChatSession } from "node-llama-cpp";
 
 const SESSION_TTL = 10 * 60 * 1000;
@@ -12,7 +12,7 @@ export async function startServer(): Promise<void> {
 	const { getLlama, LlamaChatSession } = await import("node-llama-cpp");
 	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
 	const llama = await getLlama();
-	const model = await llama.loadModel({ modelPath: LLAMA_MODEL_PATH });
+	const model = await llama.loadModel({ modelPath: LLAMA_MODEL_PATH, useMlock: true });
 	console.log("[llm-server] model loaded");
 
 	sessions = new Map();
@@ -55,9 +55,9 @@ export async function startServer(): Promise<void> {
 
 				if (!entry) {
 					try {
-						const ctx = await model.createContext({ contextSize: 4096 });
+						const ctx = await model.createContext({ contextSize: 4096, batchSize: 4096 });
 						const seq = ctx.getSequence();
-						const session = new LlamaChatSession({ contextSequence: seq });
+						const session = new LlamaChatSession({ contextSequence: seq, systemPrompt: SYSTEM_PROMPT });
 						entry = { session, lastUsed: Date.now() };
 						sessions.set(sid, entry);
 						console.log(
@@ -88,6 +88,13 @@ export async function startServer(): Promise<void> {
 					let chunkBuf = "";
 
 					await entry.session.prompt(promptText, {
+						temperature: 0.75,
+						minP: 0.05,
+						topK: 40,
+						topP: 0.95,
+						repeatPenalty: { penalty: 1.12, lastTokens: 256, presencePenalty: 0.1 },
+						dryRepeatPenalty: { strength: 0.8 },
+						maxTokens: 4096,
 						onTextChunk(token: string) {
 							if (!token) {
 								return;
