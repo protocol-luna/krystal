@@ -79,12 +79,13 @@ export const LLM_PORT: number =
 	v<number | null>("llm_port", null) ??
 	Number.parseInt(process.env.LLM_PORT ?? "3124", 10);
 
-export type LLMMode = "proxy" | "online";
+export type LLMMode = "direct" | "online";
 
 export const LLM_MODE: LLMMode =
-	(v<string | null>("llm_mode", null) as LLMMode | null) ??
+
 	(process.env.LLM_MODE as LLMMode | undefined) ??
-	"proxy";
+
+	"direct";
 
 export const LLM_API_ENDPOINT: string =
 	v<string | null>("llm_api_endpoint", null) ??

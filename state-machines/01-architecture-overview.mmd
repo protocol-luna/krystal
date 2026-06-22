@@ -18,7 +18,7 @@ graph TB
         LLMSRV{{"llama‑server<br/>4 slots, prompt cache"}}
 
         LLMCORE --> LLMBUS
-        LLMCORE -->|"proxy mode"| LLMCLIENT
+        LLMCORE -->|"direct mode"| LLMCLIENT
         LLMCLIENT -->|"HTTP POST /v1/chat/completions"| LLMSRV
         LLMCORE -->|"online mode"| API{{"OpenAI-compatible API"}}
     end

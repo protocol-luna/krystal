@@ -50,9 +50,9 @@ The last check is a flat 1.5% random chance (`randomChance` in config). This mak
 
 [![LLM Core Queue](output/04-llm-core-queue.svg)](04-llm-core-queue.mmd)
 
-This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of two backends based on `LLM_MODE`: Proxy (talks to local `llama-server` via HTTP `/v1/chat/completions`) or Online (hits an OpenAI-compatible API streaming endpoint).
+This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of two backends based on `LLM_MODE`: Direct (talks to local `llama-server` via HTTP `/v1/chat/completions`) or Online (hits an OpenAI-compatible API streaming endpoint).
 
-In proxy mode, `llm-client.ts` manages session history (system prompt + user/assistant messages per channel) in memory. It sends the full conversation to `llama-server`'s OpenAI-compatible API with `id_slot` for slot pinning and `cache_prompt` for KV cache reuse. The server responds with standard JSON containing the assistant's reply. Online mode uses the standard OpenAI SSE streaming format: `data: {"choices": [{"delta": {"content": "..."}}]}`.
+In direct mode, `llm-client.ts` manages session history (system prompt + user/assistant messages per channel) in memory. It sends the full conversation to `llama-server`'s OpenAI-compatible API with `id_slot` for slot pinning and `cache_prompt` for KV cache reuse. The server responds with standard JSON containing the assistant's reply. Online mode uses the standard OpenAI SSE streaming format: `data: {"choices": [{"delta": {"content": "..."}}]}` irrespective of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. Each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has. The typing indicator is started directly before sending (not tied to the first token).
 
 Regardless of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. Each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has. The typing indicator is started directly before sending (not tied to the first token).
 
@@ -308,6 +308,6 @@ When fatigued, two things change: the response delay is multiplied by `topic_fat
 - Total source files: ~30 TypeScript files
 - Lines of code: ~3500 LOC
 - Tests: ~71 test files (Bun)
-- LLM backends: 2 (proxy, online)
+- LLM backends: 2 (direct, online)
 - Event bus types: 7 (llmBus) + 1 (stateBus)
 - Simulated human behaviors: 10 (delay, ignore, forget, hesitation, typo, reaction, voice, follow-up, burst, topic fatigue)

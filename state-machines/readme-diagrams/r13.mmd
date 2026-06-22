@@ -8,7 +8,8 @@ sequenceDiagram
     participant sleep.ts
     participant typo.ts
     participant llm-core.ts
-    participant llm-server.ts
+    participant llm-core.ts
+    participant llama-server
 
     User->>Discord: sends a message
     Discord->>bot.ts: messageCreate
@@ -41,16 +42,12 @@ sequenceDiagram
                 bot.ts->>bot.ts: store in pendingMessages["C:U"]
                 bot.ts-->>Discord: ignored (queued)
             else free
-                bot.ts->>bot.ts: llmBus.on("token", onToken)<br/>llmBus.on("flush", onFlush)
+                bot.ts->>bot.ts: startTyping()<br/>llmBus.on("token", onToken)<br/>llmBus.on("flush", onFlush)
                 bot.ts->>llm-core.ts: askLLM({ username, text })
 
-                llm-core.ts-->>bot.ts: proxy mode → HTTP → llm-server<br/>online mode → OpenAI API
-
-                llm-server.ts-->>llm-core.ts: NDJSON stream
+                llm-core.ts->>llama-server: HTTP POST /v1/chat/completions<br/>(messages, id_slot, cache_prompt)
+                llama-server-->>llm-core.ts: JSON response
                 llm-core.ts->>llmBus: emit("token", word)  × N words<br/>llmBus.emit("flush")      → end of line
-
-                bot.ts->>bot.ts: hesitation possible, startTyping()
-                bot.ts->>Discord: sendChannelTyping()
                 Note over bot.ts: 8s interval keeps<br/>typing indicator active
                 loop each flush
                     llmBus-->>bot.ts: onFlush()

@@ -1,5 +1,5 @@
 stateDiagram-v2
-    [*] --> ACTIVE: request sent to llm-server
+    [*] --> ACTIVE: request sent to llama-server
 
     ACTIVE --> CONNECTION_ERROR: HTTP error / timeout
     CONNECTION_ERROR --> RETRY_SCHEDULE: emit("error")
@@ -16,4 +16,4 @@ stateDiagram-v2
     RETRY --> ACTIVE: success
     RETRY --> CONNECTION_ERROR: fail
 
-    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s<br/>(max 30s, max 5 attempts)<br/>llm-server is PM2-managed
+    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s<br/>(max 30s, max 5 attempts)<br/>llama-server is PM2-managed

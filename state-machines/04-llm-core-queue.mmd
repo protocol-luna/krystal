@@ -7,21 +7,15 @@ stateDiagram-v2
     PROCESS_QUEUE --> CHECK_MODE: ensureLLM() + not busy
     PROCESS_QUEUE --> IDLE: isProcessing || queueHead >= length
 
-    CHECK_MODE --> PROXY_MODE: LLM_MODE == "proxy"
+    CHECK_MODE --> DIRECT_MODE: LLM_MODE == "direct"
     CHECK_MODE --> ONLINE_MODE: LLM_MODE == "online"
 
-    state PROXY_MODE {
-        [*] --> HTTP_POST_PROXY: fetch() POST /ask to llm-server
-        HTTP_POST_PROXY --> NDJSON_STREAM: read NDJSON stream
-        NDJSON_STREAM --> PARSE_EVENTS: JSON.parse per line
-        PARSE_EVENTS --> HANDLE_firstToken: type=="firstToken"
-        PARSE_EVENTS --> HANDLE_chunk: type=="chunk"
-        PARSE_EVENTS --> HANDLE_done: type=="done"
-        PARSE_EVENTS --> HANDLE_error: type=="error"
-        HANDLE_firstToken --> NDJSON_STREAM
-        HANDLE_chunk --> EMIT_WORD_TOKENS: emitWordTokens()
-        HANDLE_done --> EMIT_DONE_PROXY: signalDone(text)
-        HANDLE_error --> EMIT_ERROR_PROXY: throw Error
+    state DIRECT_MODE {
+        [*] --> HTTP_POST_SRV: fetch() POST /v1/chat/completions to llama-server
+        HTTP_POST_SRV --> JSON_RESPONSE: read JSON response
+        JSON_RESPONSE --> HANDLE_directResp: choices[0].message.content
+        HANDLE_directResp --> EMIT_WORD_TOKENS: emitWordTokens()
+        HANDLE_directResp --> EMIT_DONE_ONLINE: signalDone(text)
     }
 
     state ONLINE_MODE {

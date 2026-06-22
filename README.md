@@ -4,7 +4,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Two LLM modes: `proxy` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
+- Two LLM modes: `direct` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 
 ```
@@ -22,7 +22,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 ┌──────────────────┐  ┌────▼──────────────────────┐
 │ core/llm-core.ts │  │ bot.ts (Eris)             │
 │                  │  │ bot/pending.ts             │
-│ mode proxy       │  │ bot/reactions.ts           │
+│ mode direct      │  │ bot/reactions.ts           │
 │   llama‑server   │  │ state/trigger.ts           │
 │ mode online      │  │ state/state.ts             │
 │   OpenAI API     │  │ behavior/*                 │
@@ -305,7 +305,7 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 | `llm_host` | string | `"localhost"` | LLM host (llama-server) |
 | `llm_port` | number | `3125` | LLM port (llama-server) |
 | `llm_session_ttl` | number | `10` | LLM session TTL in minutes (KV cache prune) |
-| `llm_mode` | `"proxy"`, `"online"` | `"proxy"` | `proxy` → bot → local llama‑server, `online` → OpenAI‑compatible API |
+| `llm_mode` | `"direct"`, `"online"` | `"direct"` | `direct` → bot → local llama‑server, `online` → OpenAI‑compatible API |
 | `llm_api_endpoint` | string | `""` | OpenAI-compatible endpoint (mode `online`) |
 | `llm_api_token` | string | `""` | API token (mode `online`) |
 | `llm_model` | string | `"gpt-4o-mini"` | Model name sent in API requests (mode `online`) |
@@ -556,7 +556,7 @@ npm run build && npm start     # production
 
 | Mode | Usage | Description |
 |------|-------|-------------|
-| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llama‑server (shared model, 4 slots, prompt cache). Two PM2 processes. |
+| `direct` (default) | `llm_mode: direct` | Bot client → HTTP → llama‑server (shared model, 4 slots, prompt cache). Two PM2 processes. |
 | `online` | `llm_mode: online` | Bot calls any OpenAI‑compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)
@@ -570,7 +570,7 @@ npm run build && npm start     # production
 `config.yml` is reloaded at runtime via `watchConfig()` (called in `startBot()`).  
 The getters on `export const config` (e.g. `config.typoChance`, `config.concentration`) return live values.  
 No restart needed to modify triggers, delays, behaviors.  
-Static values (`discord_token`, `llama_cli_path`, `llm_mode`, etc.) require a restart.
+Static values (`discord_token`, `llm_mode`, etc.) require a restart.
 
 ## Discord Developer Portal
 

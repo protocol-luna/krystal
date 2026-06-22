@@ -172,7 +172,7 @@ function processQueue(): void {
 	};
 	llmBus.on("done", currentDoneHandler);
 
-	if (LLM_MODE === "proxy") {
+	if (LLM_MODE === "direct") {
 		void proxyRequest(item).catch((err) => {
 			if (currentDoneHandler) {
 				llmBus.off("done", currentDoneHandler);
