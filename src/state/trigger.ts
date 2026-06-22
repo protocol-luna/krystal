@@ -69,6 +69,8 @@ export function evaluateMessage(
 	const isDM = message.channel.type === 1;
 	const author = message.member?.nick || message.author.username;
 
+	console.log(`[trigger] channel.type=${message.channel.type} id=${channelId} isDM=${isDM}`);
+
 	if (isMentioned) {
 		log(channelId, `${author}: "${message.content.slice(0, 60)}" → mention`);
 		setPaused(false);
