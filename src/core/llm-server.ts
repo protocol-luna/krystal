@@ -2,7 +2,7 @@ import { availableParallelism } from "node:os";
 import { createInterface } from "node:readline";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { cwd } from "node:process";
 import {
 	createServer,
 	type IncomingMessage,
@@ -17,8 +17,7 @@ import {
 	LLM_SESSION_TTL,
 } from "../config.js";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const LLAMA_CLI = resolve(__dirname, "bin/llama/llama-cli");
+const LLAMA_CLI = resolve(cwd(), "bin/llama/llama-cli");
 
 function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	if (!LLM_SERVER_KEY) {
