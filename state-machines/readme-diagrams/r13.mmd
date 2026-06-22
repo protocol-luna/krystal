@@ -8,7 +8,7 @@ sequenceDiagram
     participant sleep.ts
     participant typo.ts
     participant llm-core.ts
-    participant llama
+    participant llm-server.ts
 
     User->>Discord: sends a message
     Discord->>bot.ts: messageCreate
@@ -44,9 +44,9 @@ sequenceDiagram
                 bot.ts->>bot.ts: llmBus.on("token", onToken)<br/>llmBus.on("flush", onFlush)
                 bot.ts->>llm-core.ts: askLLM({ username, text })
 
-                llm-core.ts-->>bot.ts: cli mode → stdin<br/>proxy mode → HTTP → llm-server
+                llm-core.ts-->>bot.ts: proxy mode → HTTP → llm-server<br/>online mode → OpenAI API
 
-                llama-->>llm-core.ts: stdout stream (CLI)<br/>or HTTP stream (proxy)
+                llm-server.ts-->>llm-core.ts: NDJSON stream
                 llm-core.ts->>llmBus: emit("token", word)  × N words<br/>llmBus.emit("flush")      → end of line
 
                 bot.ts->>bot.ts: hesitation possible, startTyping()

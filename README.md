@@ -22,14 +22,13 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 ┌────────▼─────────┐  ┌────▼──────────────────────┐
 │ core/llm-core.ts │  │ bot.ts (Eris)             │
 │                  │  │ bot/pending.ts             │
-│ mode cli         │  │ bot/reactions.ts           │
-│   spawn llama-cli│  │ state/trigger.ts           │
-│ mode server      │  │ state/state.ts             │
-│   HTTP → llama-  │  │ behavior/*                 │
-│   server:port    │  │ tts/*                      │
-│ mode proxy       │  │ spontaneous.ts             │
-│   HTTP → llm-    │  │                            │
-│   server (sép.)  │  │                            │
+│ mode proxy       │  │ bot/reactions.ts           │
+│   HTTP → llm-    │  │ state/trigger.ts           │
+│   server.ts      │  │ state/state.ts             │
+│ mode online      │  │ behavior/*                 │
+│   OpenAI API     │  │ tts/*                      │
+│                  │  │ spontaneous.ts             │
+│                  │  │                            │
 └──────────────────┘  └────────────────────────────┘
 ```
 
@@ -38,7 +37,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 ```
 src/
 ├── index.ts           # → cli.ts
-├── cli.ts             # CLI (bot | server | direct)
+├── cli.ts             # CLI (bot | server)
 ├── bot.ts             # Main Eris handler
 ├── config.ts          # YAML config + env var override
 ├── spontaneous.ts     # Weighted spontaneous messages
@@ -46,7 +45,7 @@ src/
 ├── core/
 │   ├── bus.ts         # Generic TypedBus (on/off/once/emit)
 │   ├── llm-bus.ts     # LLM Bus (token, done, flush, error, crash, ready, reset)
-│   ├── llm-core.ts    # Spawn CLI or HTTP server, queue, parsing, restart
+│   ├── llm-core.ts    # Queue, proxy/online dispatch, word emission, restart
 │   ├── llm-client.ts  # HTTP client to llm-server (proxy mode)
 │   └── llm-server.ts  # NDJSON HTTP server (proxy mode)
 ├── state/
@@ -258,14 +257,6 @@ Key `channelId:userId`. Only one message queued per user per channel. Processed 
 **Persisted:** pendingMessages, paused, cooldowns, timestamps, lastSpeaker, follow-up counters.
 
 **Auto-save:** any state mutation emits on `stateBus` → automatic save (debounce 500ms). No more manual `saveAllState()` calls needed.
-
-### Auto-restart LLM (mode `cli`)
-
-If the llama-cli process crashes (OOM, segfault, etc.), it is automatically restarted:
-
-[![Auto-restart LLM diagram](state-machines/readme-diagrams/r11.svg)](state-machines/readme-diagrams/r11.mmd)
-
-Useful for aggressive quantizations (Q2_K) that may crash on complex prompts.
 
 ---
 
@@ -539,7 +530,7 @@ Explore the dataset interactively: [**Atlas Map**](https://atlas.nomic.ai/data/m
 | `[bot]` | Decision, follow-up, reply style, forget |
 | `[tts]` | Synthesis, upload, voice message |
 | `[persist]` | Save/restore |
-| `[llm-core]` | Queue, proxy/server, LLM events |
+| `[llm-core]` | Queue, proxy/online, LLM events |
 | `[llmBus]` | LLM events (token, done, flush, error, ready) |
 
 ---

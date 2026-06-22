@@ -1,22 +1,19 @@
 stateDiagram-v2
-    [*] --> UNINITIALIZED: spawnLlama()
-    UNINITIALIZED --> WAITING_MODEL: stdout "> " ?
-    WAITING_MODEL --> MODEL_READY: yes → emit("ready")<br/>restartCount=0
-    WAITING_MODEL --> CRASH: close/error event
+    [*] --> ACTIVE: request sent to llm-server
 
-    MODEL_READY --> PROCESSING: request in progress
-    PROCESSING --> CRASH: non-zero exit code
+    ACTIVE --> CONNECTION_ERROR: HTTP error / timeout
+    CONNECTION_ERROR --> RETRY_SCHEDULE: emit("error")
 
-    CRASH --> emit("crash")
-    CRASH --> INCREMENT: restartCount++
-    INCREMENT --> CHECK_LIMIT: restartCount > 5 ?
+    RETRY_SCHEDULE --> INCREMENT: retryCount++
+    INCREMENT --> CHECK_MAX: > 5 retries ?
 
-    CHECK_LIMIT --> EXIT: yes → process.exit(1)
-    CHECK_LIMIT --> BACKOFF: no → delay = restartDelay (1s)
+    CHECK_MAX --> ABORT: yes → requests rejected
+    CHECK_MAX --> BACKOFF: delay = restartDelay (1s)
 
     BACKOFF --> DOUBLE: restartDelay = min(delay×2, 30s)
     DOUBLE --> WAIT: setTimeout(delay)
-    WAIT --> RESPAWN: spawnLlama()
-    RESPAWN --> WAITING_MODER: new attempt
+    WAIT --> RETRY: new fetch()
+    RETRY --> ACTIVE: success
+    RETRY --> CONNECTION_ERROR: fail
 
-    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s<br/>(max 30s, max 5 attempts)<br/>Queue preserved
+    note right of BACKOFF: 1s → 2s → 4s → 8s → 16s<br/>(max 30s, max 5 attempts)<br/>llm-server is PM2-managed

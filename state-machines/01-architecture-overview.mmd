@@ -1,8 +1,7 @@
 graph TB
     subgraph "Entry Points"
         CLI["cli.ts<br/>CLI Dispatcher"] -->|"bot (default)"| BOT["bot.ts<br/>Discord Bot (Eris)"]
-        CLI -->|"server"| SRV["llm-server.ts<br/>LLM HTTP Server"]
-        CLI -->|"direct"| DIRECT["Terminal Interaction"]
+        CLI -->|"server"| SRV["llm-server.ts<br/>LLM HTTP Server (node-llama-cpp)"]
     end
 
     subgraph "Configuration Layer"
@@ -23,8 +22,7 @@ graph TB
         LLMCORE -->|"proxy mode"| LLMCLIENT
         LLMCLIENT -->|"HTTP POST /ask"| LLMSRV
         LLMSRV --> LLMCORE
-        LLMCORE -->|"cli mode"| LLAMACLI["llama-cli<br/>(Child Process)"]
-        LLMCORE -->|"server mode"| LLAMASRV["llama-server<br/>(HTTP SSE)"]
+        LLMCORE -->|"online mode"| API{{"OpenAI-compatible API"}}
     end
 
     subgraph "State Management"
@@ -70,8 +68,6 @@ graph TB
         DISCORD{{"Discord API"}}
         FFMPEG{{"ffmpeg/ffprobe"}}
         PIPER_BIN{{"Piper TTS Binary"}}
-        LLAMACLI
-        LLAMASRV
     end
 
     BOT -->|"askLLM()"| LLMCORE

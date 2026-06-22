@@ -27,10 +27,10 @@ flowchart TD
     
     subgraph "What requires a restart"
         COLD1["DISCORD_TOKEN"]
-        COLD2["LLAMA_CLI_PATH, LLAMA_MODEL_PATH"]
+        COLD2["LLAMA_MODEL_PATH"]
         COLD3["LLM_HOST, LLM_PORT, LLM_MODE"]
         COLD4["SYSTEM_PROMPT"]
-        COLD5["llamaArgs (tous les flags)"]
+        COLD5["LLM_SERVER_KEY, LLM_SESSION_TTL"]
         COLD6["ttsModelPath, ffmpegPath, ..."]
     end
     

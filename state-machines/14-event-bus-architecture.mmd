@@ -14,7 +14,7 @@ graph TB
             FLUSH["flush ()<br/>End of a word chunk"]
             DONE["done (fullText: string)<br/>Full text generated"]
             ERROR["error (err: Error)<br/>LLM Error"]
-            CRASH["crash (code: number|null)<br/>llama-cli crash"]
+            CRASH["crash (code: number|null)<br/>LLM error / connection lost"]
             READY["ready ()<br/>LLM model ready"]
             RESET["reset ()<br/>LLM context empty"]
         end

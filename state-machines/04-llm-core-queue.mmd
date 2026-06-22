@@ -7,36 +7,8 @@ stateDiagram-v2
     PROCESS_QUEUE --> CHECK_MODE: ensureLLM() + not busy
     PROCESS_QUEUE --> IDLE: isProcessing || queueHead >= length
 
-    CHECK_MODE --> CLI_MODE: LLM_MODE == "cli"
-    CHECK_MODE --> SERVER_MODE: LLM_MODE == "server"
     CHECK_MODE --> PROXY_MODE: LLM_MODE == "proxy"
-
-    state CLI_MODE {
-        [*] --> CHECK_MODEL_READY
-        CHECK_MODEL_READY --> WAIT_READY: !isModelReady
-        CHECK_MODEL_READY --> WRITE_STDIN: isModelReady
-        WAIT_READY --> WRITE_STDIN: model ready signal
-        WRITE_STDIN --> READ_STDOUT: llama.stdin.write()
-        READ_STDOUT --> PARSE_RESPONSE: stdout "data" event
-        PARSE_RESPONSE --> EMIT_TOKENS_LINE: newline detected
-        EMIT_TOKENS_LINE --> EMIT_FLUSH: line cleaned & sent
-        PARSE_RESPONSE --> DETECT_PROMPT: matches "<br/>> $" pattern
-        DETECT_PROMPT --> EMIT_DONE: signalDone(cleaned)
-        EMIT_DONE --> [*]
-        READ_STDOUT --> CLOSE_CRASH: process "close" event
-        CLOSE_CRASH --> CRASH: non-zero exit
-    }
-
-    state SERVER_MODE {
-        [*] --> HTTP_POST: fetch() to /completion
-        HTTP_POST --> SSE_STREAM: read response body stream
-        SSE_STREAM --> EMIT_TOKENS_SSE: parse "data: {...}" lines
-        EMIT_TOKENS_SSE --> CHECK_STOP: data.stop == true?
-        CHECK_STOP --> EMIT_DONE_SSE: signalDone(fullText)
-        CHECK_STOP --> SSE_STREAM: continue reading
-        SSE_STREAM --> EMIT_ERROR: fetch/parse error
-        EMIT_ERROR --> [*]
-    }
+    CHECK_MODE --> ONLINE_MODE: LLM_MODE == "online"
 
     state PROXY_MODE {
         [*] --> HTTP_POST_PROXY: fetch() POST /ask to llm-server
@@ -52,9 +24,18 @@ stateDiagram-v2
         HANDLE_error --> EMIT_ERROR_PROXY: throw Error
     }
 
-    EMIT_TOKENS_LINE --> PROCESS_WORD_QUEUE: emitWordTokens()
-    EMIT_TOKENS_SSE --> PROCESS_WORD_QUEUE: emitWordTokens()
+    state ONLINE_MODE {
+        [*] --> HTTP_POST_API: fetch() to /chat/completions
+        HTTP_POST_API --> JSON_STREAM: read streaming response
+        JSON_STREAM --> PARSE_API_CHUNKS: parse SSE "data: {...}"
+        PARSE_API_CHUNKS --> HANDLE_apiToken: delta.content
+        PARSE_API_CHUNKS --> HANDLE_apiDone: finish_reason
+        HANDLE_apiToken --> EMIT_WORD_TOKENS: emitWordTokens()
+        HANDLE_apiDone --> EMIT_DONE_ONLINE: signalDone(text)
+    }
+
     HANDLE_chunk --> PROCESS_WORD_QUEUE: emitWordTokens()
+    HANDLE_apiToken --> PROCESS_WORD_QUEUE: emitWordTokens()
     
     PROCESS_WORD_QUEUE --> wordEmitQueue.push()
     PROCESS_WORD_QUEUE --> processWordEmitQueue()
@@ -78,4 +59,4 @@ stateDiagram-v2
     SCHEDULE_NEXT_PROCESS --> PROCESS_QUEUE
 
     note right of PROCESS_WORD_QUEUE: Words are emitted one by one<br/>with 20-80ms random delay<br/>simulating human typing
-    note right of EMIT_DONE: The full text is sent<br/>via signalDone() only<br/>when all words are emitted
+    note right of EMIT_DONE_BUS: The full text is sent<br/>via signalDone() only<br/>when all words are emitted

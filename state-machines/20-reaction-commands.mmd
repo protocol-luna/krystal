@@ -38,5 +38,5 @@ stateDiagram-v2
     REACT_OK --> ADD_CHECK: message.addReaction(":white_check_mark:")
     ADD_CHECK --> LISTENING: return listening
 
-    note right of RESET_LLM1: resetLLM() empties the request queue, sends /clear in cli mode, resets the LLM context
+    note right of RESET_LLM1: resetLLM() empties the request queue, resets the LLM context
     note right of TRACK1: trackSpeaker() records the user as the last speaker (for follow-up)

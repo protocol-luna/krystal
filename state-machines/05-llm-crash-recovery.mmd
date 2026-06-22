@@ -1,39 +1,30 @@
 stateDiagram-v2
-    [*] --> UNINITIALIZED: system start
-    UNINITIALIZED --> WAITING_MODEL: ensureLLM() / spawnLlama()
-    
-    WAITING_MODEL --> MODEL_READY: stdout shows "> " or "Enter no prompt"
-    WAITING_MODEL --> MODEL_ERROR: spawn error
-    MODEL_ERROR --> SCHEDULE_RESTART: llmBus.emit("error", err)
+    [*] --> ACTIVE: llm-server started
 
-    MODEL_READY --> IDLE_PROCESSING: llmBus.emit("ready")
-    note right of MODEL_READY: restartCount=0, restartDelay=1000
-    
-    IDLE_PROCESSING --> PROCESSING_REQUEST: processQueue() / write stdin
-    
-    PROCESSING_REQUEST --> READING_RESPONSE: waiting for stdout
-    READING_RESPONSE --> CRASH_DETECTED: process "close" non-zero code
-    READING_RESPONSE --> RESPONSE_COMPLETE: pattern "<br/>> $" detected
-    RESPONSE_COMPLETE --> IDLE_PROCESSING: done / processQueue() next
+    ACTIVE --> CONNECTION_ERROR: fetch() to /ask fails<br/>(refused / timeout / DNS)
+    CONNECTION_ERROR --> RETRY_SCHEDULE: llmBus.emit("error", err)
 
-    CRASH_DETECTED --> EMIT_CRASH: llmBus.emit("crash", code)
-    EMIT_CRASH --> INCREMENT_RESTART: restartCount++
-    
-    INCREMENT_RESTART --> CHECK_MAX_RESTARTS
-    CHECK_MAX_RESTARTS --> EXIT_ABORT: restartCount > 5
-    CHECK_MAX_RESTARTS --> APPLY_BACKOFF: still <= 5
+    RETRY_SCHEDULE --> INCREMENT: retryCount++
+    INCREMENT --> CHECK_MAX: retryCount > 5 ?
 
-    APPLY_BACKOFF --> DOUBLE_DELAY: restartDelay = min(delay*2, 30000)
-    DOUBLE_DELAY --> WAIT_DELAY: setTimeout(delay)
-    WAIT_DELAY --> SPAWN_AGAIN: spawnLlama()
-    SPAWN_AGAIN --> WAITING_MODEL
+    CHECK_MAX --> ABORT: yes → setFailed()<br/>all queued requests reject
+    CHECK_MAX --> APPLY_BACKOFF: still <= 5
 
-    note right of CHECK_MAX_RESTARTS
-      Exponential backoff: 1s 2s 4s 8s 16s, max 30s, max 5 retries
+    APPLY_BACKOFF --> WAIT_DELAY: setTimeout(delay)
+    WAIT_DELAY --> TRY_CONNECT: retry fetch()
+
+    TRY_CONNECT --> ACTIVE: success → retryCount=0
+    TRY_CONNECT --> CONNECTION_ERROR: still failing
+
+    note right of APPLY_BACKOFF
+      Exponential backoff: 1s 2s 4s 8s 16s
+      max 30s, max 5 retries
     end note
-    note right of EXIT_ABORT
-      Abandon after 5 consecutive failures - process.exit(1)
+    note right of ABORT
+      After 5 consecutive failures, all queued<br/>requests are rejected with an error.
+      The bot logs the failure and waits for<br/>the next user message to retry.
     end note
-    note right of CRASH_DETECTED
-      Causes: OOM, segfault, model incompatibility, disk I/O error
+    note right of ACTIVE
+      The llm-server is managed externally<br/>(PM2). If it dies, PM2 restarts it.<br/>
+      The client side only handles<br/>temporary connection errors.
     end note

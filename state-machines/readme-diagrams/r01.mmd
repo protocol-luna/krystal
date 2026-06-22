@@ -18,7 +18,7 @@ flowchart TD
     FILTERS --> DELAY["⏳ Delay<br/>computeDelay()"]
 
     DELAY --> REACT["Reaction ?<br/>2-8% depending on type"]
-    REACT --> LLM["🤖 askLLM()<br/>3 possible backends"]
+    REACT --> LLM["🤖 askLLM()<br/>proxy (llm-server) / online (OpenAI API)"]
 
     LLM --> STREAM["Word-by-word emission<br/>20-80ms between words"]
     STREAM --> FLUSH["Send in batches<br/>(1 newline = 1 message)"]

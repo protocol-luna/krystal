@@ -1,7 +1,7 @@
 # State Machines & Flowcharts -- discord-llm (Project Luna)
 
 This folder contains all architecture diagrams, state machines, flowcharts, and Gantt charts
-for the **discord-llm** project -- an autonomous Discord bot using a local LLM via llama.cpp.
+for the **discord-llm** project -- an autonomous Discord bot using a local LLM via node-llama-cpp.
 
 **Source files:** `.mmd` (Mermaid syntax) -- viewable on GitHub or editable in any text editor.  
 **Exports:** `.svg` (vector, transparent background) in [`output/`](output/).
@@ -14,9 +14,9 @@ Regenerate all SVGs: `npm run diagrams`
 
 [![Architecture Overview](output/01-architecture-overview.svg)](01-architecture-overview.mmd)
 
-This is the high-level system diagram. The bot has three entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, as a standalone LLM HTTP server, or as a direct terminal interaction for testing.
+This is the high-level system diagram. The bot has two entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, or as a standalone LLM HTTP server (llm-server.ts with node-llama-cpp).
 
-The configuration layer reads from `config.yml` and `.env` with hot-reload support via live getters -- most settings can change at runtime without restarting. The LLM Core is the brain: a request queue backed by three operational modes -- spawning `llama-cli` as a child process, hitting `llama-server` over SSE, or proxying through an external `llm-server` over NDJSON. All LLM events flow through a typed event bus (`llmBus`) so subscribers stay decoupled.
+The configuration layer reads from `config.yml` and `.env` with hot-reload support via live getters -- most settings can change at runtime without restarting. The LLM Core is the brain: a request queue backed by two operational modes -- proxying through an external `llm-server` over NDJSON (one model, sessions by channel ID), or hitting an OpenAI-compatible API over HTTP. All LLM events flow through a typed event bus (`llmBus`) so subscribers stay decoupled.
 
 The bot subsystem ties everything together: it evaluates triggers, manages anti-spam queues, handles reaction commands, and fires off spontaneous messages. The "Human Behaviors" layer adds realistic delays, sleep schedules, and typos. The TTS pipeline converts responses into voice messages using Piper TTS, ffmpeg, and Discord's CDN upload flow. State management uses an in-memory store with an event bus that triggers debounced persistence to `state.json`, so the bot survives restarts without losing session state or pending messages.
 
@@ -50,23 +50,23 @@ The last check is a flat 1.5% random chance (`randomChance` in config). This mak
 
 [![LLM Core Queue](output/04-llm-core-queue.svg)](04-llm-core-queue.mmd)
 
-This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of three backends based on `LLM_MODE`: CLI (spawns llama.cpp as a child process), Server (hits a llama.cpp server over SSE), or Proxy (talks to an external `llm-server` over NDJSON).
+This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of two backends based on `LLM_MODE`: Proxy (talks to an external `llm-server` over NDJSON) or Online (hits an OpenAI-compatible API streaming endpoint).
 
-The CLI mode is the most complex: it waits for the model to be ready by watching stdout for the prompt pattern, writes the prompt to stdin, reads tokens from stdout line by line, detects when the response is done (the prompt pattern reappears), and handles crashes via the process `close` event. Server mode reads an SSE stream parsing `data: {...}` lines looking for a `stop` flag. Proxy mode reads NDJSON -- each line is a JSON event with types like `firstToken`, `chunk`, `done`, and `error`.
+In proxy mode, the bot sends a POST /ask to the llm-server with `{ username, text, sessionId }`. The server reads an NDJSON stream -- each line is a JSON event with types like `firstToken` (start typing), `chunk` (buffered text, ~40 chars or newline), `done` (full text), and `error`. Online mode uses the standard OpenAI SSE streaming format: `data: {"choices": [{"delta": {"content": "..."}}]}`.
 
 Regardless of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. Each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has. The typing indicator is started directly before sending (not tied to the first token).
 
 ---
 
-## 05 -- LLM Crash Recovery
+## 05 -- LLM Server Retry
 
 [![Crash Recovery](output/05-llm-crash-recovery.svg)](05-llm-crash-recovery.mmd)
 
-The crash recovery machine handles the reality that llama.cpp can and will crash. When the bot starts, the LLM is `UNINITIALIZED`. `ensureLLM()` spawns `llama-cli` as a child process, and the bot waits for it to print its prompt pattern -- confirming the model loaded and is ready.
+The retry machine handles temporary connection errors to the llm-server. Since the server is managed externally by PM2 (which auto-restarts it on crash), the client side only needs to handle brief outages during server restarts or network blips.
 
-If the process exits with a non-zero code during a request (detected via `close` event), that's a crash. The bot increments `restartCount`, then checks against the max of 5 retries. If under the limit, it applies exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s), then respawns. The backoff prevents rapid restart loops that would thrash the system. After 5 consecutive failures, the bot gives up and calls `process.exit(1)` -- something is fundamentally wrong (wrong model path, OOM, etc.).
+When a fetch() to /ask fails (connection refused, timeout, DNS failure), the bot emits an `error` event and schedules a retry. The retry count increments, and if under the limit of 5, applies exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s). After 5 consecutive failures, the bot gives up -- all queued requests are rejected with an error, and the bot logs the failure. The next user message will trigger a new attempt.
 
-Common crash causes: out-of-memory, segfaults in llama.cpp, model format incompatibility, and disk I/O errors. Since crashes can happen mid-response, the bot loses that response -- the user just gets nothing. The pending anti-spam queue still holds the original message, but the in-flight LLM request is gone.
+Common causes: server restarting after a model reload, brief network interruptions, or the PM2 process being temporarily unresponsive. Since the llm-server manages its own KV cache sessions with a configurable TTL, a brief retry window doesn't lose conversation context.
 
 ---
 
@@ -308,6 +308,6 @@ When fatigued, two things change: the response delay is multiplied by `topic_fat
 - Total source files: ~30 TypeScript files
 - Lines of code: ~3500 LOC
 - Tests: ~71 test files (Bun)
-- LLM backends: 4 (cli, server, proxy, online)
+- LLM backends: 2 (proxy, online)
 - Event bus types: 7 (llmBus) + 1 (stateBus)
 - Simulated human behaviors: 10 (delay, ignore, forget, hesitation, typo, reaction, voice, follow-up, burst, topic fatigue)
