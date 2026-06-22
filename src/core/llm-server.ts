@@ -221,8 +221,8 @@ export async function startServer(): Promise<void> {
 					const totalMs = (t2 - t0).toFixed(1);
 					const brief =
 						cleanResp.length > 60 ? `${cleanResp.slice(0, 60)}...` : cleanResp;
-					console.log(
-						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"`
+					process.stdout.write(
+						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"\n`
 					);
 
 					if (!firstTokenSent && cleanResp) {
