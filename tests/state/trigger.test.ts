@@ -4,6 +4,7 @@ import { mockConfig } from "../_mock-config.js";
 function makeMsg(overrides: Record<string, unknown>): Record<string, unknown> {
 	return {
 		channel: { id: "c1", type: 0 },
+		guildID: "g1",
 		content: "",
 		author: { bot: false, id: "u1", username: "User" },
 		mentions: [],
@@ -66,7 +67,7 @@ describe("evaluateMessage", () => {
 
 	it("responds in DM when replyInDM is true", async () => {
 		const { evaluateMessage } = await import("../../src/state/trigger.js");
-		const msg = makeMsg({ channel: { id: "dm1", type: 1 } });
+		const msg = makeMsg({ channel: { id: "dm1", type: 1 }, guildID: null });
 		const r = evaluateMessage(msg as any, "b1", "Luna");
 		expect(r.shouldRespond).toBeTrue();
 		expect(r.reason).toBe("dm");
@@ -75,7 +76,7 @@ describe("evaluateMessage", () => {
 	it("always responds in DM (ignores replyInDM)", async () => {
 		mockConfig({ replyInDM: false });
 		const { evaluateMessage } = await import("../../src/state/trigger.js");
-		const msg = makeMsg({ channel: { id: "dm1", type: 1 } });
+		const msg = makeMsg({ channel: { id: "dm1", type: 1 }, guildID: null });
 		const r = evaluateMessage(msg as any, "b1", "Luna");
 		expect(r.shouldRespond).toBeTrue();
 	});

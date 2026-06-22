@@ -66,10 +66,8 @@ export function evaluateMessage(
 	const botName = botMember?.nick || botUsername;
 	const contentLower = message.content.toLowerCase();
 	const isMentioned = message.mentions.some((u) => u.id === botId);
-	const isDM = message.channel.type === 1;
+	const isDM = !message.guildID;
 	const author = message.member?.nick || message.author.username;
-
-	console.log(`[trigger] channel.type=${message.channel.type} id=${channelId} isDM=${isDM}`);
 
 	if (isMentioned) {
 		log(channelId, `${author}: "${message.content.slice(0, 60)}" → mention`);

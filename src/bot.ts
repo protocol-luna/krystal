@@ -348,7 +348,7 @@ async function triggerLunaReply(
 			);
 			await triggerLunaReply(
 				queued.message,
-				queued.message.channel.type === 1,
+				!queued.message.guildID,
 				queued.reason
 			);
 		}
@@ -452,7 +452,7 @@ function logAndReact(
 
 	setTimeout(async () => {
 		if (shouldReact(reason, sleepBehavior)) {
-			const emojis = getServerEmojis(message, message.channel.type === 1);
+			const emojis = getServerEmojis(message, !message.guildID);
 			const reaction = pickReaction(emojis);
 			await message.addReaction(reaction).catch(() => {});
 		}
@@ -542,7 +542,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	const author = message.member?.nick || message.author.username;
 	const channel = message.channel as Eris.GuildTextableChannel;
 	const channelName = channel.name ?? message.channel.id;
-	const isDM = message.channel.type === 1;
+	const isDM = !message.guildID;
 
 	recordMessage(message.channel.id, message.content);
 
