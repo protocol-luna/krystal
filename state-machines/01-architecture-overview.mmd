@@ -1,7 +1,7 @@
 graph TB
     subgraph "Entry Points"
         CLI["cli.ts<br/>CLI Dispatcher"] -->|"bot (default)"| BOT["bot.ts<br/>Discord Bot (Eris)"]
-        CLI -->|"server"| SRV["llm-server.ts<br/>LLM HTTP Server (node-llama-cpp)"]
+        CLI -->|"server"| SRV["llm-server.ts<br/>LLM HTTP Server (llama‑server, 4 slots)"]
     end
 
     subgraph "Configuration Layer"

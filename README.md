@@ -4,7 +4,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Two LLM modes: `proxy` (bot → HTTP → llm-server with node-llama-cpp), `online` (OpenAI-compatible API)
+- Two LLM modes: `proxy` (bot → HTTP → llm-server with llama‑server, shared model / prompt cache), `online` (OpenAI‑compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 
 ```
@@ -178,7 +178,7 @@ Configurable probability (`voice_message_chance`, default 8%). Full pipeline:
 
 ### Typing indicator
 
-`startTyping()` is called directly before sending the response — not tied to LLM token events. Sets an 8s `setInterval` that keeps the typing indicator active until the response is sent. Cleaned up in `finally` (`clearInterval`).
+`startTyping()` is called before `askLLM()` — the typing indicator stays active during generation (refreshed every 8s via `setInterval`). Cleaned up in `finally` (`clearInterval`).
 
 ### Real-time response
 
@@ -558,7 +558,7 @@ npm run build && npm start     # production
 
 | Mode | Usage | Description |
 |------|-------|-------------|
-| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (which manages the LLM via node-llama-cpp). Two processes, ideal for PM2. |
+| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (spawns `llama-server`, shared model across 4 slots, prompt cache with KV reuse). Two processes, ideal for PM2. |
 | `online` | `llm_mode: online` | Bot calls any OpenAI-compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)

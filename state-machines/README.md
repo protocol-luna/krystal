@@ -1,7 +1,7 @@
 # State Machines & Flowcharts -- discord-llm (Project Luna)
 
 This folder contains all architecture diagrams, state machines, flowcharts, and Gantt charts
-for the **discord-llm** project -- an autonomous Discord bot using a local LLM via node-llama-cpp.
+for the **discord-llm** project -- an autonomous Discord bot using a local LLM via llama‑server (shared model, prompt cache).
 
 **Source files:** `.mmd` (Mermaid syntax) -- viewable on GitHub or editable in any text editor.  
 **Exports:** `.svg` (vector, transparent background) in [`output/`](output/).
@@ -14,7 +14,7 @@ Regenerate all SVGs: `npm run diagrams`
 
 [![Architecture Overview](output/01-architecture-overview.svg)](01-architecture-overview.mmd)
 
-This is the high-level system diagram. The bot has two entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, or as a standalone LLM HTTP server (llm-server.ts with node-llama-cpp).
+This is the high-level system diagram. The bot has two entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, or as a standalone LLM HTTP server (`llm-server.ts` with llama‑server, shared model across 4 slots).
 
 The configuration layer reads from `config.yml` and `.env` with hot-reload support via live getters -- most settings can change at runtime without restarting. The LLM Core is the brain: a request queue backed by two operational modes -- proxying through an external `llm-server` over NDJSON (one model, sessions by channel ID), or hitting an OpenAI-compatible API over HTTP. All LLM events flow through a typed event bus (`llmBus`) so subscribers stay decoupled.
 
@@ -172,7 +172,7 @@ The trickiest part is `restorePending()`: messages are stored as channelId + mes
 
 This shows the typed event bus system that decouples the bot's components. There are two buses: `llmBus` (for LLM events) and `stateBus` (for state changes). Both use a `TypedBus<TEvents>` generic providing type-safe `emit()`, `on()`, and `once()` methods.
 
-The `llmBus` carries seven events: `token` (single word emitted), `flush` (end of word chunk -- time to send a Discord message), `done` (complete text generated), `error` (LLM error), `crash` (llama-cli process crash), `ready` (model loaded), and `reset` (context cleared). Emitters are in `llm-core.ts`; subscribers are in `bot.ts` which accumulates tokens and sends messages on flush.
+The `llmBus` carries seven events: `token` (single word emitted), `flush` (end of word chunk -- time to send a Discord message), `done` (complete text generated), `error` (LLM error), `crash` (LLM process crash), `ready` (model loaded), and `reset` (context cleared). Emitters are in `llm-core.ts`; subscribers are in `bot.ts` which accumulates tokens and sends messages on flush.
 
 The `stateBus` carries a single event -- `state:changed` -- emitted by the five state mutation functions in `state.ts`. The only subscriber is `persistence.ts`, which calls `scheduleSave()` to debounce the write to disk. This separation means `state.ts` doesn't need to know anything about file I/O -- it just fires events.
 
