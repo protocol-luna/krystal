@@ -88,12 +88,10 @@ export async function startServer(): Promise<void> {
 					let chunkBuf = "";
 
 					await entry.session.prompt(promptText, {
-						temperature: 0.75,
+						temperature: 0.8,
 						minP: 0.05,
 						topK: 40,
 						topP: 0.95,
-						repeatPenalty: { penalty: 1.12, lastTokens: 256, presencePenalty: 0.1 },
-						dryRepeatPenalty: { strength: 0.8 },
 						maxTokens: 4096,
 						onTextChunk(token: string) {
 							if (!token) {
