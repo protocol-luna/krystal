@@ -70,7 +70,7 @@ export const DISCORD_TOKEN: string =
 export const LLAMA_MODEL_PATH: string =
 	v<string | null>("llama_model_path", null) ??
 	process.env.LLAMA_MODEL_PATH ??
-	join(ROOT, "models", "Discord-Hermes-3-8B.Q2_K.gguf");
+	join(ROOT, "models", "Discord-Micae-Hermes-3-3B.Q8_0.gguf");
 
 export const LLM_HOST: string =
 	v<string | null>("llm_host", null) ?? process.env.LLM_HOST ?? "localhost";

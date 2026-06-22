@@ -8,7 +8,7 @@ system_prompt: |
 
 # --- Secrets & chemins ---
 discord_token: "ton_token_ici"
-llama_model_path: "./models/Discord-Hermes-3-8B.Q3_K_M.gguf"
+llama_model_path: "./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf"
 # Hôte du LLM -- utilisé uniquement en mode "proxy"
 llm_host: "localhost"
 # Port du llm-server

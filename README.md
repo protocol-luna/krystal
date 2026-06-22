@@ -302,7 +302,7 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `discord_token` | string | *(required)* | Discord bot token |
-| `llama_model_path` | string | `"./models/Discord-Hermes-3-8B.Q2_K.gguf"` | Path to GGUF model |
+| `llama_model_path` | string | `"./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf"` | Path to GGUF model |
 | `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
 | `llm_port` | number | `3124` | LLM port |
 | `llm_server_key` | string | `""` | Shared key to secure llm-server endpoints (empty = no auth) |
