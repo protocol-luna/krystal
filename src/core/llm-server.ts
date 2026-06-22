@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import {
 	createServer,
 	type IncomingMessage,
@@ -64,10 +65,11 @@ let sessions: Map<string, SessionEntry>;
 export async function startServer(): Promise<void> {
 	const { getLlama } = await import("node-llama-cpp");
 	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
-	const llama = await getLlama();
+	const cpuThreads = availableParallelism();
+	const llama = await getLlama({ maxThreads: cpuThreads });
 	const model = await llama.loadModel({
 		modelPath: LLAMA_MODEL_PATH,
-		useMlock: true,
+		useMlock: false,
 	});
 	console.log("[llm-server] model loaded");
 
@@ -118,6 +120,7 @@ export async function startServer(): Promise<void> {
 						const ctx = await model.createContext({
 							contextSize: 4096,
 							batchSize: 4096,
+							threads: cpuThreads,
 						});
 						const seq = ctx.getSequence();
 						const messages: ChatMessage[] = [
