@@ -1,6 +1,12 @@
-import { LLM_HOST, LLM_PORT } from "../config.js";
+import { LLM_HOST, LLM_PORT, LLM_SERVER_KEY } from "../config.js";
 
 const BASE = `http://${LLM_HOST}:${LLM_PORT}`;
+
+function authHeaders(): Record<string, string> {
+	return LLM_SERVER_KEY
+		? { Authorization: `Bearer ${LLM_SERVER_KEY}`, "Content-Type": "application/json" }
+		: { "Content-Type": "application/json" };
+}
 
 export async function askLLM(
 	userMessage: { username: string; text: string; sessionId?: string },
@@ -9,7 +15,7 @@ export async function askLLM(
 	const response = await fetch(`${BASE}/ask`, {
 		method: "POST",
 		body: JSON.stringify(userMessage),
-		headers: { "Content-Type": "application/json" },
+		headers: authHeaders(),
 	});
 
 	if (!(response.ok && response.body)) {
@@ -67,7 +73,10 @@ export async function askLLM(
 }
 
 export async function resetLLM(): Promise<void> {
-	const response = await fetch(`${BASE}/reset`, { method: "POST" });
+	const response = await fetch(`${BASE}/reset`, {
+		method: "POST",
+		headers: authHeaders(),
+	});
 	if (!response.ok) {
 		console.error("LLM reset failed:", response.status);
 	}
@@ -75,7 +84,7 @@ export async function resetLLM(): Promise<void> {
 
 export async function isLLMBusy(): Promise<boolean> {
 	try {
-		const response = await fetch(`${BASE}/health`);
+		const response = await fetch(`${BASE}/health`, { headers: authHeaders() });
 		if (!response.ok) {
 			return true;
 		}

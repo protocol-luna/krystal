@@ -1,6 +1,19 @@
 import { createServer, type Server } from "node:http";
-import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT } from "../config.js";
+import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT, LLM_SERVER_KEY } from "../config.js";
 import type { LlamaChatSession } from "node-llama-cpp";
+
+function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
+	if (!LLM_SERVER_KEY) {
+		return true;
+	}
+	const header = req.headers.authorization;
+	if (header === `Bearer ${LLM_SERVER_KEY}`) {
+		return true;
+	}
+	res.writeHead(401, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+	res.end(JSON.stringify({ error: "unauthorized" }));
+	return false;
+}
 
 const SESSION_TTL = 10 * 60 * 1000;
 const PRUNE_INTERVAL = 60_000;
@@ -30,6 +43,10 @@ export async function startServer(): Promise<void> {
 
 	// biome-ignore lint/suspicious/useAwait: async needed for await inside /ask and /reset handlers
 	server = createServer(async (req, res) => {
+		if (!checkAuth(req, res)) {
+			return;
+		}
+
 		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 
 		if (req.method === "POST" && url.pathname === "/ask") {

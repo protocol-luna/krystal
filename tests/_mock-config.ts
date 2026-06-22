@@ -110,6 +110,7 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 		LLAMA_MODEL_PATH: "models/model.gguf",
 		LLM_HOST: "localhost",
 		LLM_PORT: 3124,
+		LLM_SERVER_KEY: "",
 		LLM_MODE: "proxy",
 		SYSTEM_PROMPT: "You are a test bot",
 		jinjaTemplate: "template",

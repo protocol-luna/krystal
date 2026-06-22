@@ -94,6 +94,9 @@ export const LLM_API_ENDPOINT: string =
 export const LLM_API_TOKEN: string =
 	v<string | null>("llm_api_token", null) ?? process.env.LLM_API_TOKEN ?? "";
 
+export const LLM_SERVER_KEY: string =
+	v<string | null>("llm_server_key", null) ?? process.env.LLM_SERVER_KEY ?? "";
+
 export const LLM_MODEL: string =
 	v<string | null>("llm_model", null) ?? process.env.LLM_MODEL ?? "gpt-4o-mini";
 
