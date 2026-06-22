@@ -159,6 +159,9 @@ export async function startServer(): Promise<void> {
 
 					const t1 = performance.now();
 					const prepareMs = (t1 - t0).toFixed(1);
+					console.log(
+						`[llm-server] dbg sid=${sid.slice(0, 8)} prepare=${prepareMs}ms newTokens=${newTokens.length} tokLen=${entry.nextTokenIndex}`
+					);
 
 					let genTokens: import("node-llama-cpp").Token[] = [];
 					let prevDetokLen = 0;
@@ -221,9 +224,8 @@ export async function startServer(): Promise<void> {
 					const totalMs = (t2 - t0).toFixed(1);
 					const brief =
 						cleanResp.length > 60 ? `${cleanResp.slice(0, 60)}...` : cleanResp;
-					process.stdout.write(
-						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"\n`
-					);
+					const logLine = `[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"`;
+					console.log(logLine);
 
 					if (!firstTokenSent && cleanResp) {
 						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
