@@ -100,6 +100,9 @@ export const LLM_SERVER_KEY: string =
 export const LLM_MODEL: string =
 	v<string | null>("llm_model", null) ?? process.env.LLM_MODEL ?? "gpt-4o-mini";
 
+export const LLM_SESSION_TTL: number =
+	v<number | null>("llm_session_ttl", null) ?? 10;
+
 export const SYSTEM_PROMPT = (() => {
 	const fromYaml = v<string | null>("system_prompt", null);
 	if (fromYaml) {

@@ -17,6 +17,8 @@ llm_port: 3124
 # Clé partagée entre le client et le serveur LLM pour sécuriser les endpoints
 # laisse vide pour désactiver l'auth
 llm_server_key: ""
+# Durée de vie d'une session LLM (en minutes) avant expiration du KV cache
+llm_session_ttl: 10
 # Mode de connexion au LLM :
 #   "proxy"  → bot client → HTTP → llm-server (qui gère le LLM via node-llama-cpp)
 #             (nécessite `node self-cli.js server` dans un autre process)

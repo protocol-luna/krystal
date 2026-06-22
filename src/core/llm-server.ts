@@ -1,5 +1,5 @@
-import { createServer, type Server } from "node:http";
-import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT, LLM_SERVER_KEY } from "../config.js";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { LLAMA_MODEL_PATH, LLM_PORT, SYSTEM_PROMPT, LLM_SERVER_KEY, LLM_SESSION_TTL } from "../config.js";
 import type { LlamaChatSession } from "node-llama-cpp";
 
 function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
@@ -15,7 +15,7 @@ function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	return false;
 }
 
-const SESSION_TTL = 10 * 60 * 1000;
+const SESSION_TTL = LLM_SESSION_TTL * 60 * 1000;
 const PRUNE_INTERVAL = 60_000;
 
 let server: Server | undefined;

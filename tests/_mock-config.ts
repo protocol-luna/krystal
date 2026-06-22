@@ -111,6 +111,7 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 		LLM_HOST: "localhost",
 		LLM_PORT: 3124,
 		LLM_SERVER_KEY: "",
+		LLM_SESSION_TTL: 10,
 		LLM_MODE: "proxy",
 		SYSTEM_PROMPT: "You are a test bot",
 		jinjaTemplate: "template",

@@ -315,6 +315,7 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 | `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
 | `llm_port` | number | `3124` | LLM port |
 | `llm_server_key` | string | `""` | Shared key to secure llm-server endpoints (empty = no auth) |
+| `llm_session_ttl` | number | `10` | LLM session TTL in minutes (KV cache prune) |
 | `llm_mode` | `"proxy"`, `"online"` | `"proxy"` | `proxy` → bot client via llm-server, `online` → OpenAI-compatible API |
 | `llm_api_endpoint` | string | `""` | OpenAI-compatible endpoint (mode `online`) |
 | `llm_api_token` | string | `""` | API token (mode `online`) |
