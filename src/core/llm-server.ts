@@ -1,4 +1,8 @@
 import { availableParallelism } from "node:os";
+import { createInterface } from "node:readline";
+import { spawn, type ChildProcess } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	createServer,
 	type IncomingMessage,
@@ -12,6 +16,9 @@ import {
 	LLM_SERVER_KEY,
 	LLM_SESSION_TTL,
 } from "../config.js";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const LLAMA_CLI = resolve(__dirname, "bin/llama/llama-cli");
 
 function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 	if (!LLM_SERVER_KEY) {
@@ -32,62 +39,153 @@ function checkAuth(req: IncomingMessage, res: ServerResponse): boolean {
 const SESSION_TTL = LLM_SESSION_TTL * 60 * 1000;
 const PRUNE_INTERVAL = 60_000;
 
-interface ChatMessage {
-	role: "system" | "user" | "assistant";
-	content: string;
-}
-
 interface SessionEntry {
-	seq: import("node-llama-cpp").LlamaContextSequence;
-	model: import("node-llama-cpp").LlamaModel;
-	messages: ChatMessage[];
-	nextTokenIndex: number;
+	process: ChildProcess;
 	lastUsed: number;
-}
-
-function formatChatML(
-	messages: ChatMessage[],
-	includeAssistantPrompt: boolean
-): string {
-	let text = "";
-	for (const msg of messages) {
-		text += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
-	}
-	if (includeAssistantPrompt) {
-		text += "<|im_start|>assistant\n";
-	}
-	return text;
+	send: (msg: string) => Promise<string>;
+	close: () => void;
 }
 
 let server: Server | undefined;
 let sessions: Map<string, SessionEntry>;
+const cpuThreads = availableParallelism();
+
+function spawnSession(): SessionEntry {
+	const proc = spawn(
+		LLAMA_CLI,
+		[
+			"-m",
+			LLAMA_MODEL_PATH,
+			"-t",
+			String(cpuThreads),
+			"--conversation",
+			"--simple-io",
+			"-sys",
+			SYSTEM_PROMPT,
+			"-p",
+			"",
+			"--temp",
+			"0.8",
+			"--top-k",
+			"40",
+			"--top-p",
+			"0.95",
+			"--min-p",
+			"0.05",
+		],
+		{
+			stdio: ["pipe", "pipe", "pipe"],
+		}
+	);
+
+	const rl = createInterface({
+		input: proc.stdout!,
+		crlfDelay: Number.POSITIVE_INFINITY,
+	});
+	const errBuf: string[] = [];
+	proc.stderr!.on("data", (d) => errBuf.push(d.toString()));
+
+	let readyResolve: (() => void) | null = null;
+	let readResolve: ((resp: string) => void) | null = null;
+	let responseLines: string[] = [];
+	let collecting = false;
+	let ready = false;
+
+	rl.on("line", (line) => {
+		if (!ready) {
+			if (line.trim() === ">") {
+				ready = true;
+				if (readyResolve) {
+					readyResolve();
+					readyResolve = null;
+				}
+			}
+			return;
+		}
+
+		if (readResolve) {
+			if (line.startsWith("[ Prompt:")) {
+				const resp = responseLines.join("\n").trim();
+				responseLines = [];
+				collecting = false;
+				const r = readResolve;
+				readResolve = null;
+				r(resp);
+				return;
+			}
+
+			if (!collecting && line.trim() === "") {
+				collecting = true;
+				return;
+			}
+
+			if (collecting) {
+				responseLines.push(line);
+			}
+		}
+	});
+
+	proc.on("exit", (code) => {
+		const err = errBuf.join("").trim();
+		if (readResolve) {
+			readResolve("");
+		}
+		if (err) {
+			console.error(`[llm-server] llama-cli exited (${code}): ${err}`);
+		}
+	});
+
+	return {
+		process: proc,
+		lastUsed: Date.now(),
+		send: async (msg: string): Promise<string> => {
+			if (!ready) {
+				await new Promise<void>((resolve) => {
+					readyResolve = resolve;
+				});
+			}
+			responseLines = [];
+			collecting = false;
+			return new Promise((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error("response timeout"));
+				}, 120_000);
+				readResolve = (resp: string) => {
+					clearTimeout(timeout);
+					resolve(resp);
+				};
+				proc.stdin!.write(`${msg}\n`);
+			});
+		},
+		close: () => {
+			try {
+				proc.stdin!.write("/exit\n");
+			} catch {
+				// ignore
+			}
+			setTimeout(() => {
+				proc.kill();
+			}, 2000);
+		},
+	};
+}
 
 export async function startServer(): Promise<void> {
-	const { getLlama } = await import("node-llama-cpp");
-	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
-	const cpuThreads = availableParallelism();
-	const llama = await getLlama({ maxThreads: cpuThreads });
-	const model = await llama.loadModel({
-		modelPath: LLAMA_MODEL_PATH,
-		useMlock: false,
-	});
-	console.log("[llm-server] model loaded");
-
 	sessions = new Map();
+	await Promise.resolve();
 
 	setInterval(() => {
 		const now = Date.now();
 		for (const [id, s] of sessions) {
 			if (now - s.lastUsed > SESSION_TTL) {
-				s.seq.dispose();
+				s.close();
 				sessions.delete(id);
 				console.log(`[llm-server] pruned stale session: ${id.slice(0, 8)}...`);
 			}
 		}
 	}, PRUNE_INTERVAL);
 
-	// biome-ignore lint/suspicious/useAwait: async needed for await inside /ask and /reset handlers
-	server = createServer(async (req, res) => {
+	server = createServer((req, res) => {
 		if (!checkAuth(req, res)) {
 			return;
 		}
@@ -116,34 +214,11 @@ export async function startServer(): Promise<void> {
 				let entry = sessions.get(sid);
 
 				if (!entry) {
-					try {
-						const ctx = await model.createContext({
-							contextSize: 4096,
-							batchSize: 4096,
-							threads: cpuThreads,
-						});
-						const seq = ctx.getSequence();
-						const messages: ChatMessage[] = [
-							{ role: "system", content: SYSTEM_PROMPT },
-						];
-						entry = {
-							seq,
-							model,
-							messages,
-							nextTokenIndex: 0,
-							lastUsed: Date.now(),
-						};
-						sessions.set(sid, entry);
-						console.log(
-							`[llm-server] new session: ${sid.slice(0, 8)}... (${sessions.size} total)`
-						);
-					} catch (err) {
-						res.writeHead(500);
-						res.end(
-							JSON.stringify({ type: "error", data: (err as Error).message })
-						);
-						return;
-					}
+					console.log(
+						`[llm-server] spawning llama-cli for session: ${sid.slice(0, 8)}...`
+					);
+					entry = spawnSession();
+					sessions.set(sid, entry);
 				}
 
 				entry.lastUsed = Date.now();
@@ -157,107 +232,22 @@ export async function startServer(): Promise<void> {
 
 				try {
 					const t0 = performance.now();
-
 					const userMsg = username ? `${username}: ${text}` : text;
-					entry.messages.push({ role: "user", content: userMsg });
-
-					const convText = formatChatML(entry.messages, true);
-					const convTokens = entry.model.tokenize(convText);
-					const newTokens = convTokens.slice(entry.nextTokenIndex);
-
+					const response = await entry.send(userMsg);
 					const t1 = performance.now();
-					const prepareMs = (t1 - t0).toFixed(1);
+					const totalMs = (t1 - t0).toFixed(1);
 
-					let genTokens: import("node-llama-cpp").Token[] = [];
-					let prevDetokLen = 0;
-					let firstTokenSent = false;
-					let chunkBuf = "";
-					let firstTokenMs: string | undefined;
-					const tokTimes: number[] = [];
-					let lastTokTime = 0;
-
-					for await (const token of entry.seq.evaluate(newTokens, {
-						temperature: 0.8,
-						minP: 0.05,
-						topK: 40,
-						topP: 0.95,
-						yieldEogToken: true,
-					})) {
-						if (entry.model.isEogToken(token)) {
-							break;
-						}
-
-						const now = performance.now();
-						if (firstTokenSent) {
-							tokTimes.push(now - lastTokTime);
-							lastTokTime = now;
-						} else {
-							firstTokenMs = (now - t1).toFixed(1);
-							firstTokenSent = true;
-							lastTokTime = now;
-							res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
-						}
-
-						genTokens.push(token);
-
-						if (genTokens.length > 3) {
-							const textSoFar = entry.model.detokenize(genTokens);
-							const stopIdx = textSoFar.indexOf("<|im_end|>");
-							if (stopIdx !== -1) {
-								const keepText = textSoFar.slice(0, stopIdx);
-								genTokens = entry.model.tokenize(keepText);
-								break;
-							}
-
-							const delta = textSoFar.slice(prevDetokLen);
-							if (delta) {
-								chunkBuf += delta;
-								if (chunkBuf.includes("\n") || chunkBuf.length >= 40) {
-									res.write(
-										`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`
-									);
-									chunkBuf = "";
-								}
-							}
-							prevDetokLen = textSoFar.length;
-						}
-
-						if (genTokens.length > 4000) {
-							break;
-						}
-					}
-
-					const responseText = entry.model.detokenize(genTokens);
-					let cleanResp = responseText;
-					if (cleanResp.includes("<|im_end|>")) {
-						cleanResp = cleanResp.slice(0, cleanResp.indexOf("<|im_end|>"));
-					}
-					const t2 = performance.now();
-					const totalMs = (t2 - t0).toFixed(1);
-					const genCount = tokTimes.length;
-					const avgTok =
-						genCount > 0
-							? `${(
-									1000 / (tokTimes.reduce((a, b) => a + b, 0) / genCount)
-								).toFixed(2)} t/s`
-							: "n/a";
 					const brief =
-						cleanResp.length > 60 ? `${cleanResp.slice(0, 60)}...` : cleanResp;
+						response.length > 60 ? `${response.slice(0, 60)}...` : response;
 					console.log(
-						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs}ms total=${totalMs}ms genTok=${genTokens.length} avg=${avgTok} "${brief}"`
+						`[llm-server] sid=${sid.slice(0, 8)} total=${totalMs}ms "${brief}"`
 					);
 
-					if (!firstTokenSent && cleanResp) {
-						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
+					res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
+					if (response) {
+						res.write(`${JSON.stringify({ type: "chunk", data: response })}\n`);
 					}
-					if (chunkBuf) {
-						res.write(`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`);
-					}
-
-					entry.nextTokenIndex = entry.seq.nextTokenIndex;
-					entry.messages.push({ role: "assistant", content: cleanResp });
-
-					res.write(`${JSON.stringify({ type: "done", data: cleanResp })}\n`);
+					res.write(`${JSON.stringify({ type: "done", data: response })}\n`);
 					res.end();
 				} catch (err) {
 					res.write(
@@ -274,7 +264,7 @@ export async function startServer(): Promise<void> {
 			if (sessionId) {
 				const entry = sessions.get(sessionId);
 				if (entry) {
-					entry.seq.dispose();
+					entry.close();
 					sessions.delete(sessionId);
 					console.log(
 						`[llm-server] reset session: ${sessionId.slice(0, 8)}...`
@@ -282,7 +272,7 @@ export async function startServer(): Promise<void> {
 				}
 			} else {
 				for (const [, s] of sessions) {
-					s.seq.dispose();
+					s.close();
 				}
 				sessions.clear();
 				console.log("[llm-server] reset all sessions");
