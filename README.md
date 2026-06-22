@@ -4,7 +4,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 
 - Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
 - Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
-- Two LLM modes: `proxy` (bot → HTTP → llm-server with llama‑server, shared model / prompt cache), `online` (OpenAI‑compatible API)
+- Two LLM modes: `proxy` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 
 ```
@@ -19,14 +19,14 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 │  reset           │                                   │
 └────────┬─────────┴────────┬─────────────────────────┘
          │                  │
-┌────────▼─────────┐  ┌────▼──────────────────────┐
+┌──────────────────┐  ┌────▼──────────────────────┐
 │ core/llm-core.ts │  │ bot.ts (Eris)             │
 │                  │  │ bot/pending.ts             │
 │ mode proxy       │  │ bot/reactions.ts           │
-│   HTTP → llm-    │  │ state/trigger.ts           │
-│   server.ts      │  │ state/state.ts             │
-│ mode online      │  │ behavior/*                 │
-│   OpenAI API     │  │ tts/*                      │
+│   llama‑server   │  │ state/trigger.ts           │
+│ mode online      │  │ state/state.ts             │
+│   OpenAI API     │  │ behavior/*                 │
+│                  │  │ tts/*                      │
 │                  │  │ spontaneous.ts             │
 │                  │  │                            │
 └──────────────────┘  └────────────────────────────┘
@@ -37,7 +37,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 ```
 src/
 ├── index.ts           # → cli.ts
-├── cli.ts             # CLI (bot | server)
+├── cli.ts             # CLI (bot)
 ├── bot.ts             # Main Eris handler
 ├── config.ts          # YAML config + env var override
 ├── spontaneous.ts     # Weighted spontaneous messages
@@ -46,8 +46,7 @@ src/
 │   ├── bus.ts         # Generic TypedBus (on/off/once/emit)
 │   ├── llm-bus.ts     # LLM Bus (token, done, flush, error, crash, ready, reset)
 │   ├── llm-core.ts    # Queue, proxy/online dispatch, word emission, restart
-│   ├── llm-client.ts  # HTTP client to llm-server (proxy mode)
-│   └── llm-server.ts  # NDJSON HTTP server (proxy mode)
+│   ├── llm-client.ts  # Sessions manager + HTTP client to llama-server
 ├── state/
 │   ├── state-bus.ts   # State bus (state:changed → auto-persist)
 │   ├── state.ts       # Cooldowns, activity, conversation tracking
@@ -303,11 +302,10 @@ Single `config.yml` file. Shell env vars override YAML keys if present. Hot-relo
 |-----|------|---------|-------------|
 | `discord_token` | string | *(required)* | Discord bot token |
 | `llama_model_path` | string | `"./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf"` | Path to GGUF model |
-| `llm_host` | string | `"localhost"` | LLM host (server/proxy mode) |
-| `llm_port` | number | `3124` | LLM port |
-| `llm_server_key` | string | `""` | Shared key to secure llm-server endpoints (empty = no auth) |
+| `llm_host` | string | `"localhost"` | LLM host (llama-server) |
+| `llm_port` | number | `3125` | LLM port (llama-server) |
 | `llm_session_ttl` | number | `10` | LLM session TTL in minutes (KV cache prune) |
-| `llm_mode` | `"proxy"`, `"online"` | `"proxy"` | `proxy` → bot client via llm-server, `online` → OpenAI-compatible API |
+| `llm_mode` | `"proxy"`, `"online"` | `"proxy"` | `proxy` → bot → local llama‑server, `online` → OpenAI‑compatible API |
 | `llm_api_endpoint` | string | `""` | OpenAI-compatible endpoint (mode `online`) |
 | `llm_api_token` | string | `""` | API token (mode `online`) |
 | `llm_model` | string | `"gpt-4o-mini"` | Model name sent in API requests (mode `online`) |
@@ -558,8 +556,8 @@ npm run build && npm start     # production
 
 | Mode | Usage | Description |
 |------|-------|-------------|
-| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llm-server (spawns `llama-server`, shared model across 4 slots, prompt cache with KV reuse). Two processes, ideal for PM2. |
-| `online` | `llm_mode: online` | Bot calls any OpenAI-compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
+| `proxy` (default) | `llm_mode: proxy` | Bot client → HTTP → llama‑server (shared model, 4 slots, prompt cache). Two PM2 processes. |
+| `online` | `llm_mode: online` | Bot calls any OpenAI‑compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)
 

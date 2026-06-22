@@ -14,9 +14,9 @@ Regenerate all SVGs: `npm run diagrams`
 
 [![Architecture Overview](output/01-architecture-overview.svg)](01-architecture-overview.mmd)
 
-This is the high-level system diagram. The bot has two entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, or as a standalone LLM HTTP server (`llm-server.ts` with llama‑server, shared model across 4 slots).
+This is the high-level system diagram. The bot has two entry points: the CLI dispatcher (`cli.ts`) can launch as a Discord bot via Eris, or as a standalone LLM HTTP server. The two processes are managed by PM2: `llama-server` (native C++ binary, shared model across 4 slots) and the bot (`self-cli.cjs`).
 
-The configuration layer reads from `config.yml` and `.env` with hot-reload support via live getters -- most settings can change at runtime without restarting. The LLM Core is the brain: a request queue backed by two operational modes -- proxying through an external `llm-server` over NDJSON (one model, sessions by channel ID), or hitting an OpenAI-compatible API over HTTP. All LLM events flow through a typed event bus (`llmBus`) so subscribers stay decoupled.
+The configuration layer reads from `config.yml` and `.env` with hot-reload support via live getters -- most settings can change at runtime without restarting. The LLM Core is the brain: a request queue backed by two operational modes -- talking to a local `llama-server` over HTTP (shared model, prompt cache, sessions by channel ID), or hitting an OpenAI-compatible API over HTTP. All LLM events flow through a typed event bus (`llmBus`) so subscribers stay decoupled.
 
 The bot subsystem ties everything together: it evaluates triggers, manages anti-spam queues, handles reaction commands, and fires off spontaneous messages. The "Human Behaviors" layer adds realistic delays, sleep schedules, and typos. The TTS pipeline converts responses into voice messages using Piper TTS, ffmpeg, and Discord's CDN upload flow. State management uses an in-memory store with an event bus that triggers debounced persistence to `state.json`, so the bot survives restarts without losing session state or pending messages.
 
@@ -50,9 +50,9 @@ The last check is a flat 1.5% random chance (`randomChance` in config). This mak
 
 [![LLM Core Queue](output/04-llm-core-queue.svg)](04-llm-core-queue.mmd)
 
-This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of two backends based on `LLM_MODE`: Proxy (talks to an external `llm-server` over NDJSON) or Online (hits an OpenAI-compatible API streaming endpoint).
+This shows how the bot actually gets text out of the language model. When `askLLM()` is called, the request is pushed onto a FIFO queue. `processQueue()` dispatches to one of two backends based on `LLM_MODE`: Proxy (talks to local `llama-server` via HTTP `/v1/chat/completions`) or Online (hits an OpenAI-compatible API streaming endpoint).
 
-In proxy mode, the bot sends a POST /ask to the llm-server with `{ username, text, sessionId }`. The server reads an NDJSON stream -- each line is a JSON event with types like `firstToken` (start typing), `chunk` (buffered text, ~40 chars or newline), `done` (full text), and `error`. Online mode uses the standard OpenAI SSE streaming format: `data: {"choices": [{"delta": {"content": "..."}}]}`.
+In proxy mode, `llm-client.ts` manages session history (system prompt + user/assistant messages per channel) in memory. It sends the full conversation to `llama-server`'s OpenAI-compatible API with `id_slot` for slot pinning and `cache_prompt` for KV cache reuse. The server responds with standard JSON containing the assistant's reply. Online mode uses the standard OpenAI SSE streaming format: `data: {"choices": [{"delta": {"content": "..."}}]}`.
 
 Regardless of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. Each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has. The typing indicator is started directly before sending (not tied to the first token).
 
@@ -62,11 +62,11 @@ Regardless of backend, all tokens go through `emitWordTokens()` which feeds a wo
 
 [![Crash Recovery](output/05-llm-crash-recovery.svg)](05-llm-crash-recovery.mmd)
 
-The retry machine handles temporary connection errors to the llm-server. Since the server is managed externally by PM2 (which auto-restarts it on crash), the client side only needs to handle brief outages during server restarts or network blips.
+The retry machine handles temporary connection errors to llama-server. Since the server is managed externally by PM2 (which auto-restarts it on crash), the client side only needs to handle brief outages during server restarts or network blips.
 
-When a fetch() to /ask fails (connection refused, timeout, DNS failure), the bot emits an `error` event and schedules a retry. The retry count increments, and if under the limit of 5, applies exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s). After 5 consecutive failures, the bot gives up -- all queued requests are rejected with an error, and the bot logs the failure. The next user message will trigger a new attempt.
+When a fetch() to `/v1/chat/completions` fails (connection refused, timeout, DNS failure), the bot emits an `error` event and schedules a retry. The retry count increments, and if under the limit of 5, applies exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s). After 5 consecutive failures, the bot gives up -- all queued requests are rejected with an error, and the bot logs the failure. The next user message will trigger a new attempt.
 
-Common causes: server restarting after a model reload, brief network interruptions, or the PM2 process being temporarily unresponsive. Since the llm-server manages its own KV cache sessions with a configurable TTL, a brief retry window doesn't lose conversation context.
+Common causes: server restarting after a model reload, brief network interruptions, or the PM2 process being temporarily unresponsive. Since llama-server manages its own prompt cache with a configurable TTL, a brief retry window doesn't lose conversation context.
 
 ---
 

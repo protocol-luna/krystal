@@ -1,7 +1,6 @@
 graph TB
     subgraph "Entry Points"
         CLI["cli.ts<br/>CLI Dispatcher"] -->|"bot (default)"| BOT["bot.ts<br/>Discord Bot (Eris)"]
-        CLI -->|"server"| SRV["llm-server.ts<br/>LLM HTTP Server (llama‑server, 4 slots)"]
     end
 
     subgraph "Configuration Layer"
@@ -15,13 +14,12 @@ graph TB
     subgraph "LLM Core"
         LLMCORE["llm-core.ts<br/>Queue + Backends"]
         LLMBUS["llm-bus.ts<br/>TypedBus<LLMEvents>"]
-        LLMCLIENT["llm-client.ts<br/>HTTP Client (Proxy)"]
-        LLMSRV["llm-server.ts<br/>NDJSON Server"]
+        LLMCLIENT["llm-client.ts<br/>Sessions + HTTP to llama‑server"]
+        LLMSRV{{"llama‑server<br/>4 slots, prompt cache"}}
 
         LLMCORE --> LLMBUS
         LLMCORE -->|"proxy mode"| LLMCLIENT
-        LLMCLIENT -->|"HTTP POST /ask"| LLMSRV
-        LLMSRV --> LLMCORE
+        LLMCLIENT -->|"HTTP POST /v1/chat/completions"| LLMSRV
         LLMCORE -->|"online mode"| API{{"OpenAI-compatible API"}}
     end
 
