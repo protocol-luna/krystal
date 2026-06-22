@@ -72,12 +72,12 @@ describe("evaluateMessage", () => {
 		expect(r.reason).toBe("dm");
 	});
 
-	it("ignores DM when replyInDM is false", async () => {
+	it("always responds in DM (ignores replyInDM)", async () => {
 		mockConfig({ replyInDM: false });
 		const { evaluateMessage } = await import("../../src/state/trigger.js");
 		const msg = makeMsg({ channel: { id: "dm1", type: 1 } });
 		const r = evaluateMessage(msg as any, "b1", "Luna");
-		expect(r.shouldRespond).toBeFalse();
+		expect(r.shouldRespond).toBeTrue();
 	});
 
 	it("ignores messages when paused", async () => {

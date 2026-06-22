@@ -74,13 +74,10 @@ export function evaluateMessage(
 		setPaused(false);
 		return { shouldRespond: true, reason: "mention", botName };
 	}
-	if (isDM && config.replyInDM) {
-		log(channelId, `${author}: "${message.content.slice(0, 60)}" → dm`);
-		return { shouldRespond: true, reason: "dm", botName };
-	}
 	if (isDM) {
-		log(channelId, `${author}: "${message.content.slice(0, 60)}" → DM ignoré`);
-		return { shouldRespond: false, reason: null, botName };
+		log(channelId, `${author}: "${message.content.slice(0, 60)}" → dm`);
+		setPaused(false);
+		return { shouldRespond: true, reason: "dm", botName };
 	}
 
 	if (isPaused()) {
