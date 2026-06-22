@@ -147,6 +147,8 @@ export async function startServer(): Promise<void> {
 				});
 
 				try {
+					const t0 = performance.now();
+
 					const userMsg = username ? `${username}: ${text}` : text;
 					entry.messages.push({ role: "user", content: userMsg });
 					entry.messages.push({ role: "assistant", content: "" });
@@ -155,10 +157,14 @@ export async function startServer(): Promise<void> {
 					const convTokens = entry.model.tokenize(convText);
 					const newTokens = convTokens.slice(entry.nextTokenIndex);
 
+					const t1 = performance.now();
+					const prepareMs = (t1 - t0).toFixed(1);
+
 					let genTokens: import("node-llama-cpp").Token[] = [];
 					let prevDetokLen = 0;
 					let firstTokenSent = false;
 					let chunkBuf = "";
+					let firstTokenMs: string | undefined;
 
 					for await (const token of entry.seq.evaluate(newTokens, {
 						temperature: 0.8,
@@ -169,6 +175,12 @@ export async function startServer(): Promise<void> {
 					})) {
 						if (entry.model.isEogToken(token)) {
 							break;
+						}
+
+						if (!firstTokenSent) {
+							firstTokenMs = (performance.now() - t1).toFixed(1);
+							firstTokenSent = true;
+							res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
 						}
 
 						genTokens.push(token);
@@ -184,10 +196,6 @@ export async function startServer(): Promise<void> {
 
 							const delta = textSoFar.slice(prevDetokLen);
 							if (delta) {
-								if (!firstTokenSent) {
-									firstTokenSent = true;
-									res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
-								}
 								chunkBuf += delta;
 								if (chunkBuf.includes("\n") || chunkBuf.length >= 40) {
 									res.write(
@@ -209,6 +217,14 @@ export async function startServer(): Promise<void> {
 					if (cleanResp.includes("<|im_end|>")) {
 						cleanResp = cleanResp.slice(0, cleanResp.indexOf("<|im_end|>"));
 					}
+					const t2 = performance.now();
+					const totalMs = (t2 - t0).toFixed(1);
+					const brief =
+						cleanResp.length > 60 ? `${cleanResp.slice(0, 60)}...` : cleanResp;
+					console.log(
+						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"`
+					);
+
 					if (!firstTokenSent && cleanResp) {
 						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
 					}
