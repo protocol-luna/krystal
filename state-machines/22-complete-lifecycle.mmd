@@ -96,8 +96,6 @@ stateDiagram-v2
         WAITING_LLM_QUEUE --> LLM_PROCESS: dequeued
         LLM_PROCESS --> STREAMING: tokens arrive
         
-        STREAMING --> FIRST_TOKEN: llmBus.once(token)
-        FIRST_TOKEN --> START_TYPING: typing indicator
         STREAMING --> FLUSH_ON_NEWLINE: llmBus.on(flush)
         FLUSH_ON_NEWLINE --> BURST_SPLIT: burst chance?
         BURST_SPLIT --> SEND_CHUNK: send fragment(s)

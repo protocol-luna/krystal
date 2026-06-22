@@ -54,7 +54,7 @@ This shows how the bot actually gets text out of the language model. When `askLL
 
 The CLI mode is the most complex: it waits for the model to be ready by watching stdout for the prompt pattern, writes the prompt to stdin, reads tokens from stdout line by line, detects when the response is done (the prompt pattern reappears), and handles crashes via the process `close` event. Server mode reads an SSE stream parsing `data: {...}` lines looking for a `stop` flag. Proxy mode reads NDJSON -- each line is a JSON event with types like `firstToken`, `chunk`, `done`, and `error`.
 
-Regardless of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. The first token triggers `onFirstToken` (starts the typing indicator in Discord), each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has.
+Regardless of backend, all tokens go through `emitWordTokens()` which feeds a word emission queue. Words are emitted one at a time with a random 20-80ms delay between them -- the human-typing simulation. Each word fires a `token` event, and after each word-chunk a `flush` event tells the bot to send whatever it has. The typing indicator is started directly before sending (not tied to the first token).
 
 ---
 
@@ -172,7 +172,7 @@ The trickiest part is `restorePending()`: messages are stored as channelId + mes
 
 This shows the typed event bus system that decouples the bot's components. There are two buses: `llmBus` (for LLM events) and `stateBus` (for state changes). Both use a `TypedBus<TEvents>` generic providing type-safe `emit()`, `on()`, and `once()` methods.
 
-The `llmBus` carries seven events: `token` (single word emitted), `flush` (end of word chunk -- time to send a Discord message), `done` (complete text generated), `error` (LLM error), `crash` (llama-cli process crash), `ready` (model loaded), and `reset` (context cleared). Emitters are in `llm-core.ts`; subscribers are in `bot.ts` which accumulates tokens, sends messages on flush, and starts the typing indicator on first token.
+The `llmBus` carries seven events: `token` (single word emitted), `flush` (end of word chunk -- time to send a Discord message), `done` (complete text generated), `error` (LLM error), `crash` (llama-cli process crash), `ready` (model loaded), and `reset` (context cleared). Emitters are in `llm-core.ts`; subscribers are in `bot.ts` which accumulates tokens and sends messages on flush.
 
 The `stateBus` carries a single event -- `state:changed` -- emitted by the five state mutation functions in `state.ts`. The only subscriber is `persistence.ts`, which calls `scheduleSave()` to debounce the write to disk. This separation means `state.ts` doesn't need to know anything about file I/O -- it just fires events.
 

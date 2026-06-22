@@ -41,7 +41,7 @@ sequenceDiagram
                 bot.ts->>bot.ts: store in pendingMessages["C:U"]
                 bot.ts-->>Discord: ignored (queued)
             else free
-                bot.ts->>bot.ts: llmBus.on("token", onToken)<br/>llmBus.once("token", startTyping)<br/>llmBus.on("flush", onFlush)
+                bot.ts->>bot.ts: llmBus.on("token", onToken)<br/>llmBus.on("flush", onFlush)
                 bot.ts->>llm-core.ts: askLLM({ username, text })
 
                 llm-core.ts-->>bot.ts: cli mode → stdin<br/>proxy mode → HTTP → llm-server
@@ -49,10 +49,9 @@ sequenceDiagram
                 llama-->>llm-core.ts: stdout stream (CLI)<br/>or HTTP stream (proxy)
                 llm-core.ts->>llmBus: emit("token", word)  × N words<br/>llmBus.emit("flush")      → end of line
 
-                bot.ts->>Discord: sendChannelTyping()<br/>(triggered by once)
-                loop every 8s
-                    bot.ts->>Discord: sendChannelTyping()
-                end
+                bot.ts->>bot.ts: hesitation possible, startTyping()
+                bot.ts->>Discord: sendChannelTyping()
+                Note over bot.ts: 8s interval keeps<br/>typing indicator active
                 loop each flush
                     llmBus-->>bot.ts: onFlush()
                     bot.ts->>bot.ts: hesitation possible

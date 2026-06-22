@@ -180,12 +180,7 @@ Configurable probability (`voice_message_chance`, default 8%). Full pipeline:
 
 ### Typing indicator
 
-```typescript
-llmBus.once("token", startTyping)  → sends typing + 8s interval
-finally: clearInterval, llmBus.off  → stops typing + cleanup
-```
-
-Typing only appears when the LLM starts generating (first `token` event on `llmBus`).
+`startTyping()` is called directly before sending the response — not tied to LLM token events. Sets an 8s `setInterval` that keeps the typing indicator active until the response is sent. Cleaned up in `finally` (`clearInterval`).
 
 ### Real-time response
 

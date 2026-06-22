@@ -22,7 +22,7 @@ graph TB
         subgraph "Subscribers"
             BOT_TOKEN["bot.ts on('token')<br/>accumulates chunks"]
             BOT_FLUSH["bot.ts on('flush')<br/>createMessage()"]
-            BOT_ONCE["bot.ts once('token')<br/>startTyping()"]
+            BOT_ONCE["bot.ts calls startTyping()<br/>directly before send"]
             CORE_DONE["llm-core.ts on('done')<br/>item.resolve()"]
         end
     end

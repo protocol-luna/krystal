@@ -36,7 +36,7 @@ stateDiagram-v2
     PICK_REPLY_STYLE --> STREAM_SETUP: setup onToken/onFlush
 
     STREAM_SETUP --> HESITATION_CHECK: register event listeners
-    HESITATION_CHECK --> START_TYPING: once("token", startTyping)
+    HESITATION_CHECK --> START_TYPING: startTyping() called directly
 
     START_TYPING --> CALL_LLM: askLLM({username, text})
     CALL_LLM --> STREAM_TOKENS: LLM emits token events
