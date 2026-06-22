@@ -65,7 +65,7 @@ let sessions: Map<string, SessionEntry>;
 export async function startServer(): Promise<void> {
 	const { getLlama } = await import("node-llama-cpp");
 	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
-	const cpuThreads = Math.max(4, availableParallelism() * 2);
+	const cpuThreads = availableParallelism();
 	const llama = await getLlama({ maxThreads: cpuThreads });
 	const model = await llama.loadModel({
 		modelPath: LLAMA_MODEL_PATH,
