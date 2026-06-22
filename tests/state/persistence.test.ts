@@ -30,8 +30,8 @@ describe("loadState", () => {
 					botActivity: [],
 					lastSpeaker: [],
 					responseCount: [],
-				topicWordLogs: { logs: [], lastActivity: [] },
-			}),
+					topicWordLogs: { logs: [], lastActivity: [] },
+				}),
 			writeFile: async () => {},
 		}));
 		const { loadState } = await import("../../src/state/persistence.js");

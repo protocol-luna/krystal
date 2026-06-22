@@ -48,15 +48,34 @@ describe("llm-server", () => {
 				};
 			},
 		}));
+		mock.module("node-llama-cpp", () => ({
+			getLlama: async () => ({
+				loadModel: async () => ({
+					createContext: async () => ({
+						getSequence: () => ({}),
+					}),
+				}),
+			}),
+			LlamaChatSession: class {
+				prompt = async (
+					_text: string,
+					opts?: { onTextChunk?: (c: string) => void }
+				) => {
+					opts?.onTextChunk?.("mock reply");
+				};
+				dispose = () => {};
+			},
+		}));
 	});
 
-	it("imports and triggers listen", async () => {
-		const _mod = await import("../../src/core/llm-server.js");
+	it("startServer triggers listen", async () => {
+		const { startServer } = await import("../../src/core/llm-server.js");
+		await startServer();
 		expect(capturedHandler).toBeDefined();
 	});
 
 	it("returns 404 for unknown routes", async () => {
-		await import("../../src/core/llm-server.js");
+		const { startServer: _s } = await import("../../src/core/llm-server.js");
 		const m = mockRes();
 		const req = new EventEmitter() as any;
 		req.url = "/unknown";

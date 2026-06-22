@@ -11,6 +11,7 @@ import { llmBus } from "./llm-bus.js";
 export interface UserMessage {
 	username: string;
 	text: string;
+	sessionId?: string;
 }
 
 interface QueueItem {
@@ -156,10 +157,7 @@ function buildCleanRegexes(username: string): void {
 		return;
 	}
 	lastCleanUsername = username;
-	cleanLineRe = new RegExp(
-		`^\\s*(Luna|Luna\\s*Bot|${username})\\s*:\\s*`,
-		"i"
-	);
+	cleanLineRe = new RegExp(`^\\s*(Luna|Luna\\s*Bot|${username})\\s*:\\s*`, "i");
 	cleanFullRe = new RegExp(
 		`^\\s*(Luna|Luna\\s*Bot|${username})\\s*:\\s*`,
 		"im"

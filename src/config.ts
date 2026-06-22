@@ -103,14 +103,10 @@ export const LLM_API_ENDPOINT: string =
 	"";
 
 export const LLM_API_TOKEN: string =
-	v<string | null>("llm_api_token", null) ??
-	process.env.LLM_API_TOKEN ??
-	"";
+	v<string | null>("llm_api_token", null) ?? process.env.LLM_API_TOKEN ?? "";
 
 export const LLM_MODEL: string =
-	v<string | null>("llm_model", null) ??
-	process.env.LLM_MODEL ??
-	"gpt-4o-mini";
+	v<string | null>("llm_model", null) ?? process.env.LLM_MODEL ?? "gpt-4o-mini";
 
 export const SYSTEM_PROMPT = (() => {
 	const fromYaml = v<string | null>("system_prompt", null);
