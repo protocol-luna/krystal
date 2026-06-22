@@ -13,7 +13,7 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 				mention: {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0.08,
 				},
 				dm: {
@@ -25,31 +25,31 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 				name: {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0.05,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 				keyword: {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.04,
 				},
 				"follow-up": {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0.03,
 				},
 				random: {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0.15,
+					ignore_chance: 0.02,
 					reaction_chance: 0.02,
 				},
 				default: {
 					delay_min: 0,
 					delay_max: 0,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 			},

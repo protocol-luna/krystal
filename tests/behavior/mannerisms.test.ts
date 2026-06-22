@@ -8,7 +8,7 @@ describe("computeDelay", () => {
 				mention: {
 					delay_min: 300,
 					delay_max: 1500,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0.08,
 				},
 				dm: {
@@ -20,31 +20,31 @@ describe("computeDelay", () => {
 				name: {
 					delay_min: 800,
 					delay_max: 4000,
-					ignore_chance: 0.05,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 				keyword: {
 					delay_min: 1000,
 					delay_max: 3500,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.04,
 				},
 				"follow-up": {
 					delay_min: 500,
 					delay_max: 2000,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0.03,
 				},
 				random: {
 					delay_min: 1500,
 					delay_max: 5000,
-					ignore_chance: 0.15,
+					ignore_chance: 0.02,
 					reaction_chance: 0.02,
 				},
 				default: {
 					delay_min: 800,
 					delay_max: 4000,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 			},
@@ -128,9 +128,16 @@ describe("shouldIgnore", () => {
 		mockConfig();
 	});
 
-	it("returns false for mention (0% chance)", async () => {
+	it("may return true for mention (2% chance)", async () => {
 		const { shouldIgnore } = await import("../../src/behavior/mannerisms.js");
-		expect(shouldIgnore("mention")).toBeFalse();
+		let ignored = 0;
+		for (let i = 0; i < 1000; i++) {
+			if (shouldIgnore("mention")) {
+				ignored++;
+			}
+		}
+		expect(ignored).toBeGreaterThan(0);
+		expect(ignored).toBeLessThan(100);
 	});
 
 	it("returns false for dm (0% chance)", async () => {
@@ -138,7 +145,7 @@ describe("shouldIgnore", () => {
 		expect(shouldIgnore("dm")).toBeFalse();
 	});
 
-	it("may return true for keyword (8% chance)", async () => {
+	it("may return true for keyword (2% chance)", async () => {
 		const { shouldIgnore } = await import("../../src/behavior/mannerisms.js");
 		let ignored = 0;
 		for (let i = 0; i < 1000; i++) {
@@ -147,7 +154,7 @@ describe("shouldIgnore", () => {
 			}
 		}
 		expect(ignored).toBeGreaterThan(0);
-		expect(ignored).toBeLessThan(200);
+		expect(ignored).toBeLessThan(100);
 	});
 
 	it("increases ignore chance with short sleep", async () => {
@@ -156,7 +163,7 @@ describe("shouldIgnore", () => {
 		expect(typeof result).toBe("boolean");
 	});
 
-	it("returns false for null reason (default 8%)", async () => {
+	it("returns boolean for null reason (default 2%)", async () => {
 		const { shouldIgnore } = await import("../../src/behavior/mannerisms.js");
 		expect(typeof shouldIgnore(null)).toBe("boolean");
 	});

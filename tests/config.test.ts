@@ -29,7 +29,7 @@ describe("config getters", () => {
 				mention: {
 					delay_min: 100,
 					delay_max: 500,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0,
 				},
 				dm: {
@@ -41,31 +41,31 @@ describe("config getters", () => {
 				name: {
 					delay_min: 800,
 					delay_max: 4000,
-					ignore_chance: 0.05,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 				keyword: {
 					delay_min: 1000,
 					delay_max: 3500,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.04,
 				},
 				"follow-up": {
 					delay_min: 500,
 					delay_max: 2000,
-					ignore_chance: 0,
+					ignore_chance: 0.02,
 					reaction_chance: 0.03,
 				},
 				random: {
 					delay_min: 1500,
 					delay_max: 5000,
-					ignore_chance: 0.15,
+					ignore_chance: 0.02,
 					reaction_chance: 0.02,
 				},
 				default: {
 					delay_min: 800,
 					delay_max: 4000,
-					ignore_chance: 0.08,
+					ignore_chance: 0.02,
 					reaction_chance: 0.06,
 				},
 			},
