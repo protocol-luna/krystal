@@ -159,15 +159,14 @@ export async function startServer(): Promise<void> {
 
 					const t1 = performance.now();
 					const prepareMs = (t1 - t0).toFixed(1);
-					console.log(
-						`[llm-server] dbg sid=${sid.slice(0, 8)} prepare=${prepareMs}ms newTokens=${newTokens.length} tokLen=${entry.nextTokenIndex}`
-					);
 
 					let genTokens: import("node-llama-cpp").Token[] = [];
 					let prevDetokLen = 0;
 					let firstTokenSent = false;
 					let chunkBuf = "";
 					let firstTokenMs: string | undefined;
+					const tokTimes: number[] = [];
+					let lastTokTime = 0;
 
 					for await (const token of entry.seq.evaluate(newTokens, {
 						temperature: 0.8,
@@ -180,9 +179,14 @@ export async function startServer(): Promise<void> {
 							break;
 						}
 
-						if (!firstTokenSent) {
-							firstTokenMs = (performance.now() - t1).toFixed(1);
+						const now = performance.now();
+						if (firstTokenSent) {
+							tokTimes.push(now - lastTokTime);
+							lastTokTime = now;
+						} else {
+							firstTokenMs = (now - t1).toFixed(1);
 							firstTokenSent = true;
+							lastTokTime = now;
 							res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
 						}
 
@@ -222,10 +226,18 @@ export async function startServer(): Promise<void> {
 					}
 					const t2 = performance.now();
 					const totalMs = (t2 - t0).toFixed(1);
+					const genCount = tokTimes.length;
+					const avgTok =
+						genCount > 0
+							? `${(
+									1000 / (tokTimes.reduce((a, b) => a + b, 0) / genCount)
+								).toFixed(2)} t/s`
+							: "n/a";
 					const brief =
 						cleanResp.length > 60 ? `${cleanResp.slice(0, 60)}...` : cleanResp;
-					const logLine = `[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs ?? "?"}ms total=${totalMs}ms tokens=${entry.seq.nextTokenIndex} "${brief}"`;
-					console.log(logLine);
+					console.log(
+						`[llm-server] sid=${sid.slice(0, 8)} prepare=${prepareMs}ms firstToken=${firstTokenMs}ms total=${totalMs}ms genTok=${genTokens.length} avg=${avgTok} "${brief}"`
+					);
 
 					if (!firstTokenSent && cleanResp) {
 						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
