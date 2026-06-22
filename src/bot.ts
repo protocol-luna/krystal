@@ -35,7 +35,7 @@ import {
 } from "./tts/voice-message.js";
 import { hasUnsafeTTSText } from "./tts/audio.js";
 import { getSleepBehavior } from "./behavior/sleep.js";
-import { applyTypo } from "./behavior/typo.js";
+import { applyTypo, type TypoResult } from "./behavior/typo.js";
 import { loadState } from "./state/persistence.js";
 import {
 	recordMessage,
@@ -65,15 +65,21 @@ const sessionQueue = new Map<
 
 function drainSessionQueue(channelId: string): void {
 	const queued = sessionQueue.get(channelId);
-	if (!queued || queued.length === 0) { return; }
+	if (!queued || queued.length === 0) {
+		return;
+	}
 	sessionQueue.delete(channelId);
 	const next = queued.shift()!;
-	if (queued.length > 0) { sessionQueue.set(channelId, queued); }
+	if (queued.length > 0) {
+		sessionQueue.set(channelId, queued);
+	}
 	console.log(
 		`[bot] session queue: reprise du message en attente dans #${channelId}`
 	);
 	void triggerLunaReply(next.message, next.isDM, next.reason).then(() => {
-		if (!sessionPaused.has(channelId)) { drainSessionQueue(channelId); }
+		if (!sessionPaused.has(channelId)) {
+			drainSessionQueue(channelId);
+		}
 	});
 }
 
@@ -138,7 +144,7 @@ async function triggerLunaReply(
 		: style;
 
 	let onToken: ((chunk: string) => void) | null = null;
-	let onFlush: (() => void) | null = null;
+	const onFlush: (() => void) | null = null;
 
 	try {
 		const mentionRe = new RegExp(`<@!?${client.user.id}>`, "g");
@@ -154,21 +160,25 @@ async function triggerLunaReply(
 
 		const willBurst = !isVoice && Math.random() < config.burstChance;
 
-function stripLlmPrefix(text: string): string {
-	return text.replace(/^[^:]+:\s*/, "");
-}
-
-function sendFragments(parts: string[], hasRef: boolean): void {
-	let accDelay = 0;
-	for (let i = 0; i < parts.length; i++) {
-		const frag = stripLlmPrefix(parts[i]);
-		if (!frag) {
-			continue;
+		function stripLlmPrefix(text: string): string {
+			return text.replace(/^[^:]+:\s*/, "");
 		}
+
+		function sendFragments(
+			parts: string[],
+			hasRef: boolean
+		): Promise<string | null> {
+			let accDelay = 0;
+			let firstPromise: Promise<string | null> | null = null;
+			for (let i = 0; i < parts.length; i++) {
+				const frag = stripLlmPrefix(parts[i]);
+				if (!frag) {
+					continue;
+				}
 				if (i === 0) {
 					const content = hesitationWord ? `${hesitationWord} ${frag}` : frag;
 					hesitationWord = "";
-					client
+					firstPromise = client
 						.createMessage(message.channel.id, {
 							content,
 							...(hasRef && refStyle.messageReference
@@ -183,8 +193,9 @@ function sendFragments(parts: string[], hasRef: boolean): void {
 						.then((_sent) => {
 							isFirstChunk = false;
 							markBotActivity(message.channel.id);
+							return _sent.id;
 						})
-						.catch(() => {});
+						.catch(() => null);
 				} else {
 					const delay =
 						config.burstDelayMin +
@@ -202,6 +213,7 @@ function sendFragments(parts: string[], hasRef: boolean): void {
 					}, accDelay);
 				}
 			}
+			return firstPromise ?? Promise.resolve(null);
 		}
 
 		function splitBurst(text: string): string[] {
@@ -238,10 +250,6 @@ function sendFragments(parts: string[], hasRef: boolean): void {
 		};
 		llmBus.on("token", onToken);
 
-		if (!isVoice) {
-			llmBus.once("token", startTyping);
-		}
-
 		const hasHesitation = Math.random() < config.hesitationChance;
 		let hesitationWord = "";
 		if (hasHesitation) {
@@ -251,45 +259,65 @@ function sendFragments(parts: string[], hasRef: boolean): void {
 				];
 		}
 
-		if (!isVoice) {
-			onFlush = () => {
-				if (!messageBuffer) {
-					return;
-				}
-				const parts = splitBurst(messageBuffer);
-				messageBuffer = "";
-				sendFragments(parts, isFirstChunk);
-			};
-			llmBus.on("flush", onFlush);
-		}
-
 		const fullText = await askLLM({ username: displayName, text: content });
 
-		// flush remaining buffer (last line without newline sentinel)
-		if (!isVoice && messageBuffer) {
-			const parts = splitBurst(messageBuffer);
-			messageBuffer = "";
-			sendFragments(parts, isFirstChunk);
-		}
+		// build the text to send (with optional typo)
+		const text = stripLlmPrefix(fullText);
+		let textToSend = text;
+		let typoResult: TypoResult | null = null;
 
-		// voice TTS
-		if (isVoice && !hasUnsafeTTSText(fullText)) {
-			await sendTextAsVoiceMessage(
-				message.channel.id,
-				message.id,
-				stripLlmPrefix(fullText)
-			);
-		}
-
-		// typo correction: sending correction message
 		if (!isVoice && chunks.length > 0 && Math.random() < config.typoChance) {
 			const idx = Math.floor(Math.random() * chunks.length);
 			const result = applyTypo(chunks[idx], config.typoLayout);
-			if (result) {
-				await client.createMessage(message.channel.id, {
-					content: `${result.correctedWord}*`,
+			if (result && text.includes(result.originalWord)) {
+				typoResult = result;
+				textToSend = text.replace(result.originalWord, result.correctedWord);
+				console.log(
+					`[bot] typo: "${result.originalWord}" → "${result.correctedWord}"`
+				);
+			}
+		}
+
+		// send the text (with or without typo)
+		const willEdit =
+			typoResult &&
+			(config.typoCorrectionStyle === "edit" ||
+				(config.typoCorrectionStyle === "mixed" && Math.random() < 0.5));
+
+		let firstMessageId: string | null = null;
+		if (!isVoice) {
+			startTyping();
+			const parts = splitBurst(textToSend);
+			firstMessageId = await sendFragments(parts, isFirstChunk);
+		}
+
+		// voice TTS (always use clean text)
+		if (isVoice && !hasUnsafeTTSText(text)) {
+			await sendTextAsVoiceMessage(message.channel.id, message.id, text);
+		}
+
+		// typo: correct after delay
+		if (typoResult && firstMessageId) {
+			const delay =
+				config.typoCorrectionDelay +
+				Math.random() *
+					(config.typoCorrectionDelayMax - config.typoCorrectionDelay);
+			await new Promise((r) => setTimeout(r, delay));
+
+			if (willEdit) {
+				await client.editMessage(message.channel.id, firstMessageId, {
+					content: text,
 				});
-				console.log(`[bot] typo corrigé par message: ${result.correctedWord}*`);
+				console.log(
+					`[bot] typo corrigé par edit: "${typoResult.correctedWord}" → "${typoResult.originalWord}"`
+				);
+			} else {
+				await client.createMessage(message.channel.id, {
+					content: `${typoResult.originalWord}*`,
+				});
+				console.log(
+					`[bot] typo corrigé par message: "${typoResult.originalWord}*"`
+				);
 			}
 		}
 
@@ -661,7 +689,10 @@ export async function startBot(): Promise<void> {
 	restoreTopicFatigue(
 		Array.isArray(wordLogs)
 			? { logs: wordLogs as [string, string[]][], lastActivity: [] }
-			: (wordLogs as { logs: [string, string[]][]; lastActivity: [string, number][] })
+			: (wordLogs as {
+					logs: [string, string[]][];
+					lastActivity: [string, number][];
+				})
 	);
 	startPruning();
 	setInterval(pruneTopicFatigue, 300_000);

@@ -3,7 +3,7 @@ import { LLM_HOST, LLM_PORT } from "../config.js";
 const BASE = `http://${LLM_HOST}:${LLM_PORT}`;
 
 export async function askLLM(
-	userMessage: { username: string; text: string },
+	userMessage: { username: string; text: string; sessionId?: string },
 	callbacks: { onFirstToken?: () => void; onChunk: (chunk: string) => void }
 ): Promise<string> {
 	const response = await fetch(`${BASE}/ask`, {

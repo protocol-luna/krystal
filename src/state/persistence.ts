@@ -26,7 +26,10 @@ export interface PersistedState {
 	botActivity: [string, number][];
 	lastSpeaker: [string, LastSpeakerEntry][];
 	responseCount: [string, number][];
-	topicWordLogs: { logs: [string, string[]][]; lastActivity: [string, number][] };
+	topicWordLogs: {
+		logs: [string, string[]][];
+		lastActivity: [string, number][];
+	};
 }
 
 function defaultState(): PersistedState {

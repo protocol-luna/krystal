@@ -12,8 +12,8 @@ async function main(): Promise<void> {
 		}
 
 		case "server": {
-			process.env.LLM_MODE = "cli";
-			await import("./core/llm-server.js");
+			const { startServer } = await import("./core/llm-server.js");
+			await startServer();
 			break;
 		}
 

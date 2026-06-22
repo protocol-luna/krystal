@@ -1,81 +1,170 @@
-import { createServer } from "node:http";
-import { LLM_PORT, setLLMMode } from "../config.js";
-import { askLLM, resetLLM } from "./llm-core.js";
+import { createServer, type Server } from "node:http";
+import { LLAMA_MODEL_PATH, LLM_PORT } from "../config.js";
+import type { LlamaChatSession } from "node-llama-cpp";
 
-// llm-server gère toujours le LLM en direct, jamais via proxy
-setLLMMode("cli");
+const SESSION_TTL = 10 * 60 * 1000;
+const PRUNE_INTERVAL = 60_000;
 
-const PORT = LLM_PORT;
+let server: Server | undefined;
+let sessions: Map<string, { session: LlamaChatSession; lastUsed: number }>;
 
-createServer(async (req, res) => {
-	const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+export async function startServer(): Promise<void> {
+	const { getLlama, LlamaChatSession } = await import("node-llama-cpp");
+	console.log(`[llm-server] loading model: ${LLAMA_MODEL_PATH}`);
+	const llama = await getLlama();
+	const model = await llama.loadModel({ modelPath: LLAMA_MODEL_PATH });
+	console.log("[llm-server] model loaded");
 
-	if (req.method === "POST" && url.pathname === "/ask") {
-		let body = "";
-		req.on("data", (c) => {
-			body += c;
-		});
-		req.on("end", () => {
-			const { username, text }: { username: string; text: string } =
-				JSON.parse(body);
+	sessions = new Map();
 
-			res.writeHead(200, {
-				"Content-Type": "application/x-ndjson",
-				"Cache-Control": "no-cache",
-				Connection: "keep-alive",
-				"Access-Control-Allow-Origin": "*",
+	setInterval(() => {
+		const now = Date.now();
+		for (const [id, s] of sessions) {
+			if (now - s.lastUsed > SESSION_TTL) {
+				s.session.dispose();
+				sessions.delete(id);
+				console.log(`[llm-server] pruned stale session: ${id.slice(0, 8)}...`);
+			}
+		}
+	}, PRUNE_INTERVAL);
+
+	// biome-ignore lint/suspicious/useAwait: async needed for await inside /ask and /reset handlers
+	server = createServer(async (req, res) => {
+		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+
+		if (req.method === "POST" && url.pathname === "/ask") {
+			let body = "";
+			req.on("data", (c) => {
+				body += c;
 			});
+			req.on("end", async () => {
+				const { username, text, sessionId } = JSON.parse(body) as {
+					username: string;
+					text: string;
+					sessionId?: string;
+				};
 
-			askLLM(
-				{ username, text },
-				{
-					onFirstToken: () => {
-						res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
-					},
-					onChunk: (chunk: string) => {
-						res.write(`${JSON.stringify({ type: "chunk", data: chunk })}\n`);
-					},
+				if (!text) {
+					res.writeHead(400);
+					res.end("missing text");
+					return;
 				}
-			)
-				.then((full: string) => {
-					res.write(`${JSON.stringify({ type: "done", data: full })}\n`);
+
+				const sid = sessionId ?? "default";
+				let entry = sessions.get(sid);
+
+				if (!entry) {
+					try {
+						const ctx = await model.createContext({ contextSize: 4096 });
+						const seq = ctx.getSequence();
+						const session = new LlamaChatSession({ contextSequence: seq });
+						entry = { session, lastUsed: Date.now() };
+						sessions.set(sid, entry);
+						console.log(
+							`[llm-server] new session: ${sid.slice(0, 8)}... (${sessions.size} total)`
+						);
+					} catch (err) {
+						res.writeHead(500);
+						res.end(
+							JSON.stringify({ type: "error", data: (err as Error).message })
+						);
+						return;
+					}
+				}
+
+				entry.lastUsed = Date.now();
+
+				res.writeHead(200, {
+					"Content-Type": "application/x-ndjson",
+					"Cache-Control": "no-cache",
+					Connection: "keep-alive",
+					"Access-Control-Allow-Origin": "*",
+				});
+
+				try {
+					const promptText = username ? `${username}: ${text}` : text;
+					let firstToken = true;
+					let fullText = "";
+					let chunkBuf = "";
+
+					await entry.session.prompt(promptText, {
+						onTextChunk(token: string) {
+							if (!token) {
+								return;
+							}
+							if (firstToken) {
+								firstToken = false;
+								res.write(`${JSON.stringify({ type: "firstToken" })}\n`);
+							}
+							fullText += token;
+							chunkBuf += token;
+							if (chunkBuf.includes("\n") || chunkBuf.length >= 40) {
+								res.write(
+									`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`
+								);
+								chunkBuf = "";
+							}
+						},
+					});
+
+					if (chunkBuf) {
+						res.write(`${JSON.stringify({ type: "chunk", data: chunkBuf })}\n`);
+					}
+					res.write(`${JSON.stringify({ type: "done", data: fullText })}\n`);
 					res.end();
-				})
-				.catch((err: unknown) => {
+				} catch (err) {
 					res.write(
 						`${JSON.stringify({ type: "error", data: (err as Error).message })}\n`
 					);
 					res.end();
-				});
-		});
-		return;
-	}
+				}
+			});
+			return;
+		}
 
-	if (req.method === "POST" && url.pathname === "/reset") {
-		await resetLLM();
-		res.writeHead(200, { "Access-Control-Allow-Origin": "*" });
-		res.end("ok");
-		return;
-	}
+		if (req.method === "POST" && url.pathname === "/reset") {
+			const sessionId = url.searchParams.get("sessionId");
+			if (sessionId) {
+				const entry = sessions.get(sessionId);
+				if (entry) {
+					entry.session.dispose();
+					sessions.delete(sessionId);
+					console.log(
+						`[llm-server] reset session: ${sessionId.slice(0, 8)}...`
+					);
+				}
+			} else {
+				for (const [, s] of sessions) {
+					s.session.dispose();
+				}
+				sessions.clear();
+				console.log("[llm-server] reset all sessions");
+			}
+			res.writeHead(200, { "Access-Control-Allow-Origin": "*" });
+			res.end("ok");
+			return;
+		}
 
-	if (req.method === "GET" && url.pathname === "/health") {
-		const { isLLMBusy } = await import("./llm-core.js");
-		res.writeHead(200, {
-			"Content-Type": "application/json",
-			"Access-Control-Allow-Origin": "*",
-		});
-		res.end(
-			JSON.stringify({
-				ready: true,
-				busy: isLLMBusy(),
-				queued: 0,
-			})
-		);
-		return;
-	}
+		if (req.method === "GET" && url.pathname === "/health") {
+			res.writeHead(200, {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+			});
+			res.end(
+				JSON.stringify({
+					ready: true,
+					busy: false,
+					sessions: sessions?.size ?? 0,
+				})
+			);
+			return;
+		}
 
-	res.writeHead(404);
-	res.end("not found");
-}).listen(PORT, () => {
-	console.log(`LLM server listening on port ${PORT}`);
-});
+		res.writeHead(404);
+		res.end("not found");
+	});
+
+	server.listen(LLM_PORT, () => {
+		console.log(`[llm-server] listening on port ${LLM_PORT}`);
+	});
+}
