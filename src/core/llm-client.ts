@@ -72,8 +72,11 @@ export async function askLLM(
 	return fullText;
 }
 
-export async function resetLLM(): Promise<void> {
-	const response = await fetch(`${BASE}/reset`, {
+export async function resetLLM(sessionId?: string): Promise<void> {
+	const url = sessionId
+		? `${BASE}/reset?sessionId=${encodeURIComponent(sessionId)}`
+		: `${BASE}/reset`;
+	const response = await fetch(url, {
 		method: "POST",
 		headers: authHeaders(),
 	});

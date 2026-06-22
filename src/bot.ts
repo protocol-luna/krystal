@@ -84,7 +84,7 @@ function drainSessionQueue(channelId: string): void {
 }
 
 // --- Session limit (after replying) ---
-function checkSessionLimit(channelId: string, callback: () => void): void {
+function checkSessionLimit(channelId: string, callback: (channelId: string) => void): void {
 	const count = (sessionCounts.get(channelId) ?? 0) + 1;
 	sessionCounts.set(channelId, count);
 	if (count >= config.sessionMessageLimit) {
@@ -95,7 +95,7 @@ function checkSessionLimit(channelId: string, callback: () => void): void {
 		setTimeout(() => {
 			sessionPaused.delete(channelId);
 			sessionCounts.delete(channelId);
-			callback();
+			callback(channelId);
 			console.log("[bot] session reprise, contexte vidé");
 			drainSessionQueue(channelId);
 		}, config.sessionPauseSeconds * 1000);
@@ -363,7 +363,7 @@ async function handleCommand(
 	result: TriggerResult
 ): Promise<boolean> {
 	if (result.reason === "stop") {
-		await resetLLM();
+		await resetLLM(channelId);
 		clearCooldown(channelId);
 		trackSpeaker(channelId, message.author.id);
 		setPaused(true);
@@ -388,7 +388,7 @@ async function handleCommand(
 	}
 
 	if (result.reason === "clear") {
-		await resetLLM();
+		await resetLLM(channelId);
 		clearCooldown(channelId);
 		trackSpeaker(channelId, message.author.id);
 		try {
@@ -618,8 +618,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			) * fatigueMul;
 		await new Promise((r) => setTimeout(r, delay));
 		await triggerLunaReply(message, isDM, result.reason);
-		checkSessionLimit(cid, () => {
-			void resetLLM();
+		checkSessionLimit(cid, (sid: string) => {
+			void resetLLM(sid);
 		});
 		return;
 	}
@@ -649,8 +649,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		}
 
 		await triggerLunaReply(message, isDM, "follow-up");
-		checkSessionLimit(cid, () => {
-			void resetLLM();
+		checkSessionLimit(cid, (sid: string) => {
+			void resetLLM(sid);
 		});
 	}
 

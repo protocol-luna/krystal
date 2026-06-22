@@ -120,7 +120,7 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		config.spontaneousContextMessages
 	);
 
-	await resetLLM();
+	await resetLLM(picked.channel.id);
 
 	let reply = "";
 
@@ -156,5 +156,5 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		console.log(`[spontaneous] #${picked.channel.name} : réponse vide`);
 	}
 
-	await resetLLM();
+	await resetLLM(picked.channel.id);
 }

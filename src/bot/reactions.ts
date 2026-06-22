@@ -26,14 +26,14 @@ export async function handleReactionCommand(
 	console.log(`[bot] #${channelName} réaction ${emojiName} → ${cmd}`);
 
 	if (cmd === "stop") {
-		await resetLLM();
+		await resetLLM(message.channel.id);
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
 		setPaused(true);
 	} else if (cmd === "start") {
 		setPaused(false);
 	} else if (cmd === "clear") {
-		await resetLLM();
+		await resetLLM(message.channel.id);
 		clearCooldown(message.channel.id);
 		trackSpeaker(message.channel.id, userId);
 	}

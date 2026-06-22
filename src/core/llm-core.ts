@@ -214,7 +214,7 @@ export function isLLMBusy(): boolean {
 	return isProcessing || queueHead < requestQueue.length;
 }
 
-export async function resetLLM(): Promise<void> {
+export async function resetLLM(sessionId?: string): Promise<void> {
 	requestQueue.length = 0;
 	queueHead = 0;
 	isProcessing = false;
@@ -229,10 +229,14 @@ export async function resetLLM(): Promise<void> {
 
 	if (LLM_MODE === "online") {
 		const { clearConversations } = await import("./llm-online.js");
-		clearConversations();
+		if (sessionId) {
+			clearConversations(sessionId);
+		} else {
+			clearConversations();
+		}
 		return;
 	}
 
 	const { resetLLM: resetLLMClient } = await import("./llm-client.js");
-	await resetLLMClient();
+	await resetLLMClient(sessionId);
 }

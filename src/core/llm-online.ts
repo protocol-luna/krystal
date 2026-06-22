@@ -136,6 +136,10 @@ function finishResponse(
 	return text;
 }
 
-export function clearConversations(): void {
-	conversations.clear();
+export function clearConversations(sessionId?: string): void {
+	if (sessionId) {
+		conversations.delete(sessionId);
+	} else {
+		conversations.clear();
+	}
 }
