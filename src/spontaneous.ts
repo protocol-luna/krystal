@@ -48,28 +48,27 @@ function pickWeightedGuild(
 		return null;
 	}
 
-	const ranked = guilds
-		.map((g) => ({
-			guild: g,
-			channel: getCachedActiveChannel(g),
-		}))
-		.filter(
-			(entry): entry is { guild: Eris.Guild; channel: Eris.TextChannel } =>
-				entry.channel !== undefined
-		)
-		.map((entry) => ({
-			...entry,
-			lastId: BigInt(entry.channel.lastMessageID ?? "0"),
-		}))
-		.sort((a, b) => {
-			if (b.lastId > a.lastId) {
-				return 1;
-			}
-			if (b.lastId < a.lastId) {
-				return -1;
-			}
-			return 0;
+	const ranked: { guild: Eris.Guild; channel: Eris.TextChannel; lastId: bigint }[] = [];
+	for (const guild of guilds) {
+		const channel = getCachedActiveChannel(guild);
+		if (!channel) {
+			continue;
+		}
+		ranked.push({
+			guild,
+			channel,
+			lastId: BigInt(channel.lastMessageID ?? "0"),
 		});
+	}
+	ranked.sort((a, b) => {
+		if (b.lastId > a.lastId) {
+			return 1;
+		}
+		if (b.lastId < a.lastId) {
+			return -1;
+		}
+		return 0;
+	});
 
 	if (ranked.length === 0) {
 		return null;

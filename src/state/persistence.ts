@@ -85,6 +85,7 @@ export function buildPending(
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingState: PersistedState | null = null;
+let pendingDumpTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function scheduleSave(state: PersistedState): void {
 	pendingState = state;
@@ -102,14 +103,20 @@ export function scheduleSave(state: PersistedState): void {
 }
 
 stateBus.on("state:changed", () => {
-	const raw = dumpState();
-	scheduleSave({
-		pendingMessages: [],
-		paused: raw.paused,
-		channelCooldowns: raw.channelCooldowns,
-		botActivity: raw.botActivity,
-		lastSpeaker: raw.lastSpeaker,
-		responseCount: raw.responseCount,
-		topicWordLogs: dumpTopicFatigue(),
-	});
+	if (pendingDumpTimer) {
+		return;
+	}
+	pendingDumpTimer = setTimeout(() => {
+		pendingDumpTimer = null;
+		const raw = dumpState();
+		scheduleSave({
+			pendingMessages: [],
+			paused: raw.paused,
+			channelCooldowns: raw.channelCooldowns,
+			botActivity: raw.botActivity,
+			lastSpeaker: raw.lastSpeaker,
+			responseCount: raw.responseCount,
+			topicWordLogs: dumpTopicFatigue(),
+		});
+	}, 100);
 });

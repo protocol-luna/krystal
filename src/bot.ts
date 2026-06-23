@@ -454,14 +454,9 @@ function logAndReact(
 	author: string,
 	channelName: string,
 	reason: string | null,
+	delay: number,
 	sleepBehavior: SleepBehavior
 ): void {
-	const delay = computeDelay(
-		reason,
-		sleepBehavior,
-		message.content.length,
-		getGlobalInactivityMs()
-	);
 	console.log(
 		`[bot] #${channelName} ${author}: répond (${reason}) delay=${delay.toFixed(0)}ms`
 	);
@@ -624,17 +619,18 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			return;
 		}
 
-		logAndReact(message, author, channelName, result.reason, sleepBehavior);
+		const delay = computeDelay(
+			result.reason,
+			sleepBehavior,
+			message.content.length,
+			getGlobalInactivityMs()
+		);
+
+		logAndReact(message, author, channelName, result.reason, delay, sleepBehavior);
 
 		const fatigueMul = getFatigueMultiplier(message.channel.id);
-		const delay =
-			computeDelay(
-				result.reason,
-				sleepBehavior,
-				message.content.length,
-				getGlobalInactivityMs()
-			) * fatigueMul;
-		await new Promise((r) => setTimeout(r, delay));
+		const totalDelay = delay * fatigueMul;
+		await new Promise((r) => setTimeout(r, totalDelay));
 		await triggerLunaReply(message, isDM, result.reason);
 		checkSessionLimit(cid, (sid: string) => {
 			void resetLLM(sid);

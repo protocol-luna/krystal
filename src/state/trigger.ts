@@ -22,10 +22,17 @@ export interface TriggerResult {
 	botName: string;
 }
 
+const hasWordCache = new Map<string, RegExp>();
+
 function hasWord(text: string, word: string): boolean {
-	return new RegExp(
-		`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`
-	).test(text);
+	let re = hasWordCache.get(word);
+	if (!re) {
+		re = new RegExp(
+			`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`
+		);
+		hasWordCache.set(word, re);
+	}
+	return re.test(text);
 }
 
 export function evaluateMessage(
