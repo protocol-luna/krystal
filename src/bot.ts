@@ -112,6 +112,16 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 	],
 });
 
+const typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+
+function clearTypingInterval(channelId: string): void {
+	const existing = typingIntervals.get(channelId);
+	if (existing) {
+		clearInterval(existing);
+		typingIntervals.delete(channelId);
+	}
+}
+
 async function triggerLunaReply(
 	message: Eris.Message,
 	isDM = false,
@@ -129,13 +139,16 @@ async function triggerLunaReply(
 
 	markProcessing(key);
 
-	let typingInterval: ReturnType<typeof setInterval> | null = null;
 	const startTyping = () => {
 		console.log("[bot] startTyping appelé");
+		clearTypingInterval(message.channel.id);
 		client.sendChannelTyping(message.channel.id);
-		typingInterval = setInterval(() => {
-			client.sendChannelTyping(message.channel.id);
-		}, 8000);
+		typingIntervals.set(
+			message.channel.id,
+			setInterval(() => {
+				client.sendChannelTyping(message.channel.id);
+			}, 8000)
+		);
 	};
 
 	const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
@@ -332,9 +345,7 @@ async function triggerLunaReply(
 		}
 	} finally {
 		doneProcessing(key);
-		if (typingInterval) {
-			clearInterval(typingInterval);
-		}
+		clearTypingInterval(message.channel.id);
 		if (onToken) {
 			llmBus.off("token", onToken);
 		}
@@ -539,6 +550,8 @@ client.on("messageCreate", async (message: Eris.Message) => {
 	if (message.author.id === client.user.id) {
 		return;
 	}
+
+	clearTypingInterval(message.channel.id);
 
 	const author = message.member?.nick || message.author.username;
 	const channel = message.channel as Eris.GuildTextableChannel;
