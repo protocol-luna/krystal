@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=self-cli.cjs",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --packages=external --minify --outfile=self-cli.cjs",
     "start": "node self-cli.cjs",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
