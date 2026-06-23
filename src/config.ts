@@ -107,9 +107,10 @@ export const LLM_SESSION_TTL: number =
 export const LLM_CPU_AFFINITY: string =
 	v<string | null>("llm_cpu_affinity", null) ?? process.env.LLM_CPU_AFFINITY ?? "0,1";
 
-export const LLM_N_THREADS: number =
-	v<number | null>("llm_n_threads", null) ??
-	Number.parseInt(process.env.LLM_N_THREADS ?? "2", 10);
+export const LLM_N_THREADS: number | "auto" =
+	v<number | "auto" | null>("llm_n_threads", null) ??
+	(process.env.LLM_N_THREADS as number | "auto" | undefined) ??
+	"auto";
 
 export const LLM_N_SLOTS: number =
 	v<number | null>("llm_n_slots", null) ??

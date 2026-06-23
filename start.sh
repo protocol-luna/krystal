@@ -6,7 +6,24 @@ cd "$ROOT"
 
 # Configuration
 : "${LLM_CPU_AFFINITY:=0,1}"
-: "${LLM_N_THREADS:=2}"
+: "${LLM_N_THREADS:=auto}"
+: "${LLM_N_CTX:=8192}"
+: "${LLM_N_SLOTS:=1}"
+
+# Auto-detect thread count from CPU affinity
+if [ "$LLM_N_THREADS" = "auto" ] || [ "$LLM_N_THREADS" = "0" ]; then
+	count=0
+	for part in $(echo "$LLM_CPU_AFFINITY" | tr ',' ' '); do
+		if echo "$part" | grep -q '-'; then
+			start=$(echo "$part" | cut -d- -f1)
+			end=$(echo "$part" | cut -d- -f2)
+			count=$(( count + end - start + 1 ))
+		else
+			count=$(( count + 1 ))
+		fi
+	done
+	LLM_N_THREADS=$count
+fi
 : "${LLM_N_CTX:=8192}"
 : "${LLM_N_SLOTS:=1}"
 

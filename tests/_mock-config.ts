@@ -114,7 +114,7 @@ export function mockConfig(overrides: Record<string, unknown> = {}): void {
 		LLM_SESSION_TTL: 10,
 		LLM_MODE: "direct",
 		LLM_CPU_AFFINITY: "0,1",
-		LLM_N_THREADS: 2,
+		LLM_N_THREADS: "auto",
 		LLM_N_SLOTS: 1,
 		LLM_N_CTX: 8192,
 		SYSTEM_PROMPT: "You are a test bot",
