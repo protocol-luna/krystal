@@ -82,10 +82,7 @@ export const LLM_PORT: number =
 export type LLMMode = "direct" | "online";
 
 export const LLM_MODE: LLMMode =
-
-	(process.env.LLM_MODE as LLMMode | undefined) ??
-
-	"direct";
+	(process.env.LLM_MODE as LLMMode | undefined) ?? "direct";
 
 export const LLM_API_ENDPOINT: string =
 	v<string | null>("llm_api_endpoint", null) ??
@@ -105,7 +102,9 @@ export const LLM_SESSION_TTL: number =
 	v<number | null>("llm_session_ttl", null) ?? 10;
 
 export const LLM_CPU_AFFINITY: string =
-	v<string | null>("llm_cpu_affinity", null) ?? process.env.LLM_CPU_AFFINITY ?? "0,1";
+	v<string | null>("llm_cpu_affinity", null) ??
+	process.env.LLM_CPU_AFFINITY ??
+	"0,1";
 
 export const LLM_N_THREADS: number | "auto" =
 	v<number | "auto" | null>("llm_n_threads", null) ??

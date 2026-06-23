@@ -27,9 +27,7 @@ const hasWordCache = new Map<string, RegExp>();
 function hasWord(text: string, word: string): boolean {
 	let re = hasWordCache.get(word);
 	if (!re) {
-		re = new RegExp(
-			`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`
-		);
+		re = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
 		hasWordCache.set(word, re);
 	}
 	return re.test(text);

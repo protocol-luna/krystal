@@ -84,7 +84,10 @@ function drainSessionQueue(channelId: string): void {
 }
 
 // --- Session limit (after replying) ---
-function checkSessionLimit(channelId: string, callback: (channelId: string) => void): void {
+function checkSessionLimit(
+	channelId: string,
+	callback: (channelId: string) => void
+): void {
 	const count = (sessionCounts.get(channelId) ?? 0) + 1;
 	sessionCounts.set(channelId, count);
 	if (count >= config.sessionMessageLimit) {
@@ -281,7 +284,11 @@ async function triggerLunaReply(
 
 		startTyping();
 
-		const fullText = await askLLM({ username: displayName, text: content, sessionId: message.channel.id });
+		const fullText = await askLLM({
+			username: displayName,
+			text: content,
+			sessionId: message.channel.id,
+		});
 
 		// build the text to send (with optional typo)
 		const text = stripLlmPrefix(fullText);
@@ -606,7 +613,7 @@ client.on("messageCreate", async (message: Eris.Message) => {
 		if (
 			!isDM &&
 			(shouldIgnore(result.reason, sleepBehavior) ||
-			Math.random() < fatigueIgnoreBonus)
+				Math.random() < fatigueIgnoreBonus)
 		) {
 			console.log(
 				`[bot] #${channelName} ${author}: ignoré (${result.reason})${fatigueIgnoreBonus > 0 ? ` fatigue=${fatigueIgnoreBonus.toFixed(2)}` : ""}`
@@ -626,7 +633,14 @@ client.on("messageCreate", async (message: Eris.Message) => {
 			getGlobalInactivityMs()
 		);
 
-		logAndReact(message, author, channelName, result.reason, delay, sleepBehavior);
+		logAndReact(
+			message,
+			author,
+			channelName,
+			result.reason,
+			delay,
+			sleepBehavior
+		);
 
 		const fatigueMul = getFatigueMultiplier(message.channel.id);
 		const totalDelay = delay * fatigueMul;

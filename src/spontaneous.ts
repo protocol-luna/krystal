@@ -48,7 +48,11 @@ function pickWeightedGuild(
 		return null;
 	}
 
-	const ranked: { guild: Eris.Guild; channel: Eris.TextChannel; lastId: bigint }[] = [];
+	const ranked: {
+		guild: Eris.Guild;
+		channel: Eris.TextChannel;
+		lastId: bigint;
+	}[] = [];
 	for (const guild of guilds) {
 		const channel = getCachedActiveChannel(guild);
 		if (!channel) {
@@ -119,7 +123,7 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		config.spontaneousContextMessages
 	);
 
-	await resetLLM(picked.channel.id);
+	resetLLM(picked.channel.id);
 
 	let reply = "";
 
@@ -155,5 +159,5 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 		console.log(`[spontaneous] #${picked.channel.name} : réponse vide`);
 	}
 
-	await resetLLM(picked.channel.id);
+	resetLLM(picked.channel.id);
 }

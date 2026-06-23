@@ -1,4 +1,10 @@
-import { LLM_HOST, LLM_PORT, SYSTEM_PROMPT, LLM_SESSION_TTL, LLM_N_SLOTS } from "../config.js";
+import {
+	LLM_HOST,
+	LLM_PORT,
+	SYSTEM_PROMPT,
+	LLM_SESSION_TTL,
+	LLM_N_SLOTS,
+} from "../config.js";
 
 interface Message {
 	role: "system" | "user" | "assistant";
@@ -25,7 +31,10 @@ function cleanupStaleSessions(): void {
 	}
 }
 
-async function askLlamaServer(messages: Message[], slot: number): Promise<string> {
+async function askLlamaServer(
+	messages: Message[],
+	slot: number
+): Promise<string> {
 	const body = JSON.stringify({
 		messages,
 		id_slot: slot,
@@ -45,7 +54,9 @@ async function askLlamaServer(messages: Message[], slot: number): Promise<string
 
 	if (!resp.ok) {
 		const errText = await resp.text();
-		throw new Error(`llama-server error ${resp.status}: ${errText.slice(0, 200)}`);
+		throw new Error(
+			`llama-server error ${resp.status}: ${errText.slice(0, 200)}`
+		);
 	}
 
 	const data = (await resp.json()) as {
@@ -62,12 +73,17 @@ export async function askLLM(
 
 	let session = sessions.get(sid);
 	if (!session) {
-		session = { messages: [{ role: "system", content: SYSTEM_PROMPT }], lastUsed: Date.now() };
+		session = {
+			messages: [{ role: "system", content: SYSTEM_PROMPT }],
+			lastUsed: Date.now(),
+		};
 		sessions.set(sid, session);
 	}
 	session.lastUsed = Date.now();
 
-	const userMsg = userMessage.username ? `${userMessage.username}: ${userMessage.text}` : userMessage.text;
+	const userMsg = userMessage.username
+		? `${userMessage.username}: ${userMessage.text}`
+		: userMessage.text;
 	session.messages.push({ role: "user", content: userMsg });
 
 	cleanupStaleSessions();
@@ -83,7 +99,7 @@ export async function askLLM(
 	return response;
 }
 
-export async function resetLLM(sessionId?: string): Promise<void> {
+export function resetLLM(sessionId?: string): void {
 	if (sessionId) {
 		sessions.delete(sessionId);
 	} else {
