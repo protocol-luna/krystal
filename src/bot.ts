@@ -114,6 +114,15 @@ const client = new Eris.Client(DISCORD_TOKEN, {
 
 const typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
+let mentionRe: RegExp | null = null;
+
+function getMentionRe(): RegExp {
+	if (!mentionRe) {
+		mentionRe = new RegExp(`<@!?${client.user.id}>`, "g");
+	}
+	return mentionRe;
+}
+
 function clearTypingInterval(channelId: string): void {
 	const existing = typingIntervals.get(channelId);
 	if (existing) {
@@ -157,11 +166,9 @@ async function triggerLunaReply(
 		: style;
 
 	let onToken: ((chunk: string) => void) | null = null;
-	const onFlush: (() => void) | null = null;
 
 	try {
-		const mentionRe = new RegExp(`<@!?${client.user.id}>`, "g");
-		const content = message.content.replace(mentionRe, "").trim();
+		const content = message.content.replace(getMentionRe(), "").trim();
 
 		const displayName =
 			(message.member as Eris.Member | null)?.nick || message.author.username;
@@ -348,9 +355,6 @@ async function triggerLunaReply(
 		clearTypingInterval(message.channel.id);
 		if (onToken) {
 			llmBus.off("token", onToken);
-		}
-		if (onFlush) {
-			llmBus.off("flush", onFlush);
 		}
 
 		const queued = drainPending(key);

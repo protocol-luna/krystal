@@ -1,11 +1,10 @@
-import { LLM_HOST, LLM_PORT, SYSTEM_PROMPT, LLM_SESSION_TTL } from "../config.js";
+import { LLM_HOST, LLM_PORT, SYSTEM_PROMPT, LLM_SESSION_TTL, LLM_N_SLOTS } from "../config.js";
 
 interface Message {
 	role: "system" | "user" | "assistant";
 	content: string;
 }
 
-const SLOTS = 4;
 const BASE = `http://${LLM_HOST}:${LLM_PORT}`;
 const sessions = new Map<string, { messages: Message[]; lastUsed: number }>();
 
@@ -14,7 +13,7 @@ function slotForSession(sessionId: string): number {
 	for (let i = 0; i < sessionId.length; i++) {
 		hash = ((hash << 5) - hash + sessionId.charCodeAt(i)) | 0;
 	}
-	return Math.abs(hash) % SLOTS;
+	return Math.abs(hash) % LLM_N_SLOTS;
 }
 
 function cleanupStaleSessions(): void {
