@@ -6,14 +6,16 @@ cd "$ROOT"
 
 npx pm2 delete llm-server llm-client 2>/dev/null || true
 
-npx pm2 start ./bin/llama/llama-server \
+npx pm2 start taskset \
   --interpreter none \
   --name llm-server \
   -- \
+  -c 0,1 \
+  ./bin/llama/llama-server \
   -m ./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf \
-  -t 4 \
-  -c 4096 \
-  -np 4 \
+  -t 2 \
+  -c 8192 \
+  -np 1 \
   --slot-prompt-similarity 0 \
   --cache-reuse 256 \
   --host 127.0.0.1 \
