@@ -9,7 +9,7 @@ system_prompt: |
 # --- Secrets & chemins ---
 discord_token: "ton_token_ici"
 llama_model_path: "./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf"
-# Hôte du LLM -- utilisé uniquement en mode "proxy"
+# Hôte du LLM -- utilisé uniquement en mode "direct"
 llm_host: "localhost"
 # Port du llm-server
 llm_port: 3124
@@ -19,11 +19,15 @@ llm_server_key: ""
 # Durée de vie d'une session LLM (en minutes) avant expiration du KV cache
 llm_session_ttl: 10
 # Mode de connexion au LLM :
-#   "proxy"  → bot client → HTTP → llm-server (qui gère le LLM via node-llama-cpp)
-#             (nécessite `node self-cli.cjs server` dans un autre process)
-#   "online" → appel HTTP à une API compatible OpenAI (chat/completions)
-#             (nécessite llm_api_endpoint et llm_api_token)
-llm_mode: "proxy"
+#   "direct"  → HTTP direct vers llama-server (recommandé)
+#   "online"  → appel HTTP à une API compatible OpenAI (chat/completions)
+#              (nécessite llm_api_endpoint et llm_api_token)
+llm_mode: "direct"
+# Réglages llama-server (utilisés par start.sh via variables d'env) :
+llm_cpu_affinity: "0,1"
+llm_n_threads: 2
+llm_n_slots: 1
+llm_n_ctx: 8192
 # Endpoint API compatible OpenAI (mode online uniquement)
 # llm_api_endpoint: "https://api.openai.com/v1/chat/completions"
 # Token API (mode online uniquement)
