@@ -1,0 +1,25 @@
+graph TD
+  subgraph "Bot Token (Eris)"
+    A["Discord API / Gateway Bot"] -->|"messageCreate"| B["Eris Client"]
+    B -->|"client.on()"| C["Message Handler<br/>(bot.ts)"]
+    C --> D["LLM Pipeline"]
+    D -->|"createMessage()"| E["Discord API<br/>Bot Token"]
+  end
+
+  subgraph "User Token (Chrome)"
+    F["Discord API / Gateway User"] -->|"WSS frames"| G["Chrome CDP"]
+    G -->|"Network.webSocketFrameReceived"| H["feedGatewayFrame()"]
+    H -->|"gatewayBus.emit()"| I["Gateway Bus"]
+    G -->|"mention_token"| J["Auto ACK"]
+    J -->|"POST /ack"| F
+    I -->|"event"| K["Chrome Message Handler"]
+    K -->|"navigateTo()"| L["history.pushState"]
+    L -->|"SPA nav"| F
+    K -->|"__puppetFetch"| M["POST /messages<br/>vrais headers<br/>vrais cookies<br/>vrai TLS"]
+    M -->|"send/edit"| F
+  end
+
+  subgraph "Shared"
+    C -.->|"navigateTo()"| L
+    D -.->|"sendMessage() via Chrome"| M
+  end
