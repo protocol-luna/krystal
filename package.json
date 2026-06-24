@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --packages=external --minify --outfile=self-cli.cjs",
+    "build-full": "esbuild src/index.ts --bundle --platform=node --format=cjs --minify --outfile=luna-protocol-full.cjs",
     "start": "node self-cli.cjs",
     "format": "bunx --bun @biomejs/biome format --write ./src",
     "check": "bunx --bun @biomejs/biome check ./src",
@@ -29,5 +30,8 @@
     "concurrently": "^10.0.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^24.43.1"
   }
 }

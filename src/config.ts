@@ -67,6 +67,11 @@ export const DISCORD_TOKEN: string =
 		process.exit(1);
 	})();
 
+export const DISCORD_USER_TOKEN: string | null =
+	v<string | null>("discord_user_token", null) ??
+	process.env.DISCORD_USER_TOKEN ??
+	null;
+
 export const LLAMA_MODEL_PATH: string =
 	v<string | null>("llama_model_path", null) ??
 	process.env.LLAMA_MODEL_PATH ??

@@ -145,7 +145,9 @@ export async function trySpawn(client: Eris.Client): Promise<void> {
 
 	if (reply.trim()) {
 		try {
-			await client.createMessage(picked.channel.id, { content: reply.trim() });
+			await client.createMessage(picked.channel.id, {
+				content: reply.trim(),
+			});
 			markBotActivity(picked.channel.id);
 			console.log(
 				`[spontaneous] #${picked.channel.name} : " ${reply.slice(0, 100).replace(/\n/g, " ")} "`

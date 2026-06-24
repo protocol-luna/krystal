@@ -2,8 +2,8 @@
 
 Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, topic fatigue, message bursts, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
 
-- Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
-- Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
+- Model fine-tuned on [Discord-OpenMicae](https://huggingface.co/datasets/mookiezi/Discord-OpenMicae) (362k multi-turn Discord conversations)
+- Quantized GGUF format: `Discord-Micae-Hermes-3-3B.Q8_0.gguf` (3B params, Q8_0)
 - Two LLM modes: `direct` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 
@@ -71,7 +71,7 @@ src/
 
 ## Overview
 
-> Detailed diagrams (state machines, flowcharts, Gantt) are available in the [`state-machines/`](state-machines/) folder -- 22 Mermaid diagrams covering the entire codebase.
+> Detailed diagrams (state machines, flowcharts, Gantt) are available in the [`state-machines/`](state-machines/) folder -- 24 Mermaid diagrams covering the entire codebase.
 
 [![Message processing overview](state-machines/readme-diagrams/r01.svg)](state-machines/readme-diagrams/r01.mmd)
 
@@ -435,29 +435,25 @@ concentration:
 |-----|------|---------|-------------|
 | `reply_styles` | object[] | Weighted 50/15/30/5 | Array of `{ message_reference, mention_replied_user, weight }` entries |
 
-### LLM Parameters (hardcoded in `src/config.ts`)
+### LLM Parameters (hardcoded in `src/core/llm-client.ts`)
 
-ChatML template (`<|im_start|>/<|im_end|>`). Threads auto-detected via `os.cpus().length`.
+ChatML template (`<|im_start|>/<|im_end|>`). Thread count from `LLM_N_THREADS` config (affects prompt eval speed).
 
-```yaml
-temp: 0.75
-dynatemp-range: 0.15
-top-k: 40
-top-p: 0.95
-min-p: 0.05
-repeat-penalty: 1.12
-repeat-last-n: 256
-presence-penalty: 0.1
-batch: 4096
-ubatch: 256
-context: 4096
+```json
+{
+  "temperature": 0.8,
+  "top_k": 40,
+  "top_p": 0.95,
+  "min_p": 0.05,
+  "max_tokens": 2000
+}
 ```
 
 ---
 
 ## Detailed Architecture Diagrams
 
-The [`state-machines/`](state-machines/) folder contains **24 Mermaid diagrams** covering the entire source code, each with a detailed human-language explanation:
+The [`state-machines/`](state-machines/) folder contains **25 Mermaid diagrams** covering the entire source code, each with a detailed human-language explanation:
 
 | # | Diagram | Type |
 |---|---------|------|
@@ -485,6 +481,7 @@ The [`state-machines/`](state-machines/) folder contains **24 Mermaid diagrams**
 | 22 | Complete Lifecycle | `stateDiagram` |
 | 23 | Message Burst | `flowchart` |
 | 24 | Topic Fatigue | `flowchart` |
+| 25 | Hybrid Mode (Eris + Chrome) | `graph` |
 
 All SVGs are available in [`state-machines/output/`](state-machines/output/). Below are key overview diagrams:
 
@@ -501,21 +498,15 @@ All SVGs are available in [`state-machines/output/`](state-machines/output/). Be
 
 ## Dataset
 
-[**Discord-Dialogues**](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) -- 7.3M exchanges, 17M turns, 140M words. Real Discord conversations spring-summer 2025, filtered PII/ToS/bots/commands. Apache 2.0.
-
-Explore the dataset interactively: [**Atlas Map**](https://atlas.nomic.ai/data/mookiezi/discord-alpha/map)
+The model is fine-tuned on [**Discord-OpenMicae**](https://huggingface.co/datasets/mookiezi/Discord-OpenMicae) -- 362k multi-turn Discord conversations, 1.2M messages, filtered PII/ToS/bots/commands. Apache 2.0.
 
 | Metric | Value |
 |---|---|
-| Samples | 7 303 464 |
-| Total turns | 16 881 010 |
-| Total words | 139 922 950 |
-| Average tokens | 32.8 |
-| Tokenizer | Hermes-3-Llama-3.1-8B |
-
-<img width="823" height="784" alt="image" src="https://github.com/user-attachments/assets/89493037-37a2-477c-8c7d-4a6a6016f003" />
-
-[![Dataset distribution chart](state-machines/readme-diagrams/r14.svg)](state-machines/readme-diagrams/r14.mmd)
+| Conversations | 362 581 |
+| Total messages | 1 252 080 |
+| Turns per conversation | 3.45 avg |
+| Unique users | ~170K |
+| Time span | Spring-summer 2025 |
 
 ---
 
@@ -556,7 +547,7 @@ npm run build && npm start     # production
 
 | Mode | Usage | Description |
 |------|-------|-------------|
-| `direct` (default) | `llm_mode: direct` | Bot client → HTTP → llama‑server (shared model, 4 slots, prompt cache). Two PM2 processes. |
+| `direct` (default) | `llm_mode: direct` | Bot client → HTTP → llama‑server (shared model, 1 slot, prompt cache). Two PM2 processes. |
 | `online` | `llm_mode: online` | Bot calls any OpenAI‑compatible API (OpenAI, OpenRouter, Groq, Together...). No local LLM needed. |
 
 ### PM2 (production)
@@ -564,6 +555,33 @@ npm run build && npm start     # production
 ```bash
 ./start.sh   # launches llm-server + llm-client under PM2
 ```
+
+### Hybrid Mode — Eris + Chrome
+
+When `discord_user_token` is set in `config.yml` (user token, not `Bot `), a headless Chrome launches alongside Eris for real browser fingerprinting.
+
+| Layer | Token | Role |
+|-------|-------|------|
+| Eris | `discord_token` (bot) | Gateway receive, typing, reactions |
+| Chrome | `discord_user_token` (user) | Navigation, ACK, send/edit via native `fetch` |
+
+Chrome provides:
+- **Real TLS fingerprint** (JA3), cookies, `X-Super-Properties`, `X-Fingerprint`
+- **Gateway interception** via CDP — `mention_token` → auto ACK
+- **Channel navigation** via `history.pushState` + `PopStateEvent` (SPA, no reload)
+- **`window.__puppetFetch`** — all API calls go through Chrome's native fetch stack
+
+```
+Discord Gateway
+    ├── Eris  ──► client.on("messageCreate") ──► handle / respond
+    └── Chrome CDP ──► feedGatewayFrame() ──► gatewayBus.emit()
+```
+
+![Hybrid mode architecture](state-machines/output/25-hybrid-mode.svg)
+
+Messages received via Eris trigger `navigateTo()` on Chrome, putting the user session in the right channel before responding. All sends use Chrome's real browser context.
+
+**Config:** `discord_user_token: "ton_token_utilisateur_ici"` in `config.yml`. If empty, only Eris runs (no change from before).
 
 ### Hot-reload config
 

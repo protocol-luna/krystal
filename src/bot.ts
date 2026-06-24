@@ -1,10 +1,12 @@
 import * as Eris from "eris";
 import {
-	DISCORD_TOKEN,
+	DISCORD_USER_TOKEN,
 	pickReplyStyle,
 	config,
 	watchConfig,
 } from "./config.js";
+import { DiscordClient } from "./discord-client.js";
+import { gatewayBus } from "./core/gateway-bus.js";
 import { askLLM, resetLLM } from "./core/llm-core.js";
 import { llmBus } from "./core/llm-bus.js";
 import { evaluateMessage, type TriggerResult } from "./state/trigger.js";
@@ -28,92 +30,8 @@ import {
 	pickReaction,
 } from "./behavior/mannerisms.js";
 import type { SleepBehavior } from "./behavior/sleep.js";
-import { initTTS } from "./tts/piper.js";
-import {
-	sendTextAsVoiceMessage,
-	shouldSendVoice,
-} from "./tts/voice-message.js";
-import { hasUnsafeTTSText } from "./tts/audio.js";
-import { getSleepBehavior } from "./behavior/sleep.js";
-import { applyTypo, type TypoResult } from "./behavior/typo.js";
-import { loadState } from "./state/persistence.js";
-import {
-	recordMessage,
-	getFatigueMultiplier,
-	getFatigueIgnoreBonus,
-	restoreTopicFatigue,
-	pruneTopicFatigue,
-} from "./state/topic-fatigue.js";
-import {
-	processing,
-	pendingKey,
-	queuePending,
-	markProcessing,
-	doneProcessing,
-	drainPending,
-	restorePending,
-} from "./bot/pending.js";
-import { handleReactionCommand } from "./bot/reactions.js";
 
-const sessionCounts = new Map<string, number>();
-const sessionPaused = new Set<string>();
-const sessionLastMessage = new Map<string, number>();
-const sessionQueue = new Map<
-	string,
-	{ message: Eris.Message; isDM: boolean; reason: string }[]
->();
-
-function drainSessionQueue(channelId: string): void {
-	const queued = sessionQueue.get(channelId);
-	if (!queued || queued.length === 0) {
-		return;
-	}
-	sessionQueue.delete(channelId);
-	const next = queued.shift()!;
-	if (queued.length > 0) {
-		sessionQueue.set(channelId, queued);
-	}
-	console.log(
-		`[bot] session queue: reprise du message en attente dans #${channelId}`
-	);
-	void triggerLunaReply(next.message, next.isDM, next.reason).then(() => {
-		if (!sessionPaused.has(channelId)) {
-			drainSessionQueue(channelId);
-		}
-	});
-}
-
-// --- Session limit (after replying) ---
-function checkSessionLimit(
-	channelId: string,
-	callback: (channelId: string) => void
-): void {
-	const count = (sessionCounts.get(channelId) ?? 0) + 1;
-	sessionCounts.set(channelId, count);
-	if (count >= config.sessionMessageLimit) {
-		sessionPaused.add(channelId);
-		console.log(
-			`[bot] session limit atteinte (${count}), pause ${config.sessionPauseSeconds}s`
-		);
-		setTimeout(() => {
-			sessionPaused.delete(channelId);
-			sessionCounts.delete(channelId);
-			callback(channelId);
-			console.log("[bot] session reprise, contexte vidé");
-			drainSessionQueue(channelId);
-		}, config.sessionPauseSeconds * 1000);
-	}
-}
-
-const client = new Eris.Client(DISCORD_TOKEN, {
-	intents: [
-		"guilds",
-		"guildMessages",
-		"guildMessageReactions",
-		"messageContent",
-		"directMessages",
-	],
-});
+export const discordClient = new DiscordClient();
 
 const typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -162,6 +80,11 @@ async function triggerLunaReply(
 			}, 8000)
 		);
 	};
+
+	// Navigate Chrome to the channel if available
+	if (discordClient.isReady && message.guildID) {
+		void discordClient.navigateTo(message.guildID, message.channel.id);
+	}
 
 	const style = pickReplyStyle(isRecentBotActivity(message.channel.id));
 	const refStyle = isDM
@@ -530,7 +453,7 @@ function updateStatus(): void {
 	scheduleNextStatus(config.dynamicStatusIntervalMinutes * 60000);
 }
 
-function startDynamicStatus(): void {
+function _startDynamicStatus(): void {
 	if (statusTimeout) {
 		clearTimeout(statusTimeout);
 		statusTimeout = null;
@@ -543,9 +466,11 @@ client.on("ready", () => {
 	console.log(
 		`Connecté comme ${client.user.username}#${(client.user as Eris.User).discriminator} (Mode CLI Interactif Strict)`
 	);
+	/*
 	if (config.dynamicStatus.length > 0) {
 		startDynamicStatus();
 	}
+	*/
 });
 
 client.on("error", (err: Error) => {
@@ -709,6 +634,20 @@ client.on(
 export async function startBot(): Promise<void> {
 	watchConfig();
 	void initTTS();
+
+	if (DISCORD_USER_TOKEN && !DISCORD_USER_TOKEN.startsWith("Bot ")) {
+		console.log(
+			"[bot] Token utilisateur détecté, initialisation du client Chrome..."
+		);
+		discordClient
+			.init(DISCORD_USER_TOKEN)
+			.then(() => {
+				console.log("[bot] Client Chrome prêt");
+			})
+			.catch((err) => {
+				console.error("[bot] Client Chrome échoué:", err);
+			});
+	}
 
 	const saved = await loadState();
 	restoreState(saved);
