@@ -30,12 +30,18 @@ export class DiscordClient {
 		const page = await this.browser.newPage();
 		this.page = page;
 
+		// Inject token into localStorage before any page script runs
+		await page.evaluateOnNewDocument((token: string) => {
+			window.localStorage.setItem("token", JSON.stringify({ token, provider: null }));
+		}, userToken);
+
 		// Hook Gateway WebSocket frames via CDP for mention_token
 		const cdp = await page.target().createCDPSession();
 		await cdp.send("Network.enable");
 		cdp.on(
 			"Network.webSocketFrameReceived",
 			({ response }: { response: { payloadData: string } }) => {
+				console.debug("[cdp:ws]", response.payloadData.slice(0, 120));
 				feedGatewayFrame(response.payloadData);
 				try {
 					const data = JSON.parse(response.payloadData);
@@ -48,24 +54,22 @@ export class DiscordClient {
 			}
 		);
 
-		await page.goto("https://discord.com/login", {
-			waitUntil: "domcontentloaded",
-		});
-
-		await page.evaluate((token: string) => {
-			localStorage.setItem("token", JSON.stringify({ token, provider: null }));
-		}, userToken);
-
 		await page.goto("https://discord.com/channels/@me", {
-			waitUntil: "networkidle2",
+			waitUntil: "domcontentloaded",
+			timeout: 45000,
 		});
 
-		const authed = await page.evaluate(() =>
-			Boolean(document.querySelector('[data-list-item-id="guildsnav___home"]'))
-		);
-		if (!authed) {
+		// Attendre que le panneau des serveurs apparaisse
+		try {
+			await page.waitForSelector(
+				'[data-list-item-id^="guildsnav"], [class*="guilds"]',
+				{ timeout: 20000 }
+			);
+		} catch {
+			const url = page.url();
 			throw new Error(
-				"Injection du token échouée — vérifie que c'est un token utilisateur valide et que le profil chrome-profile est vide"
+				`Page Discord non connectée (URL=${url})` +
+					" — vérifie le token utilisateur"
 			);
 		}
 
