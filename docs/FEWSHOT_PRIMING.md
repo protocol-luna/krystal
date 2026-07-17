@@ -31,6 +31,14 @@ Bot: [generates response in the same casual style]
 4. **Better Performance**: Especially effective with smaller models like Luna-Protocol-1.5B
 5. **Reduced System Prompt Complexity**: Show instead of tell
 
+### Why Few-Shot is More Efficient with Luna-Protocol
+
+The Luna-Protocol model is a fine-tuned Qwen2.5 1.5B trained on only **50k samples** from the Discord-Dialogues dataset (a small subset of the full 7.3M exchanges). This limited training data means:
+
+- **Greater flexibility**: The model hasn't overfit to specific conversation patterns, making it more responsive to in-context examples
+- **Faster adaptation**: Few-shot priming can redirect the model's behavior more effectively than with models trained on massive datasets
+- **Improved consistency**: Examples provide clear signals that the model can quickly align with, unlike the base Qwen2.5 1.5B which may ignore or poorly follow examples
+
 ### When to Use
 
 - ✅ **Small to medium models** (< 7B parameters) - huge impact
@@ -292,6 +300,7 @@ const fewShotMessages = formatFewShotExamples(customExamples);
 ### Model Performance
 
 - Small models (1.5B): ⭐⭐⭐⭐⭐ Significant improvement
+  - **Luna-Protocol-1.5B**: Particularly effective due to limited training data (50k samples), making few-shot priming more efficient than base Qwen2.5 1.5B
 - Medium models (7B): ⭐⭐⭐⭐ Good improvement
 - Large models (13B+): ⭐⭐⭐ Modest improvement
 - Very large models (70B+): ⭐⭐ Minimal improvement (but still helps)

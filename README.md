@@ -11,7 +11,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 >
 > These models come with **few-shot priming support** to guide conversation style and improve consistency.
 
-- Models fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
+- Fine-tuned Qwen2.5 1.5B model, trained on 50k samples from [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (subset of the full 7.3M exchanges dataset)
 - Quantized GGUF format (e.g. `Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q5_K_M.gguf`)
 - **Few-shot priming**: Inject example conversations to guide model behavior (configurable in `config.yml`)
 - Two LLM modes: `direct` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
@@ -113,7 +113,7 @@ few_shot_examples:
 3. Current message: `user: "hey Luna, what's up?"`
 4. Model generates response in the same style as the examples
 
-This approach is especially effective with the new Luna Protocol models, which are fine-tuned on Discord conversations.
+This approach is especially effective with the Luna Protocol models. Since these models are fine-tuned on only 50k Discord samples (rather than the full 7.3M dataset), they retain more flexibility to adapt to in-context examples. Few-shot priming becomes significantly more efficient than with the base Qwen2.5 1.5B, as the model can quickly align to the desired conversation style through examples rather than relying solely on training data.
 
 ---
 
