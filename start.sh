@@ -35,7 +35,7 @@ npx pm2 start taskset \
   -- \
   -c "$LLM_CPU_AFFINITY" \
   ./bin/llama/llama-server \
-  -m ./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf \
+  -m ./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf \
   -t "$LLM_N_THREADS" \
   -c "$LLM_N_CTX" \
   -np "$LLM_N_SLOTS" \

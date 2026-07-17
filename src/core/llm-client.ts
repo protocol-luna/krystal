@@ -4,7 +4,13 @@ import {
 	SYSTEM_PROMPT,
 	LLM_SESSION_TTL,
 	LLM_N_SLOTS,
+	FEW_SHOT_ENABLED,
+	FEW_SHOT_EXAMPLES,
 } from "../config.js";
+import {
+	formatFewShotExamples,
+	injectFewShotIntoConversation,
+} from "./few-shot.js";
 
 interface Message {
 	role: "system" | "user" | "assistant";
@@ -35,13 +41,20 @@ async function askLlamaServer(
 	messages: Message[],
 	slot: number
 ): Promise<string> {
+	// Ajouter le few-shot priming si activé
+	let finalMessages = messages;
+	if (FEW_SHOT_ENABLED && FEW_SHOT_EXAMPLES.length > 0) {
+		const fewShotMessages = formatFewShotExamples(FEW_SHOT_EXAMPLES);
+		finalMessages = injectFewShotIntoConversation(messages, fewShotMessages);
+	}
+
 	const body = JSON.stringify({
-		messages,
+		messages: finalMessages,
 		id_slot: slot,
 		cache_prompt: true,
 		temperature: 0.8,
-		top_k: 40,
-		top_p: 0.95,
+		top_k: 60,
+		top_p: 0.9,
 		min_p: 0.05,
 		max_tokens: 2000,
 	});

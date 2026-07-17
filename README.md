@@ -2,8 +2,18 @@
 
 Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and converses naturally -- sleep, inattention, typos, hesitations, forgetfulness, topic fatigue, message bursts, voice messages, anti-spam queue, persistence, auto-restart, rotating status.
 
-- Model fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
-- Quantized GGUF format (e.g. `Discord-Hermes-3-8B.Q3_K_M.gguf`)
+> [!NOTE]
+> **Luna Protocol now has its own official models!** 🚀
+> 
+> The project includes optimized models trained specifically for Discord conversations:
+> - **Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf** (Recommended) - Lightweight, fast, perfect for Discord bots
+> - Available on [HuggingFace](https://huggingface.co/fox3000foxy/Luna-Protocol-1.5B-Discord-Dialogues)
+>
+> These models come with **few-shot priming support** to guide conversation style and improve consistency.
+
+- Models fine-tuned on [Discord-Dialogues](https://huggingface.co/datasets/mookiezi/Discord-Dialogues) (7.3M exchanges, 17M turns)
+- Quantized GGUF format (e.g. `Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q5_K_M.gguf`)
+- **Few-shot priming**: Inject example conversations to guide model behavior (configurable in `config.yml`)
 - Two LLM modes: `direct` (bot → llama‑server directly, shared model / prompt cache), `online` (OpenAI‑compatible API)
 - Event-driven architecture: `llmBus` for LLM tokens/errors, `stateBus` for auto-persist
 
@@ -66,6 +76,44 @@ src/
     ├── upload.ts      # Discord CDN upload
     └── voice-message.ts  # Voice message orchestration
 ```
+
+---
+
+## Few-shot Priming
+
+**Few-shot priming** is a technique that injects example conversations into the model's context to guide its behavior and improve consistency. Instead of the model learning style only from the system prompt, it learns from actual examples.
+
+### How it works
+
+Before each user message, Luna Protocol can include a few examples of past conversations. This "primes" the model to:
+- Adopt the desired tone (casual, friendly, witty, etc.)
+- Match response length and style
+- Follow conversation patterns
+- Improve overall coherence
+
+### Configuration
+
+In `config.yml`:
+
+```yaml
+few_shot_enabled: true
+few_shot_examples:
+  - user: "yo whats good"
+    assistant: "nm just chillin, u"
+  - user: "bored af"
+    assistant: "lol same energy fr"
+  - user: "hey how are you"
+    assistant: "im doing pretty good tbh, just vibing"
+```
+
+### Example flow
+
+1. System prompt: `"Your name is Luna..."`
+2. Few-shot examples: `[user: "yo whats good", assistant: "nm just chillin, u"]`
+3. Current message: `user: "hey Luna, what's up?"`
+4. Model generates response in the same style as the examples
+
+This approach is especially effective with the new Luna Protocol models, which are fine-tuned on Discord conversations.
 
 ---
 

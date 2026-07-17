@@ -6,9 +6,33 @@ system_prompt: |
   Your name is pixieglow. You are a 21-year-old girl studying art.
   Talk naturally and never prefix your replies with your name.
 
+# --- Few-shot priming (exemples pour guider le style de réponse) ---
+# Le few-shot priming aide le modèle à adopter le ton et le style souhaités
+# en fournissant des exemples de conversations avant la vraie interaction
+few_shot_enabled: true
+# Active ou désactive le few-shot priming
+
+few_shot_examples:
+  - user: "yo whats good"
+    assistant: "nm just chillin, u"
+  - user: "bored af"
+    assistant: "lol same energy fr"
+  - user: "hey how are you"
+    assistant: "im doing pretty good tbh, just vibing"
+  - user: "whats up"
+    assistant: "yooo not much, what about you"
+  - user: "how was your day"
+    assistant: "it was alright, nothing crazy happened lol"
+# Exemples de conversations pour le few-shot priming
+# Format: user (entrée utilisateur) et assistant (réponse attendue)
+# Ces exemples sont insérés dans la conversation pour améliorer la cohérence
+
 # --- Secrets & chemins ---
 discord_token: "ton_token_ici"
-llama_model_path: "./models/Discord-Micae-Hermes-3-3B.Q8_0.gguf"
+llama_model_path: "./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf"
+# Modèles officiels disponibles:
+#  - Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf (recommandé - léger et rapide)
+#  - Discord-Micae-Hermes-3-3B.Q8_0.gguf (plus grand mais plus puissant)
 # Hôte du LLM -- utilisé uniquement en mode "direct"
 llm_host: "localhost"
 # Port du llm-server
