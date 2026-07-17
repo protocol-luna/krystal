@@ -139,25 +139,30 @@ export const jinjaTemplate =
 	"{% for message in messages %}{{'<|im_start|>' + message['role']}}{% if message['name'] %}{{' name=' + message['name']}}{% endif %}{{'\\n' + message['content'] + '<|im_end|>\n'}}{% endfor %}{% if add_generation_prompt %}{{'<|im_start|>assistant\\n'}}{% endif %}";
 
 // --- Few-shot priming configuration ---
-export type FewShotExample = { user: string; assistant: string };
+export interface FewShotExample {
+	user: string;
+	assistant: string;
+}
 
 export const FEW_SHOT_ENABLED: boolean =
 	v<boolean | null>("few_shot_enabled", null) ?? true;
 
-export const FEW_SHOT_EXAMPLES: FewShotExample[] =
-	v<FewShotExample[] | null>("few_shot_examples", null) ?? [
-		{ user: "yo whats good", assistant: "nm just chillin, u" },
-		{ user: "bored af", assistant: "lol same energy fr" },
-		{
-			user: "hey how are you",
-			assistant: "im doing pretty good tbh, just vibing",
-		},
-		{ user: "whats up", assistant: "yooo not much, what about you" },
-		{
-			user: "how was your day",
-			assistant: "it was alright, nothing crazy happened lol",
-		},
-	];
+export const FEW_SHOT_EXAMPLES: FewShotExample[] = v<FewShotExample[] | null>(
+	"few_shot_examples",
+	null
+) ?? [
+	{ user: "yo whats good", assistant: "nm just chillin, u" },
+	{ user: "bored af", assistant: "lol same energy fr" },
+	{
+		user: "hey how are you",
+		assistant: "im doing pretty good tbh, just vibing",
+	},
+	{ user: "whats up", assistant: "yooo not much, what about you" },
+	{
+		user: "how was your day",
+		assistant: "it was alright, nothing crazy happened lol",
+	},
+];
 
 export const ttsModelPath: string =
 	v<string | null>("tts_model_path", null) ??

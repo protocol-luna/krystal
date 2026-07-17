@@ -22,7 +22,7 @@ export interface FewShotConfig {
  */
 export function formatFewShotExamples(
 	examples: FewShotExample[],
-	username: string = "user"
+	username = "user"
 ): Array<{ role: "user" | "assistant"; content: string }> {
 	const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
@@ -63,11 +63,10 @@ export function injectFewShotIntoConversation(
 	const userMessages = messages.slice(1);
 
 	// Construit le nouvel array : system + few-shot + reste de la conversation
-	return [
-		systemMessage,
-		...fewShotMessages,
-		...userMessages,
-	] as Array<{ role: "system" | "user" | "assistant"; content: string }>;
+	return [systemMessage, ...fewShotMessages, ...userMessages] as Array<{
+		role: "system" | "user" | "assistant";
+		content: string;
+	}>;
 }
 
 /**
