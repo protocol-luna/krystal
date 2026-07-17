@@ -6,3 +6,4 @@ prompt.txt
 *.tsbuildinfo
 state.json
 self-cli.cjs
+chrome-profile/
