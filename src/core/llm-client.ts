@@ -1,15 +1,15 @@
 import {
-	LLM_HOST,
-	LLM_PORT,
-	SYSTEM_PROMPT,
-	LLM_SESSION_TTL,
-	LLM_N_SLOTS,
 	FEW_SHOT_ENABLED,
 	FEW_SHOT_EXAMPLES,
+	LLM_HOST,
+	LLM_N_SLOTS,
+	LLM_PORT,
+	LLM_SESSION_TTL,
 	MIROSTAT_ENABLED,
-	MIROSTAT_MODE,
-	MIROSTAT_LR,
 	MIROSTAT_ENT,
+	MIROSTAT_LR,
+	MIROSTAT_MODE,
+	SYSTEM_PROMPT,
 } from "../config.js";
 import {
 	formatFewShotExamples,
@@ -41,7 +41,7 @@ function cleanupStaleSessions(): void {
 	}
 }
 
-async function askLlamaServer(
+async function askLlamaServerOnce(
 	messages: Message[],
 	slot: number
 ): Promise<string> {
@@ -52,19 +52,21 @@ async function askLlamaServer(
 		finalMessages = injectFewShotIntoConversation(messages, fewShotMessages);
 	}
 
-	// Sampling : Mirostat 2 (par défaut) OU top_k/top_p/min_p classique,
-	// jamais les deux en même temps (Mirostat prend le contrôle du sampling).
 	const samplingParams = MIROSTAT_ENABLED
 		? {
 				mirostat: MIROSTAT_MODE,
 				mirostat_lr: MIROSTAT_LR,
 				mirostat_ent: MIROSTAT_ENT,
+				repeat_penalty: 1.15,
+				repeat_last_n: 64,
 			}
 		: {
 				temperature: 0.8,
 				top_k: 60,
 				top_p: 0.9,
 				min_p: 0.05,
+				repeat_penalty: 1.15,
+				repeat_last_n: 64,
 			};
 
 	const body = JSON.stringify({
@@ -92,6 +94,39 @@ async function askLlamaServer(
 		choices: { message: { content: string } }[];
 	};
 	return data.choices?.[0]?.message?.content ?? "";
+}
+
+function isDegenerateOutput(text: string): boolean {
+	const trimmed = text.trim();
+	if (trimmed.length === 0) {
+		return true;
+	}
+	if (trimmed.length < 2) {
+		return true;
+	}
+	if (!/\s/.test(trimmed) && trimmed.length < 15 && !/[.!?]$/.test(trimmed)) {
+		return true;
+	}
+	return false;
+}
+
+const MAX_RETRIES = 2;
+
+async function askLlamaServer(
+	messages: Message[],
+	slot: number
+): Promise<string> {
+	let lastResponse = "";
+	for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+		lastResponse = await askLlamaServerOnce(messages, slot);
+		if (!isDegenerateOutput(lastResponse)) {
+			return lastResponse;
+		}
+		console.warn(
+			`[llm-client] sortie dégénérée détectée (tentative ${attempt + 1}/${MAX_RETRIES + 1}): "${lastResponse}"`
+		);
+	}
+	return lastResponse;
 }
 
 export async function askLLM(

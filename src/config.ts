@@ -1,6 +1,6 @@
-import { readFileSync, existsSync, watch } from "node:fs";
-import { join } from "node:path";
 import yaml from "js-yaml";
+import { existsSync, readFileSync, watch } from "node:fs";
+import { join } from "node:path";
 
 const ROOT = process.cwd();
 
@@ -164,11 +164,6 @@ export const FEW_SHOT_EXAMPLES: FewShotExample[] = v<FewShotExample[] | null>(
 	},
 ];
 
-// --- Sampling configuration ---
-// Mirostat 2 a donné de meilleurs résultats que le sampling top_k/top_p/min_p
-// classique lors des tests manuels (réponses plus naturelles, meilleures
-// relances de conversation). Reste configurable pour pouvoir revenir en
-// arrière ou A/B tester facilement.
 export const MIROSTAT_ENABLED: boolean =
 	v<boolean | null>("mirostat_enabled", null) ?? true;
 
