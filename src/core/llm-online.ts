@@ -1,9 +1,15 @@
 import {
-	SYSTEM_PROMPT,
+	FEW_SHOT_ENABLED,
+	FEW_SHOT_EXAMPLES,
 	LLM_API_ENDPOINT,
 	LLM_API_TOKEN,
 	LLM_MODEL,
+	SYSTEM_PROMPT,
 } from "../config.js";
+import {
+	formatFewShotExamples,
+	injectFewShotIntoConversation,
+} from "./few-shot.js";
 
 interface OnlineCallbacks {
 	onFirstToken?: () => void;
@@ -48,6 +54,15 @@ export async function askOnline(
 		content: `${userMessage.username}: ${userMessage.text}`,
 	});
 
+	let payloadMessages: Message[] = messages;
+	if (FEW_SHOT_ENABLED && FEW_SHOT_EXAMPLES.length > 0) {
+		const fewShotMessages = formatFewShotExamples(FEW_SHOT_EXAMPLES);
+		payloadMessages = injectFewShotIntoConversation(
+			messages,
+			fewShotMessages
+		) as Message[];
+	}
+
 	const response = await fetch(LLM_API_ENDPOINT, {
 		method: "POST",
 		headers: {
@@ -56,8 +71,10 @@ export async function askOnline(
 		},
 		body: JSON.stringify({
 			model: LLM_MODEL,
-			messages,
+			messages: payloadMessages,
 			stream: true,
+			frequency_penalty: 0.3,
+			presence_penalty: 0.3,
 		}),
 	});
 
