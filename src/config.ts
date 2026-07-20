@@ -164,6 +164,23 @@ export const FEW_SHOT_EXAMPLES: FewShotExample[] = v<FewShotExample[] | null>(
 	},
 ];
 
+// --- Sampling configuration ---
+// Mirostat 2 a donné de meilleurs résultats que le sampling top_k/top_p/min_p
+// classique lors des tests manuels (réponses plus naturelles, meilleures
+// relances de conversation). Reste configurable pour pouvoir revenir en
+// arrière ou A/B tester facilement.
+export const MIROSTAT_ENABLED: boolean =
+	v<boolean | null>("mirostat_enabled", null) ?? true;
+
+export const MIROSTAT_MODE: 1 | 2 =
+	(v<number | null>("mirostat_mode", null) as 1 | 2 | null) ?? 2;
+
+export const MIROSTAT_LR: number =
+	v<number | null>("mirostat_lr", null) ?? 0.1;
+
+export const MIROSTAT_ENT: number =
+	v<number | null>("mirostat_ent", null) ?? 5.0;
+
 export const ttsModelPath: string =
 	v<string | null>("tts_model_path", null) ??
 	process.env.TTS_MODEL_PATH ??

@@ -27,6 +27,17 @@ few_shot_examples:
 # Format: user (entrée utilisateur) et assistant (réponse attendue)
 # Ces exemples sont insérés dans la conversation pour améliorer la cohérence
 
+# --- Sampling ---
+# Mirostat 2 a donné de meilleurs résultats que le sampling top_k/top_p/min_p
+# classique en tests manuels : réponses plus naturelles, meilleures relances
+# de conversation. Désactive-le pour revenir au sampling classique (temperature
+# 0.8, top_k 60, top_p 0.9, min_p 0.05, en dur dans llm-client.ts).
+mirostat_enabled: true
+mirostat_mode: 2       # 1 ou 2 (2 recommandé, plus stable)
+mirostat_lr: 0.1       # taux d'apprentissage de l'ajustement d'entropie
+mirostat_ent: 5.0      # entropie cible -- plus haut = plus imprévisible/créatif,
+                       # plus bas = plus prévisible/cohérent. Teste entre 3.0 et 7.0.
+
 # --- Secrets & chemins ---
 discord_token: "ton_token_ici"
 llama_model_path: "./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf"

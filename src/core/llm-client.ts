@@ -6,6 +6,10 @@ import {
 	LLM_N_SLOTS,
 	FEW_SHOT_ENABLED,
 	FEW_SHOT_EXAMPLES,
+	MIROSTAT_ENABLED,
+	MIROSTAT_MODE,
+	MIROSTAT_LR,
+	MIROSTAT_ENT,
 } from "../config.js";
 import {
 	formatFewShotExamples,
@@ -48,15 +52,27 @@ async function askLlamaServer(
 		finalMessages = injectFewShotIntoConversation(messages, fewShotMessages);
 	}
 
+	// Sampling : Mirostat 2 (par défaut) OU top_k/top_p/min_p classique,
+	// jamais les deux en même temps (Mirostat prend le contrôle du sampling).
+	const samplingParams = MIROSTAT_ENABLED
+		? {
+				mirostat: MIROSTAT_MODE,
+				mirostat_lr: MIROSTAT_LR,
+				mirostat_ent: MIROSTAT_ENT,
+			}
+		: {
+				temperature: 0.8,
+				top_k: 60,
+				top_p: 0.9,
+				min_p: 0.05,
+			};
+
 	const body = JSON.stringify({
 		messages: finalMessages,
 		id_slot: slot,
 		cache_prompt: true,
-		temperature: 0.8,
-		top_k: 60,
-		top_p: 0.9,
-		min_p: 0.05,
 		max_tokens: 2000,
+		...samplingParams,
 	});
 
 	const resp = await fetch(`${BASE}/v1/chat/completions`, {
