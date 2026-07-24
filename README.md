@@ -7,7 +7,7 @@ Fully autonomous and sentient-like Discord bot. Runs a local LLM (llama.cpp) and
 > 
 > The project includes optimized models trained specifically for Discord conversations:
 > - **Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf** (Recommended) - Lightweight, fast, perfect for Discord bots
-> - Available on [HuggingFace](https://huggingface.co/fox3000foxy/Luna-Protocol-1.5B-Discord-Dialogues)
+> - Available on [HuggingFace](https://huggingface.co/fox3000foxy/Luna-Protocol-1.5B-Discord-Dialogues-50k-instruct)
 >
 > These models come with **few-shot priming support** to guide conversation style and improve consistency.
 
