@@ -1,9 +1,0 @@
-flowchart LR
-    A[Trigger reason] --> B{type ?}
-    B -- mention --> C["delay 300-1500ms<br/>ignore=0%<br/>react=8%"]
-    B -- dm --> D["delay 400-1800ms<br/>ignore=0%<br/>react=5%"]
-    B -- name --> E["delay 800-4000ms<br/>ignore=5%<br/>react=6%"]
-    B -- keyword --> F["delay 1000-3500ms<br/>ignore=8%<br/>react=4%"]
-    B -- follow-up --> G["delay 500-2000ms<br/>ignore=0%<br/>react=3%"]
-    B -- random --> H["delay 1500-5000ms<br/>ignore=15%<br/>react=2%"]
-    C & D & E & F & G & H --> I[computeDelay<br/>shouldIgnore<br/>shouldReact]

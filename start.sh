@@ -45,7 +45,5 @@ npx pm2 start taskset \
   --port 3125 \
   --no-slots
 
-npx pm2 start self-cli.cjs --interpreter node --name llm-client
-
 npx pm2 save
 npx pm2 status

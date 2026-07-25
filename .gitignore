@@ -2,8 +2,3 @@ models
 node_modules/
 .env
 config.yml
-prompt.txt
-*.tsbuildinfo
-state.json
-self-cli.cjs
-chrome-profile/

@@ -1,8 +1,0 @@
-[test]
-coverageSkipTestFiles = true
-coveragePathIgnorePatterns = [
-	"src/bot.ts",
-	"src/core/llm-core.ts",
-	"src/tts/audio.ts",
-	"src/tts/voice-message.ts",
-]
