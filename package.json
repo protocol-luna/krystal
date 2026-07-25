@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "./start.sh",
-    "download-model": "mkdir -p models && cd models && wget https://huggingface.co/mradermacher/Discord-Hermes-3-8B-GGUF/resolve/main/Discord-Hermes-3-8B.Q2_K.gguf && cd .."
+    "download-model": "mkdir -p models && cd models && echo 'Downloading Luna-Protocol-1.5B (recommended)...' && wget https://huggingface.co/fox3000foxy/Luna-Protocol-1.5B-Discord-Dialogues-50k-instruct/resolve/main/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf && cd .."
   },
   "dependencies": {
     "pm2": "^6.0.0"

@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 # Configuration
+: "${LLAMA_MODEL_PATH:=./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf}"
 : "${LLM_CPU_AFFINITY:=0,1}"
 : "${LLM_N_THREADS:=auto}"
 : "${LLM_N_CTX:=8192}"
@@ -35,7 +36,7 @@ npx pm2 start taskset \
   -- \
   -c "$LLM_CPU_AFFINITY" \
   ./bin/llama/llama-server \
-  -m ./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf \
+  -m "$LLAMA_MODEL_PATH" \
   -t "$LLM_N_THREADS" \
   -c "$LLM_N_CTX" \
   -np "$LLM_N_SLOTS" \

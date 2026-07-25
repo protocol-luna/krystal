@@ -1,11 +1,17 @@
 # Configuration du serveur LLM (krystal)
 # Utilisé par jade (le bot Discord) pour se connecter
 
+# Chemin vers le modèle GGUF
+llama_model_path: "./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf"
+# Modèles officiels disponibles:
+#  - Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf (recommandé - léger et rapide)
+#  - Discord-Micae-Hermes-3-3B.Q8_0.gguf (plus grand mais plus puissant)
+
 llm_host: "localhost"
 llm_port: 3125
 
 # Réglages llama-server (utilisés par start.sh via variables d'environnement)
 llm_cpu_affinity: "0,1"
-llm_n_threads: "auto"
+llm_n_threads: "auto"   # "auto" = détecté depuis llm_cpu_affinity, ou un nombre fixe
 llm_n_slots: 1
 llm_n_ctx: 8192
