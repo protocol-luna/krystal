@@ -1,6 +1,6 @@
 # krystal
 
-LLM inference server for the [jade](https://github.com/protocol-luna/jade) Discord bot.
+LLM inference server for the Luna Protocol ecosystem.
 
 Wraps [llama.cpp](https://github.com/ggerganov/llama.cpp) (`llama-server`) to serve GGUF models via an OpenAI-compatible HTTP API.
 
@@ -11,23 +11,28 @@ Wraps [llama.cpp](https://github.com/ggerganov/llama.cpp) (`llama-server`) to se
 
 ## Usage
 
+Start a **small** (fast) or **large** (deep) instance:
+
 ```bash
 npm install
-cp config.example.yml config.yml
-# edit config.yml with your model path
-./start.sh
+./start.sh small     # Luna 1.5B  on :3124 (GENERIC)
+./start.sh large     # Hermes-8B  on :3125 (SEMANTIC)
 ```
 
-The server listens on `http://127.0.0.1:3125` by default.
+Both can run simultaneously.
 
 ## Configuration
 
-See `config.example.yml` for all options. Environment variables override YAML keys:
+Environment variables (prefixed `KRYSTAL_*` or legacy `LLM_*`):
 
-- `LLM_CPU_AFFINITY` -- CPU core affinity (default: `0,1`)
-- `LLM_N_THREADS` -- thread count (default: auto-detect from affinity)
-- `LLM_N_CTX` -- context size (default: `8192`)
-- `LLM_N_SLOTS` -- slot count (default: `1`)
+| Variable | Small default | Large default | Description |
+|---|---|---|---|
+| `KRYSTAL_MODEL_PATH` | Luna-Protocol-1.5B...gguf | Discord-Hermes-3-3B.Q8_0.gguf | Path to GGUF model |
+| `KRYSTAL_PORT` | `3124` | `3125` | Server port |
+| `KRYSTAL_CPU_AFFINITY` | `0` | `0,1` | CPU core affinity |
+| `KRYSTAL_N_THREADS` | `auto` | `auto` | Thread count |
+| `KRYSTAL_N_CTX` | `8192` | `8192` | Context size |
+| `KRYSTAL_N_SLOTS` | `1` | `1` | Slot count |
 
 ## Model
 
@@ -39,5 +44,7 @@ npm run download-model
 
 ## Related
 
-- [jade](https://github.com/protocol-luna/jade) -- Discord bot client
+- [sapphire](https://github.com/protocol-luna/sapphire) -- LLM gateway (classification + routing)
+- [pixieglow](https://github.com/protocol-luna/pixieglow) -- Matrix bot
+- [jade](https://github.com/protocol-luna/jade) -- Discord bot
 - [protocol-luna](https://github.com/protocol-luna/.github) -- Documentation & state-machine diagrams

@@ -1,4 +1,4 @@
-models
 node_modules/
-.env
+models/
 config.yml
+*.gguf
