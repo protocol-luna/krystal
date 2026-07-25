@@ -6,8 +6,8 @@ Wraps [llama.cpp](https://github.com/ggerganov/llama.cpp) (`llama-server`) to se
 
 ## Stack
 
-- **llama-server** (C++) — model inference engine
-- **PM2** — process management & auto-restart
+- **llama-server** (C++) -- model inference engine
+- **PM2** -- process management & auto-restart
 
 ## Usage
 
@@ -24,10 +24,10 @@ The server listens on `http://127.0.0.1:3125` by default.
 
 See `config.example.yml` for all options. Environment variables override YAML keys:
 
-- `LLM_CPU_AFFINITY` — CPU core affinity (default: `0,1`)
-- `LLM_N_THREADS` — thread count (default: auto-detect from affinity)
-- `LLM_N_CTX` — context size (default: `8192`)
-- `LLM_N_SLOTS` — slot count (default: `1`)
+- `LLM_CPU_AFFINITY` -- CPU core affinity (default: `0,1`)
+- `LLM_N_THREADS` -- thread count (default: auto-detect from affinity)
+- `LLM_N_CTX` -- context size (default: `8192`)
+- `LLM_N_SLOTS` -- slot count (default: `1`)
 
 ## Model
 
@@ -39,5 +39,5 @@ npm run download-model
 
 ## Related
 
-- [jade](https://github.com/protocol-luna/jade) — Discord bot client
-- [protocol-luna](https://github.com/protocol-luna/.github) — Documentation & state-machine diagrams
+- [jade](https://github.com/protocol-luna/jade) -- Discord bot client
+- [protocol-luna](https://github.com/protocol-luna/.github) -- Documentation & state-machine diagrams
