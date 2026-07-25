@@ -40,3 +40,4 @@ npm run download-model
 ## Related
 
 - [jade](https://github.com/protocol-luna/jade) — Discord bot client
+- [protocol-luna](https://github.com/protocol-luna/.github) — Documentation & state-machine diagrams
