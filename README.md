@@ -1,50 +1,55 @@
-# krystal
+# Krystal
 
-LLM inference server for the Luna Protocol ecosystem.
+Krystal is the LLM inference server for the Luna Protocol ecosystem. It runs llama.cpp server to serve GGUF models.
 
-Wraps [llama.cpp](https://github.com/ggerganov/llama.cpp) (`llama-server`) to serve GGUF models via an OpenAI-compatible HTTP API.
+> **Architecture**: `Sapphire → Krystal (llama.cpp)`
 
-## Stack
+## Setup
 
-- **llama-server** (C++) -- model inference engine
-- **PM2** -- process management & auto-restart
-
-## Usage
-
-Start a **small** (fast) or **large** (deep) instance:
+Single-backend mode — both routes serve the same model on port 3124.
 
 ```bash
-npm install
-./start.sh small     # Luna 1.5B  on :3124 (GENERIC)
-./start.sh large     # Hermes-8B  on :3125 (SEMANTIC)
+# Start the server
+./start.sh
 ```
 
-Both can run simultaneously.
+Runs via PM2 with the Luna Protocol 1.5B model:
+
+```
+Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5-200k-instruct.Q4_K_M.gguf
+```
 
 ## Configuration
 
-Environment variables (prefixed `KRYSTAL_*` or legacy `LLM_*`):
+Key parameters in `start.sh`:
 
-| Variable | Small default | Large default | Description |
-|---|---|---|---|
-| `KRYSTAL_MODEL_PATH` | Luna-Protocol-1.5B...gguf | Discord-Hermes-3-3B.Q8_0.gguf | Path to GGUF model |
-| `KRYSTAL_PORT` | `3124` | `3125` | Server port |
-| `KRYSTAL_CPU_AFFINITY` | `0` | `0,1` | CPU core affinity |
-| `KRYSTAL_N_THREADS` | `auto` | `auto` | Thread count |
-| `KRYSTAL_N_CTX` | `8192` | `8192` | Context size |
-| `KRYSTAL_N_SLOTS` | `1` | `1` | Slot count |
+| Parameter | Value |
+|-----------|-------|
+| Port | 3124 |
+| Model | Luna 1.5B Q4_K_M (941 MB) |
+| Context | 4096 tokens |
+| GPU layers | 0 (CPU only) |
+| Threads | 6 |
 
-## Model
+## Requirements
 
-Download a GGUF model:
+- llama.cpp compiled server
+- GGUF model in `models/`
+- ~1 GB disk per model
+- ~3 GB RAM for 1.5B Q4_K_M
+
+## Running
 
 ```bash
-npm run download-model
+# Start
+pm2 start start.sh --interpreter bash --name krystal-small
+
+# View logs
+pm2 logs krystal-small
+
+# Stop
+pm2 stop krystal-small
+
+# Restart
+pm2 restart krystal-small
 ```
-
-## Related
-
-- [sapphire](https://github.com/protocol-luna/sapphire) -- LLM gateway (classification + routing)
-- [pixieglow](https://github.com/protocol-luna/pixieglow) -- Matrix bot
-- [jade](https://github.com/protocol-luna/jade) -- Discord bot
-- [protocol-luna](https://github.com/protocol-luna/.github) -- Documentation & state-machine diagrams
