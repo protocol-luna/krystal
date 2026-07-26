@@ -28,12 +28,12 @@ fi
 
 case "$MODE" in
   small)
-    : "${KRYSTAL_MODEL_PATH:=./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf}"
+    : "${KRYSTAL_MODEL_PATH:=./models/Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5-200k-instruct.Q4_K_M.gguf}"
     : "${KRYSTAL_PORT:=3124}"
     : "${KRYSTAL_CPU_AFFINITY:=0}"
     ;;
   large)
-    : "${KRYSTAL_MODEL_PATH:=./models/Discord-Hermes-3-3B.Q8_0.gguf}"
+    : "${KRYSTAL_MODEL_PATH:=./models/Discord-Hermes-3-8B.Q2_K.gguf}"
     : "${KRYSTAL_PORT:=3125}"
     : "${KRYSTAL_CPU_AFFINITY:=0,1}"
     ;;
