@@ -24,8 +24,8 @@
 Krystal runs **llama.cpp `llama-server`** to serve GGUF models via an OpenAI-compatible HTTP API. It is the inference backend for the Luna Protocol ecosystem — called by Sapphire (the LLM gateway).
 
 ```mermaid
-graph LR
-    Sapphire["Sapphire<br/>LLM Gateway"] -- "HTTP :3124" --> Krystal["Krystal<br/><strong>llama.cpp</strong>"]
+flowchart LR
+    Sapphire["Sapphire (LLM Gateway)"] -- ":3124" --> Krystal["Krystal (llama.cpp)"]
 ```
 
 ## Technical Overview
