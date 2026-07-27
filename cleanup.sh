@@ -13,4 +13,4 @@ npx pm2 delete llm-client 2>/dev/null || true
 npx pm2 save 2>/dev/null || true
 
 echo "[krystal] all stopped"
-npx pm2 status 2>/dev/null || echo "[krystal] (pm2 not found — nothing was running)"
+npx pm2 status 2>/dev/null || echo "[krystal] (pm2 not found -- nothing was running)"

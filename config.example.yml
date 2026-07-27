@@ -1,12 +1,12 @@
 # Configuration krystal
 # Utilisé par start.sh <mode> (small | large)
 
-# Mode small (GENERIC — Luna 1.5B, rapide)
+# Mode small (GENERIC -- Luna 1.5B, rapide)
 #   Port: 3124
 #   CPU: 0
 #   Modèle: Luna-Protocol-1.5B-Fine-Tuned-Qwen2.5.Q4_K_M.gguf
 
-# Mode large (SEMANTIC — Discord-Hermes-8B, profond)
+# Mode large (SEMANTIC -- Discord-Hermes-8B, profond)
 #   Port: 3125
 #   CPU: 0,1
 #   Modèle: Discord-Hermes-3-3B.Q8_0.gguf

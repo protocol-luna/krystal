@@ -6,7 +6,7 @@ Krystal is the LLM inference server for the Luna Protocol ecosystem. It runs lla
 
 ## Setup
 
-Single-backend mode — both routes serve the same model on port 3124.
+Single-backend mode -- both routes serve the same model on port 3124.
 
 ```bash
 # Start the server
