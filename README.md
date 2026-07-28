@@ -21,7 +21,7 @@
   </p>
 </p>
 
-Krystal runs **llama.cpp `llama-server`** to serve GGUF models via an OpenAI-compatible HTTP API. It is the inference backend for the Luna Protocol ecosystem — called by Sapphire (the LLM gateway).
+Krystal runs **llama.cpp `llama-server`** to serve GGUF models via an OpenAI-compatible HTTP API. It is the inference backend for the Luna Protocol ecosystem -- called by Sapphire (the LLM gateway).
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ flowchart LR
 
 ## Technical Overview
 
-Krystal is not a code project in the traditional sense — it's an **orchestration layer** for llama.cpp. The entire "codebase" is a shell script (`start.sh`) that launches `llama-server` with specific model and hardware parameters. The `bin/` directory contains a pre-compiled llama.cpp build (version 9682).
+Krystal is not a code project in the traditional sense -- it's an **orchestration layer** for llama.cpp. The entire "codebase" is a shell script (`start.sh`) that launches `llama-server` with specific model and hardware parameters. The `bin/` directory contains a pre-compiled llama.cpp build (version 9682).
 
 ### Architecture
 
@@ -103,12 +103,12 @@ Backward-compatible with two namespaces (`KRYSTAL_*` takes precedence over `LLM_
 Contains **62 files** from llama.cpp build 9682 (MIT License):
 
 **Key binaries:**
-- `llama-server` — HTTP inference server (used by Krystal)
-- `llama-cli` — Interactive CLI for testing
-- `llama-bench` / `llama-batched-bench` — Benchmarking tools
-- `llama-quantize` — GGUF quantizer
-- `llama-tokenize` — Tokenizer utility
-- `llama-perplexity` — Perplexity evaluation
+- `llama-server` -- HTTP inference server (used by Krystal)
+- `llama-cli` -- Interactive CLI for testing
+- `llama-bench` / `llama-batched-bench` -- Benchmarking tools
+- `llama-quantize` -- GGUF quantizer
+- `llama-tokenize` -- Tokenizer utility
+- `llama-perplexity` -- Perplexity evaluation
 
 **CPU-optimized shared libraries:**
 `libggml-cpu-*.so` variants for: `alderlake`, `cannonlake`, `cascadelake`, `cooperlake`, `haswell`, `icelake`, `ivybridge`, `piledriver`, `sandybridge`, `sapphirerapids`, `skylakex`, `sse42`, `x64`, `zen4`
